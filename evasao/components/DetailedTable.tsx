@@ -207,7 +207,7 @@ const DetailedTable: React.FC<DetailedTableProps> = ({
             Tabela Detalhada de Candidatos
           </h1>
           <p className="text-lg text-amber-400 font-medium">
-            Auditores e Técnicos Federais de Finanças e Controle &mdash; CGU
+            Auditores Federais de Finanças e Controle &mdash; CGU
           </p>
         </header>
 

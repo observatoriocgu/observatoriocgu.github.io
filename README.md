@@ -2,9 +2,9 @@
 
 Observatório das Evasões — CGU.
 
-Site estático que monitora a evasão dos aprovados no concurso CGU 2021 (FGV),
-cargos de Auditor Federal de Finanças e Controle (AFFC) e Técnico Federal de
-Finanças e Controle (TFFC), a partir da homologação em 14/06/2022.
+Site estático que monitora a evasão dos aprovados no concurso CGU 2021 (FGV)
+para o cargo de Auditor Federal de Finanças e Controle (AFFC), a partir da
+homologação em 14/06/2022.
 
 Fork do Observatório SEF-MG (Auditores Fiscais da Receita Estadual de Minas Gerais).
 

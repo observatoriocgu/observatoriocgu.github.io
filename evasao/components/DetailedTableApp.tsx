@@ -580,7 +580,7 @@ const DetailedTableApp: React.FC<DetailedTableAppProps> = () => {
 
                 <header className="text-center mb-3">
                     <span className="text-sm text-red-600 font-medium">
-                        Auditores e Técnicos Federais de Finanças e Controle &mdash; CGU
+                        Auditores Federais de Finanças e Controle &mdash; CGU
                     </span>
                 </header>
 

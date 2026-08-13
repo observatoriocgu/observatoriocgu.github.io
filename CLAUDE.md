@@ -1,8 +1,19 @@
 # Observatório CGU (fork do Observatório SEF-MG)
 Site estático (GitHub Pages) que monitora a evasão de aprovados em concurso.
 Versão original: Auditores Fiscais SEF-MG. Esta versão: concurso CGU 2021 (FGV),
-cargos AFFC (áreas: Auditoria e Fiscalização, TI, Contabilidade Pública e
-Finanças, Correição e Combate à Corrupção) e TFFC (nível médio).
+cargo AFFC — Auditor Federal de Finanças e Controle (áreas: Auditoria e
+Fiscalização, TI, Contabilidade Pública e Finanças, Correição e Combate à
+Corrupção).
+
+## Escopo de cargos (decisão D7 do PLANO.md)
+- APENAS AFFC. O cargo TFFC (Técnico Federal de Finanças e Controle, nível
+  médio) está FORA do observatório: não entra em dados, filtros, contagens
+  nem textos. Ao carregar a lista da FGV ou o Portal da Transparência,
+  filtrar só AFFC.
+- Como há um cargo só, NÃO existe coluna CARGO no dados.csv.
+- Terminologia nos textos da interface: "Auditor" / "Auditores". Nunca
+  "servidor" nem "Técnico". Subtítulo padrão das páginas:
+  "Auditores Federais de Finanças e Controle — CGU".
 
 ## Regras de adaptação
 - Matrícula: MASP (MG) vira SIAPE (federal)
