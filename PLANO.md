@@ -8,7 +8,7 @@ Regra do CLAUDE.md: **uma fase por vez**.
 - [x] `cd evasao && npm install` — `node_modules/` não existe no clone. Node 24.18 / npm 11.16 já instalados.
 - [x] Rodar `npm run build` **antes** de qualquer alteração, para registrar o baseline verde. (OK em 13/08/2026, vite 6.4.3, 60 módulos.)
 
-**Sobre o `dist/`:** `vite.config.ts` usa `base: '/evasao/dist/'` e a pasta `evasao/dist/` está commitada — é ela que o GitHub Pages serve. Toda fase que mexer em `evasao/` precisa terminar com rebuild **e commit do `dist/` regenerado**. Nunca editar `dist/` à mão.
+**Sobre o `dist/`:** ~~está commitada e é ela que o Pages serve~~ — **mudou na Fase 1.5**. Hoje `vite.config.ts` usa `base: '/evasao/'`, a pasta `evasao/dist/` é **artefato local ignorado pelo Git**, e quem publica é o workflow `.github/workflows/deploy-pages.yml`, que roda `npm run build` no CI a cada push na `main`. Toda fase que mexer em `evasao/` ainda deve terminar com `npm run build` verde — mas **não há mais `dist/` para commitar**. Nunca editar `dist/` à mão.
 
 ---
 
@@ -86,7 +86,7 @@ Todas as decisões abaixo estão **fechadas**. As fases podem ser executadas sem
 
 ---
 
-## [~] Fase 1.5 — Estrutura de URLs (aguardando 1 clique seu)
+## [x] Fase 1.5 — Estrutura de URLs ✅ concluída em 13/08/2026
 
 **Objetivo:** `https://observatoriocgu.github.io/evasao/` abre o painel direto, sem `/dist/` na URL.
 
@@ -132,21 +132,19 @@ o `/dist/` continua na URL. A C não move nenhum arquivo-fonte e elimina a class
 - [x] Placeholders SVG **não** foram criados: os logos existiam e as referências do build já
   resolviam. Os 404 eram do HTML cru servido em `/evasao/` e morreram com a correção estrutural.
 
-### Falta você fazer (1 clique) — o site só muda de endereço depois disto
+### Migração executada
 
-1. Commitar e dar push.
-2. No GitHub: **Settings → Pages → Build and deployment → Source**, trocar
-   *"Deploy from a branch"* por **"GitHub Actions"**.
-3. Aba **Actions** → workflow "Publicar site no GitHub Pages" → se o primeiro run falhou no passo
-   `deploy` (esperado, se rodou antes do passo 2), clicar em **Re-run all jobs**.
-4. Confirmado o site no ar em `/evasao/`, apagar `evasao/dist/` do versionamento e acrescentar
-   `evasao/dist/` ao `.gitignore` (hoje o `.gitignore` **preserva** a pasta de propósito).
+1. [x] Push com a nova configuração.
+2. [x] **Settings → Pages → Build and deployment → Source** trocado de *"Deploy from a branch"*
+   para **"GitHub Actions"**.
+3. [x] Workflow "Publicar site no GitHub Pages" rodou e o site subiu em `/evasao/`.
+4. [x] `evasao/dist/` removida do versionamento (17 arquivos) e acrescentada ao `.gitignore`.
+   O estado de transição — `dist/` commitada com o build antigo para não derrubar `/evasao/dist/`
+   durante a troca — **acabou aqui**.
 
-**Estado de transição (proposital):** `evasao/dist/` continua commitada e **com o build antigo**
-(`base: '/evasao/dist/'`), para o endereço atual seguir funcionando até o clique. Por isso o build de
-verificação desta fase foi feito numa pasta temporária, sem sobrescrever `dist/`. Enquanto o passo 2
-não acontecer: um push quebra nada, mas o run do deploy fica vermelho, o redirect da raiz aponta para
-uma `/evasao/` ainda quebrada, e uma alteração no `dados.csv` não se reflete no `/evasao/dist/` no ar.
+**Consequência para as próximas fases:** não existe mais "commitar o `dist/`". O ciclo passa a ser
+editar → `npm run build` (só para verificar que compila) → commit das fontes → push. O CI builda e
+publica sozinho.
 
 **Verificado:** build OK (`vite 6.4.3`, 60 módulos); `_site/` montado localmente igual ao workflow e
 **todas as referências conferidas uma a uma** — 8 caminhos absolutos, 15 relativos, 3 links entre

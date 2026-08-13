@@ -1,8 +1,9 @@
 # Dependências
 node_modules/
 
-# ATENÇÃO: evasao/dist/ é versionado de propósito — é a pasta que o GitHub
-# Pages serve (vite.config.ts usa base: '/evasao/dist/'). Não ignorar.
+# Resultado do build. Desde a Fase 1.5 o site é publicado pelo workflow
+# deploy-pages.yml, que builda no CI — a pasta não é mais versionada.
+evasao/dist/
 
 # Logs
 logs/
