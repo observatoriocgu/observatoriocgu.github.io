@@ -207,7 +207,7 @@ const DetailedTable: React.FC<DetailedTableProps> = ({
             Tabela Detalhada de Candidatos
           </h1>
           <p className="text-lg text-amber-400 font-medium">
-            Auditores Fiscais da Receita Estadual de Minas Gerais
+            Auditores e Técnicos Federais de Finanças e Controle &mdash; CGU
           </p>
         </header>
 
@@ -435,7 +435,7 @@ const DetailedTable: React.FC<DetailedTableProps> = ({
         </div>
 
         <footer className="text-center mt-8 text-gray-500 text-sm">
-          <p>&copy; {new Date().getFullYear()} Observatório das Evasões. Dados extraídos do Diário Oficial de Minas Gerais.</p>
+          <p>&copy; {new Date().getFullYear()} Observatório das Evasões. Dados extraídos do Diário Oficial da União (DOU).</p>
         </footer>
       </div>
     </div>

@@ -1322,14 +1322,14 @@ const App: React.FC = () => {
               <h1 className="text-4xl md:text-5xl font-extrabold drop-shadow-lg text-center md:text-left whitespace-normal break-words min-w-0 md:inline-block" style={{color: '#E21111'}}>OBSERVATÓRIO DAS EVASÕES</h1>
             </span>
           </div>
-          <p className="text-lg text-amber-400 font-medium text-center">Auditores Fiscais da Receita Estadual de Minas Gerais</p>
+          <p className="text-lg text-amber-400 font-medium text-center">Auditores e Técnicos Federais de Finanças e Controle &mdash; CGU</p>
         </header>
 
         <main>
           <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
             <CounterCard
               value={diasDesdeUltimaEvasao ?? 0}
-              label={`Dia${(diasDesdeUltimaEvasao ?? 0) > 1 ? 's' : ''} sem perder um Auditor Fiscal`}
+              label={`Dia${(diasDesdeUltimaEvasao ?? 0) > 1 ? 's' : ''} sem perder um servidor`}
               icon={<IconeCalendario />}
               footer={<div><div>Por data de publicação.</div><div>Última publicação de exoneração, afastamento ou aposentadoria: <b>{dataUltimaExoneracaoFormatada}</b></div> <div className="text-xs text-amber-400 mt-2">Nosso recorde é {diasRecorde} dias</div></div>}
               estaCarregando={estaCarregando || diasDesdeUltimaEvasao === null}
@@ -1343,7 +1343,7 @@ const App: React.FC = () => {
             />
             <CounterCard
               value={contagemInativos}
-              label="Auditores transferidos para inatividade"
+              label="Servidores transferidos para inatividade"
               icon={<IconeInativo />}
               footer={
                 <div className="space-y-2">
@@ -1351,7 +1351,7 @@ const App: React.FC = () => {
                   <div className="flex flex-wrap gap-3 justify-center">
                     <div className="text-xs text-gray-400">Aposentados: <span className="font-medium text-amber-400">{contagemAposentado}</span></div>
                     <div className="text-xs text-gray-400">Afastamento preliminar: <span className="font-medium text-amber-400">{contagemAfastamentoPreliminar}</span></div>
-                    <div className="text-xs text-gray-400">Cada Auditor é contado uma única vez. Caso o Auditor tenha primeiro se afastado e depois se aposentado, predomina o status de aposentado.</div>
+                    <div className="text-xs text-gray-400">Cada servidor é contado uma única vez. Caso o servidor tenha primeiro se afastado e depois se aposentado, predomina o status de aposentado.</div>
                   </div>
                 </div>
               }
@@ -1359,11 +1359,11 @@ const App: React.FC = () => {
             />
             <CounterCard
               value={contagemAuditoresEmExercicioAguardandoNomeacao}
-              label="Auditores em exercício aguardando nomeação em outros concursos"
+              label="Servidores em exercício aguardando nomeação em outros concursos"
               icon={<IconeAguardandoNomeacao />}
               footer={
                 <div className="text-xs text-gray-400">
-                  <span>Cada Auditor é contado uma única vez, ainda que tenha sido aprovado em múltiplos concursos.</span>
+                  <span>Cada servidor é contado uma única vez, ainda que tenha sido aprovado em múltiplos concursos.</span>
                 </div>
               }
               estaCarregando={estaCarregando}
@@ -1441,7 +1441,7 @@ const App: React.FC = () => {
                   ))}
                 </ul>
                 <div className="mt-3 text-sm">
-                  <a href="/evasao/dist/historico_alteracoes.html" className="text-amber-400 hover:text-amber-300">Ver histórico completo</a>
+                  <a href="./historico_alteracoes.html" className="text-amber-400 hover:text-amber-300">Ver histórico completo</a>
                 </div>
               </>
             )}
@@ -1450,8 +1450,8 @@ const App: React.FC = () => {
           <section className="bg-gray-900 rounded-xl p-6 shadow-2xl border border-gray-800">
             <h2 className="text-2xl font-bold text-red-300 mb-4">Destinos da Evasão</h2>
             <p className="text-gray-400 mb-6">
-              Esta tabela detalha os órgãos (destinos) para os quais os Auditores se transferiram após a exoneração ou que se mantiveram, desistindo de tomar posse na SEF/MG.
-              A SEF/MG perdeu <span className="font-bold text-orange-400">{contagemEvasoes + contagemInativos}</span> Auditores desde Janeiro/2024.
+              Esta tabela detalha os órgãos (destinos) para os quais os servidores se transferiram após a exoneração ou que se mantiveram, desistindo de tomar posse na CGU.
+              A CGU perdeu <span className="font-bold text-orange-400">{contagemEvasoes + contagemInativos}</span> servidores desde Janeiro/2024.
             </p>
             <EvasionTable 
               data={areaSelecionada === 'TODAS' ? dadosDestinoEvasao : dadosDestinoEvasaoFiltrado} 
@@ -1459,13 +1459,13 @@ const App: React.FC = () => {
             />
           </section>
 
-          {/* Nova seção: Auditores Aguardando Nomeação */}
+          {/* Nova seção: Servidores Aguardando Nomeação */}
           {dadosAprovadoOutrosConcursos.length > 0 && (
             <section className="bg-gray-900 rounded-xl p-6 shadow-2xl border border-gray-800 mt-8">
-              <h2 className="text-2xl font-bold text-amber-400 mb-4">Auditores Aguardando Nomeação</h2>
+              <h2 className="text-2xl font-bold text-amber-400 mb-4">Servidores Aguardando Nomeação</h2>
               <p className="text-gray-400 mb-6">
-                Esta tabela apresenta os Auditores Fiscais Em Exercício na SEF/MG que foram aprovados em outros concursos e estão aguardando suas nomeações. 
-                Um Auditor pode aparecer em mais de um órgão caso tenha sido aprovado em múltiplos concursos.
+                Esta tabela apresenta os servidores em exercício na CGU que foram aprovados em outros concursos e estão aguardando suas nomeações.
+                Um servidor pode aparecer em mais de um órgão caso tenha sido aprovado em múltiplos concursos.
               </p>
               <AprovadosOutrosConcursosTable 
                 data={dadosAprovadoOutrosCursosFiltrados}
@@ -1478,7 +1478,7 @@ const App: React.FC = () => {
         {/* Links para páginas auxiliares */}
         <div className="mt-8 mb-6 flex flex-col sm:flex-row items-center justify-center gap-3 text-center">
           <a
-            href="/evasao/dist/dados_detalhados.html"
+            href="./dados_detalhados.html"
             className="inline-flex items-center px-6 py-3 text-base font-medium text-white bg-red-600 border border-transparent rounded-lg shadow-sm hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-colors duration-200"
           >
             Ver Dados Detalhados →
@@ -1487,21 +1487,21 @@ const App: React.FC = () => {
 
         <div className="mt-8 text-sm text-gray-400 space-y-2">
           <p>
-            Esta análise considera os Auditores aprovados no último concurso público (Edital 1/2022) e exonerações, afastamento e aposentadorias de Auditores veteranos a partir de Janeiro de 2024.
+            Esta análise considera os candidatos aprovados no concurso CGU 2021 (FGV), homologado em 14/06/2022, e exonerações, afastamentos e aposentadorias de servidores veteranos a partir de Janeiro de 2024.
           </p>
 
           <p>
             São contabilizadas tanto exonerações quanto desistências como eventos de evasão.
           </p>
           <p>
-            A quantidade de dias sem perder um Auditor Fiscal, assim como o respectivo recorde, considera a data de publicação das exonerações, afastamentos e aposentadorias.
+            A quantidade de dias sem perder um servidor, assim como o respectivo recorde, considera a data de publicação no Diário Oficial da União (DOU) das exonerações, afastamentos e aposentadorias.
           </p>
         </div>
 
         <CollaborationForm />
 
         <footer className="text-center mt-6 text-gray-500 text-sm">
-          <p>&copy; {new Date().getFullYear()} Observatório das Evasões. Dados extraídos do Diário Oficial de Minas Gerais e outras fontes públicas.</p>
+          <p>&copy; {new Date().getFullYear()} Observatório das Evasões. Dados extraídos do Diário Oficial da União (DOU) e outras fontes públicas.</p>
         </footer>
       </div>
     </div>

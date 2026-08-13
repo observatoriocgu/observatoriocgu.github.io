@@ -571,7 +571,7 @@ const DetailedTableApp: React.FC<DetailedTableAppProps> = () => {
                 {/* Link para voltar */}
                 <div className="mb-2">
                     <a
-                        href="/evasao/dist/index.html"
+                        href="./index.html"
                         className="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-100 hover:text-gray-900 transition-colors duration-200 shadow-sm"
                     >
                         ← Voltar ao Dashboard
@@ -580,7 +580,7 @@ const DetailedTableApp: React.FC<DetailedTableAppProps> = () => {
 
                 <header className="text-center mb-3">
                     <span className="text-sm text-red-600 font-medium">
-                        Auditores Fiscais da Receita Estadual de Minas Gerais
+                        Auditores e Técnicos Federais de Finanças e Controle &mdash; CGU
                     </span>
                 </header>
 
@@ -826,7 +826,7 @@ const DetailedTableApp: React.FC<DetailedTableAppProps> = () => {
                 </div>
 
                 <footer className="text-center mt-8 text-gray-500 text-sm">
-                    <p>&copy; {new Date().getFullYear()} Observatório das Evasões. Dados extraídos do Diário Oficial de Minas Gerais e outras fontes públicas.</p>
+                    <p>&copy; {new Date().getFullYear()} Observatório das Evasões. Dados extraídos do Diário Oficial da União (DOU) e outras fontes públicas.</p>
                 </footer>
             </div>
         </div>

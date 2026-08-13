@@ -41,11 +41,11 @@ const AnnouncementModal: React.FC = () => {
 
         <div className="space-y-4 text-gray-300">
           <p>
-            O Observatório das Evasões agora rastreia também os Auditores Fiscais da SEF/MG aprovados em outros concursos que estão <span className="font-semibold text-amber-400">aguardando nomeação</span>.
+            O Observatório das Evasões agora rastreia também os servidores da CGU aprovados em outros concursos que estão <span className="font-semibold text-amber-400">aguardando nomeação</span>.
           </p>
 
           <p>
-            Se você tem informações sobre auditores que já foram aprovados em outros concursos, <span className="font-semibold text-amber-400">entre em contato conosco</span>! Suas informações são importantes para manter este observatório atualizado.
+            Se você tem informações sobre servidores que já foram aprovados em outros concursos, <span className="font-semibold text-amber-400">entre em contato conosco</span>! Suas informações são importantes para manter este observatório atualizado.
           </p>
 
           <div className="bg-gray-800 rounded p-3 border-l-4 border-amber-500">

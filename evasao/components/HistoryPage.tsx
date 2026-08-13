@@ -395,7 +395,7 @@ const HistoryPage: React.FC = () => {
           </div>
           <div className="flex flex-wrap gap-3 justify-center sm:justify-end">
             <a
-              href="/evasao/dist/"
+              href="./index.html"
               className="inline-flex items-center px-5 py-3 rounded-lg bg-gray-800 border border-gray-700 text-sm font-semibold text-white hover:bg-gray-700 transition-colors"
             >
               Voltar ao dashboard

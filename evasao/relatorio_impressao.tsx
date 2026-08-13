@@ -171,17 +171,17 @@ const RelatorioImpressao: React.FC = () => {
 
   const configuracoes = {
     exonerados: {
-      titulo: 'Auditores exonerados',
+      titulo: 'Servidores exonerados',
       dataPrincipal: 'Data de exoneração',
       publicacao: 'Publicação da exoneração',
     },
     desistentes: {
-      titulo: 'Auditores desistentes',
+      titulo: 'Servidores desistentes',
       dataPrincipal: 'Data de nomeação',
       publicacao: 'Nomeação sem efeito',
     },
     nomeados: {
-      titulo: 'Auditores nomeados recentemente em outros concursos',
+      titulo: 'Servidores nomeados recentemente em outros concursos',
       dataPrincipal: 'Data da última nomeação',
       publicacao: null,
     },
@@ -196,7 +196,7 @@ const RelatorioImpressao: React.FC = () => {
         <header className="mb-6 border-b-2 border-slate-800 pb-4">
           <p className="text-sm font-semibold uppercase tracking-wide text-red-700">Observatório das Evasões</p>
           <h1 className="text-3xl font-bold mt-1">{configuracao.titulo}</h1>
-          <p className="text-sm text-slate-600 mt-1">Auditores Fiscais da Receita Estadual de Minas Gerais</p>
+          <p className="text-sm text-slate-600 mt-1">Auditores e Técnicos Federais de Finanças e Controle &mdash; CGU</p>
         </header>
 
         <div className="print-hidden mb-6 flex flex-col md:flex-row gap-3 md:items-center md:justify-between">

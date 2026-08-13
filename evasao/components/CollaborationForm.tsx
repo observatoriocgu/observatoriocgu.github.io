@@ -11,23 +11,23 @@ const CollaborationForm: React.FC = () => {
           Colabore com Informações
         </h3>
         <p className="text-gray-300 text-sm">
-          Tem dados ou informações sobre evasão na SEF? Compartilhe conosco!
+          Tem dados ou informações sobre evasão na CGU? Compartilhe conosco!
         </p>
         {/* Não exibir mensagens sobre anonimato; apenas não pedir nome */}
       </div>
 
       {/*
         Envio estático via FormSubmit (funciona no GitHub Pages)
-        Primeira submissão pedirá verificação do email observatoriosefmg@gmail.com.
+        Primeira submissão pedirá verificação do email observatoriocgu@gmail.com.
       */}
       <form
-        action="https://formsubmit.co/observatoriosefmg@gmail.com"
+        action="https://formsubmit.co/observatoriocgu@gmail.com"
         method="POST"
         className="space-y-4"
       >
         {/* Configurações do FormSubmit */}
         <input type="hidden" name="_captcha" value="false" />
-        <input type="hidden" name="_subject" value="[Observatório SEF] Nova colaboração" />
+        <input type="hidden" name="_subject" value="[Observatório CGU] Nova colaboração" />
         {/* Campo honeypot anti-bot */}
         <input type="text" name="_honey" className="hidden" tabIndex={-1} autoComplete="off" />
 

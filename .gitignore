@@ -1,0 +1,42 @@
+# Dependências
+node_modules/
+
+# ATENÇÃO: evasao/dist/ é versionado de propósito — é a pasta que o GitHub
+# Pages serve (vite.config.ts usa base: '/evasao/dist/'). Não ignorar.
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Variáveis de ambiente
+.env
+.env.*
+!.env.example
+
+# Python (evasao/scripts/, evasao/data/processador.ipynb)
+__pycache__/
+*.py[cod]
+.ipynb_checkpoints/
+.venv/
+venv/
+
+# Sistema operacional
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editores
+.vscode/*
+!.vscode/extensions.json
+.idea/
+*.swp
+*.sw?
+
+# Ferramentas locais / artefatos de apoio
+repomix-output.xml
+.claude/settings.local.json
+*.local
