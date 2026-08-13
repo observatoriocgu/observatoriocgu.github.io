@@ -86,6 +86,74 @@ Todas as decisões abaixo estão **fechadas**. As fases podem ser executadas sem
 
 ---
 
+## [~] Fase 1.5 — Estrutura de URLs (aguardando 1 clique seu)
+
+**Objetivo:** `https://observatoriocgu.github.io/evasao/` abre o painel direto, sem `/dist/` na URL.
+
+**O bug:** o Pages servia a branch crua, então `/evasao/` entregava o `evasao/index.html` de
+desenvolvimento do Vite — cujo `<script src="/index.tsx">` o navegador não executa. A página ficava
+**em branco**, com 3 favicons 404. A entrada real sempre foi `/evasao/dist/`, e daí vinham os links
+absolutos `/evasao/dist/*.html` espalhados pelo código. Comportamento herdado do site original de MG.
+
+**Opção escolhida: C — o GitHub Actions builda e publica.** As alternativas avaliadas foram
+(A) mudar o `outDir` para `evasao/`, que exigiria mover as fontes para `evasao/src/`, e
+(B) um redirect, que **não resolve** — `meta refresh` leva a barra de endereços para `/evasao/dist/`,
+o `/dist/` continua na URL. A C não move nenhum arquivo-fonte e elimina a classe de bug
+"esqueci de rodar o build, site desatualizado".
+
+### Feito
+
+- [x] `evasao/vite.config.ts` — `base: '/evasao/dist/'` → **`'/evasao/'`**.
+- [x] `.github/workflows/deploy-pages.yml` (novo) — `npm ci` → `npm run build` → monta `_site/` → publica.
+  - `_site/index.html` = redirect da raiz · `_site/evasao/` = `dist/` · `_site/.nojekyll`
+  - **`_site/evasao/data/*.csv`** — cópia explícita: os CSVs são lidos em runtime por
+    `/evasao/data/dados.csv` e **não passam pelo build** (não estão em `public/`). Sem esse passo o
+    painel carrega vazio.
+  - **`_site/ranking/`** — copiado para não sumir do ar por efeito colateral. A Fase 5 (**D6**) o remove.
+- [x] `index.html` na raiz do repo — redirect para `/evasao/` (`meta refresh` + `location.replace` + link
+  visível), para o domínio raiz não cair no README.
+- [x] `.github/workflows/update-alteracoes.yml` — parou de commitar `evasao/dist/alteracoes*.json`
+  (virou artefato de build); segue commitando os de `evasao/public/`.
+  - **Pegadinha resolvida:** push feito com `GITHUB_TOKEN` **não dispara outros workflows**. Sem
+    tratamento, uma atualização do `dados.csv` nunca chegaria ao ar. Por isso o `deploy-pages.yml`
+    tem também o gatilho `workflow_run` apontando para o workflow de histórico.
+- [x] Links internos entre as 4 páginas — já relativos desde a Fase 1 (`./index.html`,
+  `./dados_detalhados.html`, `./historico_alteracoes.html`), continuam corretos na nova estrutura.
+- [x] Logos renomeados para CGU, **arte preservada** (**D3** mantida):
+  - `observatorio-logo.png` → `observatorio-cgu-logo.png`
+  - `observatorio-logo-mini.png` → `observatorio-cgu-logo-mini.png`
+  - `observatorio-logo-mini-2.ico` → `observatorio-cgu-favicon.ico`
+  - `observatorio-logo-mini.ico` → `observatorio-cgu-favicon-alt.ico` (não é referenciado por ninguém)
+  - Fonte única agora é `evasao/public/assets/images/`. As duas cópias soltas em `evasao/` eram
+    **byte a byte idênticas** (md5 conferido) e foram removidas; `evasao/index.html` passou a usar
+    `/assets/images/...` como as outras páginas.
+  - `ranking/{index,composicao,composicao.template}.html` — 6 referências de favicon repontadas para
+    `../evasao/assets/images/`, que é onde os arquivos ficam no site publicado.
+- [x] Placeholders SVG **não** foram criados: os logos existiam e as referências do build já
+  resolviam. Os 404 eram do HTML cru servido em `/evasao/` e morreram com a correção estrutural.
+
+### Falta você fazer (1 clique) — o site só muda de endereço depois disto
+
+1. Commitar e dar push.
+2. No GitHub: **Settings → Pages → Build and deployment → Source**, trocar
+   *"Deploy from a branch"* por **"GitHub Actions"**.
+3. Aba **Actions** → workflow "Publicar site no GitHub Pages" → se o primeiro run falhou no passo
+   `deploy` (esperado, se rodou antes do passo 2), clicar em **Re-run all jobs**.
+4. Confirmado o site no ar em `/evasao/`, apagar `evasao/dist/` do versionamento e acrescentar
+   `evasao/dist/` ao `.gitignore` (hoje o `.gitignore` **preserva** a pasta de propósito).
+
+**Estado de transição (proposital):** `evasao/dist/` continua commitada e **com o build antigo**
+(`base: '/evasao/dist/'`), para o endereço atual seguir funcionando até o clique. Por isso o build de
+verificação desta fase foi feito numa pasta temporária, sem sobrescrever `dist/`. Enquanto o passo 2
+não acontecer: um push quebra nada, mas o run do deploy fica vermelho, o redirect da raiz aponta para
+uma `/evasao/` ainda quebrada, e uma alteração no `dados.csv` não se reflete no `/evasao/dist/` no ar.
+
+**Verificado:** build OK (`vite 6.4.3`, 60 módulos); `_site/` montado localmente igual ao workflow e
+**todas as referências conferidas uma a uma** — 8 caminhos absolutos, 15 relativos, 3 links entre
+páginas (dentro do bundle) e 5 caminhos de dados em runtime. Nenhum 404.
+
+---
+
 ## [ ] Fase 2 — Novo esquema de dados
 
 **Objetivo:** definir o contrato de dados CGU e um `dados.csv` de EXEMPLO para validar a UI. A UI ainda **não** é adaptada (isso é Fase 3) — esta fase pode deixar o dashboard com números zerados/errados, desde que o build passe.
@@ -181,9 +249,10 @@ Opções (**D6**):
 - [ ] `evasao/metadata.json` — `name` e `description`.
 - [ ] `evasao/package.json:2` — `"name": "evasão-auditores-fiscais-mg"` → `observatorio-cgu`.
 - [ ] `evasao/vite.config.ts:29-31` — remove o `define` de `process.env.API_KEY` / `GEMINI_API_KEY`: **não há nenhum uso de Gemini no código**, é resto do scaffold.
-- [ ] `.github/workflows/update-alteracoes.yml` — nome do workflow e mensagem de commit em português já servem; revisar caminhos se a Fase 4 mudar a estrutura.
+- [ ] `.github/workflows/update-alteracoes.yml` — nome do workflow e mensagem de commit em português já servem; revisar caminhos se a Fase 4 mudar a estrutura. (Os caminhos de `dist/` já saíram na Fase 1.5.)
+- [ ] `evasao/scripts/generate-alteracoes.js:8` — ainda escreve em `['public', 'dist']`. Depois que a Fase 1.5 for concluída, `dist/` é artefato de build e a escrita lá vira inútil; deixar só `public`.
 - [ ] Remover `evasao/table.html` e `evasao/table.tsx` — **não estão no build** (`vite.config.ts` declara só 4 entradas), é código morto. `table.html:24,30` ainda carrega o GA `G-NZ84J0PJBF` e `:41` o `/index.css` inexistente — a remoção do arquivo resolve os dois.
-- [ ] Reavaliar `base: '/evasao/dist/'` — publicar de `dist/` commitado é frágil. Alternativa: workflow do Actions que builda e publica no Pages, tirando `dist/` do versionamento.
+- [x] ~~Reavaliar `base: '/evasao/dist/'`~~ — **resolvido na Fase 1.5**: workflow do Actions builda e publica no Pages. Só falta tirar `dist/` do versionamento, no passo 4 daquela fase.
 - [ ] Varredura final: `grep -ri "sef\|minas\|masp\|doe-mg" --exclude-dir=.git --exclude-dir=node_modules .` deve voltar vazio (fora de arquivos de legado explicitamente arquivados).
 
 **Concluída quando:** `npm run build` OK e a varredura final está limpa.

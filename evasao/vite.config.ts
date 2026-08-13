@@ -29,6 +29,9 @@ export default defineConfig(({ mode }) => {
           '@': path.resolve(__dirname, '.'),
         }
       },
-      base: '/evasao/dist/'
+      // O site publicado fica em https://observatoriocgu.github.io/evasao/.
+      // Quem monta essa estrutura é o workflow .github/workflows/deploy-pages.yml,
+      // que copia o resultado do build (dist/) para _site/evasao/.
+      base: '/evasao/'
     };
 });

@@ -1315,7 +1315,7 @@ const App: React.FC = () => {
           <div className="text-center mb-4">
             <span className="inline-flex flex-col md:flex-row items-center gap-2 md:gap-3">
               <img 
-                src="assets/images/observatorio-logo-mini.png" 
+                src="assets/images/observatorio-cgu-logo-mini.png"
                 alt="Logo do Observatório" 
                 className="w-20 h-20 md:w-24 md:h-24 flex-shrink-0"
               />

@@ -1,0 +1,103 @@
+name: Publicar site no GitHub Pages
+
+# Este workflow substitui a publicação "servir a branch main".
+# Ele builda o projeto Vite e entrega o resultado pronto para o GitHub Pages.
+#
+# PRÉ-REQUISITO (uma vez só): em Settings -> Pages -> Build and deployment,
+# trocar "Source" de "Deploy from a branch" para "GitHub Actions".
+# Enquanto isso não for feito, o passo "deploy" falha e o site continua
+# sendo servido a partir da branch (evasao/dist/).
+
+on:
+  push:
+    branches:
+      - main
+  # O push feito pelo workflow de histórico usa o GITHUB_TOKEN e, por regra do
+  # GitHub, não dispara outros workflows. Sem este gatilho, uma atualização do
+  # dados.csv nunca chegaria ao site publicado.
+  workflow_run:
+    workflows: ["Atualizar histórico de alterações do dados.csv"]
+    types:
+      - completed
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Uma publicação por vez; não cancela a que já está em andamento.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: evasao/package-lock.json
+
+      - name: Instalar dependências
+        run: npm ci
+        working-directory: evasao
+
+      - name: Build
+        run: npm run build
+        working-directory: evasao
+
+      - name: Montar o site
+        run: |
+          set -euo pipefail
+          mkdir -p _site
+
+          # Impede o Jekyll de reprocessar o que já está pronto.
+          touch _site/.nojekyll
+
+          # Página raiz: redireciona observatoriocgu.github.io -> /evasao/
+          cp index.html _site/index.html
+
+          # O painel em si.
+          mkdir -p _site/evasao
+          cp -r evasao/dist/. _site/evasao/
+
+          # Os CSVs são lidos em tempo de execução por /evasao/data/*.csv e não
+          # passam pelo build (não estão em public/). Precisam ser copiados.
+          mkdir -p _site/evasao/data
+          cp evasao/data/*.csv _site/evasao/data/
+
+          # Conteúdo herdado do projeto original. A Fase 5 do PLANO.md decide
+          # removê-lo; até lá, é copiado para não sumir do ar sem aviso.
+          if [ -d ranking ]; then
+            mkdir -p _site/ranking
+            cp -r ranking/. _site/ranking/
+          fi
+
+          echo "--- conteúdo publicado ---"
+          find _site -maxdepth 2 -mindepth 1 | sort
+
+      - name: Configurar Pages
+        uses: actions/configure-pages@v5
+
+      - name: Subir artefato
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Publicar no GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

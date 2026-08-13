@@ -40,11 +40,11 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
+          # Só o público-fonte é versionado: evasao/dist/ passou a ser artefato
+          # de build, regenerado pelo workflow deploy-pages.yml a cada publicação.
           git add \
             evasao/public/alteracoes.json \
-            evasao/public/alteracoes-registros.json \
-            evasao/dist/alteracoes.json \
-            evasao/dist/alteracoes-registros.json
+            evasao/public/alteracoes-registros.json
           if ! git diff --cached --quiet; then
             git commit -m "Atualiza histórico de alterações do dados.csv"
             git push
