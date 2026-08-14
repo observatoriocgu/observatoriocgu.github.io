@@ -32,6 +32,14 @@ Três armadilhas do texto, todas encontradas na marra:
      hífen). Casar `[A-Z ]+` perderia gente.
   3. O sub-bloco começa pela UF DA VAGA ("AC - REGIAO NORTE - ACRE"), que não é
      onde a pessoa foi lotada depois — é a vaga a que concorreu.
+
+O ATO NÃO É A LISTA INTEIRA. O Edital CGU nº 5 é a foto de 13/06/2022; desde
+então a CGU publicou dezenas de atos incluindo candidatos SUB JUDICE no
+resultado final, e são justamente esses que a CGU nomeou nas levas de 2024 e
+2025. Eles não estão no DOU do Edital nº 5 e não têm como estar. Por isso este
+script mescla `data/concurso_2021_subjudice.csv`, escrito à mão a partir dos
+atos publicados pela FGV em conhecimento.fgv.br/concursos/concursocgu21 — ver
+ARQ_SUBJUDICE abaixo.
 """
 
 from __future__ import annotations
@@ -47,6 +55,11 @@ import dou
 RAIZ = Path(__file__).resolve().parent.parent
 
 ATO_CGU_2021 = "edital-cgu-n-5-de-13-de-junho-de-2022-407806622"
+
+# Curadoria humana: os aprovados incluídos por decisão judicial depois do edital
+# de homologação. Fonte por linha em FONTE_URL. Editável à mão — é uma entrada,
+# não uma saída.
+ARQ_SUBJUDICE = "concurso_2021_subjudice.csv"
 
 CABECALHOS = (
     "INSCRICAO",
@@ -143,6 +156,38 @@ def extrair(texto_normalizado: str) -> tuple[list[dict], dict]:
     return registros, relatorio
 
 
+def mesclar_subjudice(registros: list[dict], caminho: Path) -> dict:
+    """
+    Acrescenta os aprovados sub judice curados à mão, se o arquivo existir.
+
+    O ato do DOU vence: nome já presente no Edital nº 5 não é sobrescrito. Isso
+    é de propósito — o sub judice que depois entrou na lista oficial já vem do
+    DOU com nota e classificação, e a curadoria só existe para quem o DOU não
+    tem. Casa por nome normalizado porque a maioria dos atos da FGV não traz
+    inscrição confiável (o PDF embaralha as colunas), e nome aqui não é chave de
+    identidade: é só o que decide se a linha é nova.
+    """
+    relatorio = {"lidos": 0, "acrescentados": 0, "ja_no_dou": []}
+    if not caminho.exists():
+        return relatorio
+
+    ja_tem = {dou.normalizar(r["NOME"]) for r in registros}
+    with open(caminho, encoding="utf-8", newline="") as fh:
+        for linha in csv.DictReader(fh, delimiter=";"):
+            nome = (linha.get("NOME") or "").strip()
+            if not nome:
+                continue
+            relatorio["lidos"] += 1
+            if dou.normalizar(nome) in ja_tem:
+                relatorio["ja_no_dou"].append(nome)
+                continue
+            registros.append({coluna: (linha.get(coluna) or "").strip() for coluna in CABECALHOS})
+            ja_tem.add(dou.normalizar(nome))
+            relatorio["acrescentados"] += 1
+
+    return relatorio
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(
         description="Extrai o resultado final de um concurso da CGU publicado no DOU."
@@ -165,12 +210,18 @@ def main() -> int:
         print("Nenhum registro AFFC extraído — o formato do ato pode ter mudado.", file=sys.stderr)
         return 1
 
+    do_dou = len(registros)
+    sub = mesclar_subjudice(registros, RAIZ / "data" / ARQ_SUBJUDICE)
+
     print()
     print(f"Seções            : {', '.join(relatorio['secoes'])}")
     print(f"Blocos AFFC       : {relatorio['blocos_affc']}")
     print(f"Blocos TFFC       : {relatorio['blocos_tffc']} "
           f"({relatorio['descartados_tffc']} registros descartados — D7)")
-    print(f"Aprovados AFFC    : {len(registros)}")
+    print(f"Aprovados AFFC    : {do_dou} do DOU + {sub['acrescentados']} sub judice "
+          f"= {len(registros)}")
+    if sub["ja_no_dou"]:
+        print(f"  já no Edital nº 5, curadoria ignorada: {', '.join(sub['ja_no_dou'])}")
 
     print()
     print("Por área:")
@@ -182,7 +233,9 @@ def main() -> int:
         total = sum(1 for r in registros if r["MODALIDADE"] == modalidade)
         print(f"   {total:4d}  {modalidade}")
 
-    inscricoes = [r["INSCRICAO"] for r in registros]
+    # Só as preenchidas: as linhas da curadoria sub judice ficam sem inscrição
+    # de propósito, e um conjunto de vazios se contaria como repetição.
+    inscricoes = [r["INSCRICAO"] for r in registros if r["INSCRICAO"]]
     if len(set(inscricoes)) != len(inscricoes):
         print(f"\n! {len(inscricoes) - len(set(inscricoes))} inscrição(ões) repetida(s) — "
               f"esperado: quem concorre por cota aparece na ampla e na cota.")
