@@ -11,6 +11,7 @@
 
 import {
   AREA_DESCONHECIDA,
+  AREA_VETERANO,
   ID_CONCURSO_2021,
   ID_CONCURSO_VETERANO,
   MOTIVO_APOSENTADORIA,
@@ -54,8 +55,17 @@ export const emExercicio = (registros: RegistroAuditor[]): RegistroAuditor[] =>
 export const motivoDe = (registro: RegistroAuditor): string =>
   registro.MOTIVO_SAIDA || MOTIVO_SEM_ATO;
 
-/** Área já pronta para exibir: vazia vira o rótulo de desconhecida. */
-export const areaDe = (registro: RegistroAuditor): string => registro.AREA || AREA_DESCONHECIDA;
+/**
+ * Área já pronta para exibir.
+ *
+ * Vazia não é um caso só: no veterano é "não se aplica", porque a especialidade
+ * só existe no edital do concurso de 2021 e ele não o fez; em quem é da coorte
+ * de 2021 é lacuna — o nome não casou com documento nenhum do concurso.
+ */
+export const areaDe = (registro: RegistroAuditor): string => {
+  if (registro.AREA) return registro.AREA;
+  return registro.CONCURSO === ID_CONCURSO_VETERANO ? AREA_VETERANO : AREA_DESCONHECIDA;
+};
 
 /**
  * Link para o ato que explica a saída.

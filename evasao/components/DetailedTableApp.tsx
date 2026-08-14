@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 
 import {
-  AREA_DESCONHECIDA,
+  AREAS_SEM_ESPECIALIDADE,
   ID_CONCURSO_2021,
   ID_CONCURSO_VETERANO,
   MOTIVOS_SAIDA,
@@ -84,10 +84,12 @@ const DetailedTableApp: React.FC = () => {
   // no filtro sozinha, e uma que sumiu não fica de opção morta.
   const areas = useMemo(() => {
     const encontradas = new Set(registros.map(areaDe));
-    const comArea = Array.from(encontradas)
-      .filter((valor) => valor !== AREA_DESCONHECIDA)
+    const especialidades = Array.from(encontradas)
+      .filter((valor) => !AREAS_SEM_ESPECIALIDADE.includes(valor))
       .sort((a, b) => a.localeCompare(b, 'pt-BR'));
-    return encontradas.has(AREA_DESCONHECIDA) ? [...comArea, AREA_DESCONHECIDA] : comArea;
+    // "Veterano" e "Sem área identificada" no fim: não são especialidade, e
+    // misturá-las na ordem alfabética as faria parecer uma.
+    return [...especialidades, ...AREAS_SEM_ESPECIALIDADE.filter((valor) => encontradas.has(valor))];
   }, [registros]);
 
   const unidades = useMemo(

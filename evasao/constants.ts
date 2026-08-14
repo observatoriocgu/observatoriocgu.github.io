@@ -89,8 +89,25 @@ export const areasDoConcurso = (idConcurso?: string): readonly string[] => {
   return Array.from(new Set(CONCURSOS.flatMap((concurso) => concurso.areas)));
 };
 
-/** Rótulo do filtro para quem não tem área: veteranos e quem não casou com o edital. */
+/**
+ * Os dois rótulos de quem não tem especialidade — e eles não querem dizer a
+ * mesma coisa.
+ *
+ * `AREA_VETERANO` é "não se aplica": quem já estava na CGU em jun/2022 não fez o
+ * concurso de 2021, e a especialidade só existe no edital dele. Não há dado a
+ * buscar, e não haverá.
+ *
+ * `AREA_DESCONHECIDA` é lacuna de verdade: é gente da coorte de 2021 cujo nome
+ * não casou com nenhum documento do concurso. Aí ainda há o que procurar.
+ *
+ * Juntar os dois num rótulo só faria 104 saídas de veterano parecerem buraco de
+ * dado, e daria a 4 Auditores do concurso um rótulo que não é o deles.
+ */
+export const AREA_VETERANO = 'Veterano';
 export const AREA_DESCONHECIDA = 'Sem área identificada';
+
+/** As duas que não são especialidade. Nascem desmarcadas no filtro. */
+export const AREAS_SEM_ESPECIALIDADE: readonly string[] = [AREA_VETERANO, AREA_DESCONHECIDA];
 
 /**
  * Vocabulário da coluna `SITUACAO`.

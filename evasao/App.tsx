@@ -15,7 +15,8 @@ import FiltroMultiplo, { OpcaoFiltro } from './components/FiltroMultiplo';
 import { SelosDaLinha } from './components/Selos';
 
 import {
-  AREA_DESCONHECIDA,
+  AREAS_SEM_ESPECIALIDADE,
+  AREA_VETERANO,
   COR_POR_CONCURSO,
   COR_POR_MOTIVO,
   ID_CONCURSO_2021,
@@ -155,10 +156,12 @@ const App: React.FC = () => {
     // Toda área que exista em alguém, tenha ou não saída — senão uma
     // especialidade sem nenhuma evasão simplesmente sumiria do filtro.
     const encontradas = new Set(registros.map(areaDe));
-    const comArea = Array.from(encontradas)
-      .filter((area) => area !== AREA_DESCONHECIDA)
+    const especialidades = Array.from(encontradas)
+      .filter((area) => !AREAS_SEM_ESPECIALIDADE.includes(area))
       .sort((a, b) => a.localeCompare(b, 'pt-BR'));
-    const ordenadas = encontradas.has(AREA_DESCONHECIDA) ? [...comArea, AREA_DESCONHECIDA] : comArea;
+    // As duas que não são especialidade vão para o fim, na ordem da constante:
+    // primeiro o veterano, que é "não se aplica", e só depois a lacuna.
+    const ordenadas = [...especialidades, ...AREAS_SEM_ESPECIALIDADE.filter((area) => encontradas.has(area))];
     return ordenadas.map((area) => ({ valor: area, rotulo: area, total: totais.get(area) ?? 0 }));
   }, [registros, todasAsSaidas]);
 
@@ -172,12 +175,18 @@ const App: React.FC = () => {
     }));
   }, [todasAsSaidas]);
 
-  // As especialidades só se sabem depois que o CSV chega, então o "todas"
-  // inicial é aplicado aqui, uma vez, sem sobrescrever escolha do leitor.
+  // As especialidades só se sabem depois que o CSV chega, então a marcação
+  // inicial é aplicada aqui, uma vez, sem sobrescrever escolha do leitor.
+  //
+  // Nasce desmarcada só "Veterano": o painel abre na coorte de 2021, e uma
+  // caixinha marcada que não acrescenta nada ao recorte faz o leitor procurar
+  // no gráfico um número que não está lá. "Sem área identificada" continua
+  // marcada — ali há Auditor de 2021 de verdade, e desmarcá-la os tiraria do
+  // gráfico de abertura sem que ninguém tivesse pedido.
   const [areasIniciadas, setAreasIniciadas] = useState(false);
   useEffect(() => {
     if (areasIniciadas || opcoesArea.length === 0) return;
-    setAreas(opcoesArea.map((opcao) => opcao.valor));
+    setAreas(opcoesArea.map((opcao) => opcao.valor).filter((area) => area !== AREA_VETERANO));
     setAreasIniciadas(true);
   }, [opcoesArea, areasIniciadas]);
 
@@ -185,6 +194,27 @@ const App: React.FC = () => {
 
   const recorte = useMemo(() => ({ coortes, areas, motivos }), [coortes, areas, motivos]);
   const saidasFiltradas = useMemo(() => filtrarSaidas(registros, recorte), [registros, recorte]);
+
+  /** O que dizer ao lado de "Filtros" enquanto o card está fechado. */
+  const resumoDoRecorte = useMemo(() => {
+    const parte = (selecionados: string[], opcoes: OpcaoFiltro[], singular: string, plural: string) => {
+      if (opcoes.length === 0) return '';
+      if (selecionados.length === 0) return `nenhum${singular === 'coorte' ? 'a' : ''} ${singular}`;
+      // Um só: vale mais dizer qual do que dizer quantos.
+      if (selecionados.length === 1) {
+        return opcoes.find((opcao) => opcao.valor === selecionados[0])?.rotulo ?? selecionados[0];
+      }
+      if (selecionados.length === opcoes.length) return `${plural}: todas`;
+      return `${plural}: ${selecionados.length} de ${opcoes.length}`;
+    };
+    return [
+      parte(coortes, opcoesCoorte, 'coorte', 'coortes'),
+      parte(areas, opcoesArea, 'especialidade', 'especialidades'),
+      parte(motivos, opcoesMotivo, 'tipo de saída', 'tipos de saída'),
+    ]
+      .filter(Boolean)
+      .join(' · ');
+  }, [coortes, areas, motivos, opcoesCoorte, opcoesArea, opcoesMotivo]);
 
   // === Cards (acima dos filtros: são sempre o quadro inteiro) ===
 
@@ -462,18 +492,40 @@ const App: React.FC = () => {
                 maximoRotulosX={14}
               />
             ) : (
-              semDados('Nenhuma saída neste recorte. Marque mais alguma caixinha abaixo.')
+              semDados('Nenhuma saída neste recorte. Abra "Filtros", logo abaixo, e marque mais alguma caixinha.')
             )}
           </section>
 
           {/* Os filtros ficam DEPOIS do gráfico: quem chega vê primeiro o quadro
-              inteiro, e só então o recorta. Os três grupos lado a lado, com as
-              caixinhas empilhadas dentro de cada um. */}
-          <section className="mb-8 grid grid-cols-1 gap-6 rounded-xl border border-gray-800 bg-gray-900/60 p-5 sm:grid-cols-3">
-            <FiltroMultiplo titulo="Coorte" opcoes={opcoesCoorte} selecionados={coortes} aoMudar={setCoortes} />
-            <FiltroMultiplo titulo="Especialidade" opcoes={opcoesArea} selecionados={areas} aoMudar={setAreas} />
-            <FiltroMultiplo titulo="Tipo de saída" opcoes={opcoesMotivo} selecionados={motivos} aoMudar={setMotivos} />
-          </section>
+              inteiro, e só então o recorta. Fechados por padrão, porque o recorte
+              que abre o painel já é o que interessa à maioria — e um `details`
+              nativo dá o teclado e o leitor de tela de graça, sem estado nosso.
+              O resumo ao lado do título existe para que fechado não vire opaco:
+              dá para saber o que está aplicado sem abrir. */}
+          <details className="group mb-8 rounded-xl border border-gray-800 bg-gray-900/60">
+            <summary className="flex cursor-pointer list-none items-center gap-2 p-5 text-sm font-semibold text-gray-200 [&::-webkit-details-marker]:hidden">
+              <svg
+                aria-hidden="true"
+                viewBox="0 0 20 20"
+                fill="currentColor"
+                className="h-4 w-4 flex-shrink-0 text-gray-500 transition-transform duration-200 group-open:rotate-180"
+              >
+                <path
+                  fillRule="evenodd"
+                  d="M5.23 7.21a.75.75 0 0 1 1.06.02L10 11.17l3.71-3.94a.75.75 0 1 1 1.08 1.04l-4.25 4.5a.75.75 0 0 1-1.08 0l-4.25-4.5a.75.75 0 0 1 .02-1.06Z"
+                  clipRule="evenodd"
+                />
+              </svg>
+              Filtros
+              <span className="truncate text-xs font-normal text-gray-500 group-open:hidden">{resumoDoRecorte}</span>
+            </summary>
+            {/* Os três grupos lado a lado, com as caixinhas empilhadas dentro de cada um. */}
+            <div className="grid grid-cols-1 gap-6 px-5 pb-5 sm:grid-cols-3">
+              <FiltroMultiplo titulo="Coorte" opcoes={opcoesCoorte} selecionados={coortes} aoMudar={setCoortes} />
+              <FiltroMultiplo titulo="Especialidade" opcoes={opcoesArea} selecionados={areas} aoMudar={setAreas} />
+              <FiltroMultiplo titulo="Tipo de saída" opcoes={opcoesMotivo} selecionados={motivos} aoMudar={setMotivos} />
+            </div>
+          </details>
 
           <section className="mb-8">
             <h2 className="mb-1 text-lg font-semibold text-red-300">Curva de permanência</h2>
