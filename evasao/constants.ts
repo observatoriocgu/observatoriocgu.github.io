@@ -133,11 +133,12 @@ export const MOTIVO_SEM_ATO = 'Sem ato identificado';
 
 export const MOTIVO_EXONERACAO = 'Exoneração';
 export const MOTIVO_VACANCIA = 'Vacância (posse em outro cargo)';
+export const MOTIVO_APOSENTADORIA = 'Aposentadoria';
 
 export const MOTIVOS_SAIDA: readonly string[] = [
   MOTIVO_EXONERACAO,
   MOTIVO_VACANCIA,
-  'Aposentadoria',
+  MOTIVO_APOSENTADORIA,
   'Falecimento',
   'Demissão',
   SITUACAO_MUDOU_ORGAO,

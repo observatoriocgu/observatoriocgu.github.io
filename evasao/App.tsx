@@ -4,7 +4,6 @@ import {
   faArrowTrendDown,
   faCalendarAlt,
   faUserMinus,
-  faUsers,
 } from '@fortawesome/free-solid-svg-icons';
 
 import AnnouncementModal from './components/AnnouncementModal';
@@ -39,7 +38,7 @@ import {
 } from './lib/dados';
 import {
   agregarPorDestino,
-  agregarPorMotivo,
+  agregarPorMotivoResumido,
   agregarPorUf,
   agregarPorUnidade,
   areaDe,
@@ -192,11 +191,17 @@ const App: React.FC = () => {
 
   // === Cards (acima dos filtros: são sempre o quadro inteiro) ===
 
-  const motivosDoTotal = useMemo(() => agregarPorMotivo(registros), [registros]);
+  /** O card de saídas conta a partir de ago/2022, o mesmo corte do gráfico. */
+  const motivosDoTotal = useMemo(
+    () => agregarPorMotivoResumido(registros, MES_INICIO_GRAFICO_SAIDAS),
+    [registros]
+  );
+  const saidasNoPeriodo = useMemo(
+    () => motivosDoTotal.reduce((soma, grupo) => soma + grupo.total, 0),
+    [motivosDoTotal]
+  );
   const coorte2021 = useMemo(() => evasaoDaCoorte(registros, ID_CONCURSO_2021), [registros]);
-  const coorteVeterana = useMemo(() => evasaoDaCoorte(registros, ID_CONCURSO_VETERANO), [registros]);
 
-  const primeiroMes = serie[0];
   const ultimoMes = serie[serie.length - 1];
 
   const diasSemPerderAuditor = saidasDou ? diasDesde(saidasDou.dataMaisRecente) : null;
@@ -366,7 +371,7 @@ const App: React.FC = () => {
         )}
 
         <main>
-          <section className="mb-8 grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
+          <section className="mb-8 grid grid-cols-1 gap-6 md:grid-cols-3">
             <CounterCard
               value={diasSemPerderAuditor ?? '—'}
               label={`Dia${(diasSemPerderAuditor ?? 0) === 1 ? '' : 's'} sem perder um Auditor`}
@@ -423,12 +428,12 @@ const App: React.FC = () => {
             />
 
             <CounterCard
-              value={numero(todasAsSaidas.length)}
+              value={numero(saidasNoPeriodo)}
               label="Auditores que saíram da CGU"
               icon={icone(faUserMinus)}
               footer={
                 <div className="space-y-2">
-                  <div>Desde {primeiroMes ? formatarCompetenciaLonga(primeiroMes.mes) : 'o início da série'}.</div>
+                  <div>Desde {formatarCompetenciaLonga(MES_INICIO_GRAFICO_SAIDAS)}.</div>
                   <div className="flex flex-wrap justify-center gap-x-3 gap-y-1 border-t border-gray-700 pt-2">
                     {motivosDoTotal.map((grupo) => (
                       <span key={grupo.rotulo} className="text-xs text-gray-400">
@@ -451,33 +456,6 @@ const App: React.FC = () => {
                     <span className="font-medium text-amber-400">{numero(coorte2021.saiu)}</span> de{' '}
                     {numero(coorte2021.total)} da coorte {rotuloDoConcurso(ID_CONCURSO_2021)}.
                   </div>
-                  <div className="border-t border-gray-700 pt-1">
-                    Entre os veteranos, {percentual(coorteVeterana.percentual)} ({numero(coorteVeterana.saiu)} de{' '}
-                    {numero(coorteVeterana.total)}).
-                  </div>
-                </div>
-              }
-              estaCarregando={carregando}
-            />
-
-            <CounterCard
-              value={ultimoMes ? numero(ultimoMes.efetivo) : '—'}
-              label="Auditores na CGU hoje"
-              icon={icone(faUsers)}
-              footer={
-                <div className="space-y-1">
-                  {primeiroMes && ultimoMes && (
-                    <div>
-                      Eram <span className="font-medium text-amber-400">{numero(primeiroMes.efetivo)}</span> em{' '}
-                      {formatarCompetenciaLonga(primeiroMes.mes)}.
-                    </div>
-                  )}
-                  {ultimoMes && (
-                    <div className="border-t border-gray-700 pt-1">
-                      {numero(ultimoMes.cedidos)} cedidos a outros órgãos · competência{' '}
-                      {formatarCompetenciaLonga(ultimoMes.mes)}
-                    </div>
-                  )}
                 </div>
               }
               estaCarregando={carregando}

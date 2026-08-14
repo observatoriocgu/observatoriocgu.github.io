@@ -13,8 +13,10 @@ import {
   AREA_DESCONHECIDA,
   ID_CONCURSO_2021,
   ID_CONCURSO_VETERANO,
+  MOTIVO_APOSENTADORIA,
+  MOTIVO_EXONERACAO,
   MOTIVO_SEM_ATO,
-  MOTIVOS_SAIDA,
+  MOTIVO_VACANCIA,
   SITUACAO_EM_EXERCICIO,
 } from '../constants';
 import {
@@ -170,9 +172,36 @@ const contarPor = (
     .sort((a, b) => posicao(a.rotulo) - posicao(b.rotulo) || b.total - a.total || a.rotulo.localeCompare(b.rotulo, 'pt-BR'));
 };
 
-/** Saídas agrupadas por motivo, na ordem de `MOTIVOS_SAIDA`. */
-export const agregarPorMotivo = (registros: RegistroAuditor[]) =>
-  contarPor(saidas(registros), motivoDe, MOTIVOS_SAIDA);
+/** Rótulo do balde que junta o que o card de saídas não destaca. */
+export const MOTIVO_OUTROS = 'Outros';
+
+const MOTIVOS_DESTACADOS: readonly string[] = [
+  MOTIVO_EXONERACAO,
+  MOTIVO_VACANCIA,
+  MOTIVO_APOSENTADORIA,
+];
+
+/**
+ * Saídas a partir de `mesMinimo`, resumidas em quatro baldes.
+ *
+ * No card acima dos filtros os sete motivos viram uma parede de números. Os
+ * quatro menores — falecimento, demissão, mudança de órgão na carreira e saída
+ * sem ato — somados ainda cabem abaixo da aposentadoria, então juntá-los em
+ * "Outros" não esconde nenhuma ordem de grandeza. A quebra completa continua na
+ * caixinha "Tipo de saída", no gráfico mês a mês e na tabela detalhada.
+ *
+ * `mesMinimo` é o mesmo corte do gráfico (`MES_INICIO_GRAFICO_SAIDAS`, ago/2022):
+ * antes dele só existiam veteranos na série, e o card diria "desde jun/2022"
+ * sobre um período em que metade do universo ainda não tinha tomado posse.
+ */
+export const agregarPorMotivoResumido = (registros: RegistroAuditor[], mesMinimo: string) => {
+  const noPeriodo = saidas(registros).filter((registro) => registro.MES_SAIDA >= mesMinimo);
+  const balde = (registro: RegistroAuditor): string => {
+    const motivo = motivoDe(registro);
+    return MOTIVOS_DESTACADOS.includes(motivo) ? motivo : MOTIVO_OUTROS;
+  };
+  return contarPor(noPeriodo, balde, [...MOTIVOS_DESTACADOS, MOTIVO_OUTROS]);
+};
 
 /**
  * Saídas agrupadas por unidade de lotação, com a quebra por coorte.
