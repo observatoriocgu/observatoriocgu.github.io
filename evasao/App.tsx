@@ -290,13 +290,16 @@ const App: React.FC = () => {
   const graficoPermanencia = useMemo(() => {
     if (!ultimoMes) return { rotulos: [], completos: [], series: [] as SerieGrafico[], vazio: true };
 
-    // Só o filtro de especialidade se aplica. O de tipo de saída, não: excluir
-    // um tipo transformaria quem saiu por ele em alguém que ficou, e a curva
-    // mentiria para cima. O de coorte também não — o gráfico é, por definição,
-    // só de quem entrou depois de jun/2022.
-    const porArea = registros.filter((registro) => areas.includes(areaDe(registro)));
+    // NENHUM filtro se aplica aqui. A curva responde a uma pergunta só, sobre a
+    // coorte inteira: de todos os Auditores que entraram pelo concurso de 2021,
+    // quantos ainda restam. É `registros`, e não `saidasFiltradas`.
+    //
+    // O filtro de tipo de saída é o que não pode entrar de jeito nenhum:
+    // esconder um tipo transformaria quem saiu por ele em alguém que ficou, e a
+    // curva mentiria para cima. O de coorte já não valia — o gráfico é, por
+    // definição, só de quem entrou depois de jun/2022.
     const meses = listarCompetencias(MES_INICIO_GRAFICO_SAIDAS, ultimoMes.mes);
-    const pontos = curvaDePermanencia(porArea, ID_CONCURSO_2021, meses);
+    const pontos = curvaDePermanencia(registros, ID_CONCURSO_2021, meses);
     if (pontos.every((ponto) => ponto.percentual === null)) {
       return { rotulos: [], completos: [], series: [] as SerieGrafico[], vazio: true };
     }
@@ -319,7 +322,7 @@ const App: React.FC = () => {
       ],
       vazio: false,
     };
-  }, [registros, areas, ultimoMes]);
+  }, [registros, ultimoMes]);
 
   // === Tabela de destinos e últimas saídas ===
 
@@ -554,12 +557,15 @@ const App: React.FC = () => {
           <section className="mb-8">
             <h2 className="mb-1 text-lg font-semibold text-red-300">Curva de permanência</h2>
             <p className="mb-3 text-sm text-gray-400">
-              Que percentual de quem entrou depois de jun/2022 ainda estava na CGU em cada competência. Em cada mês do
-              eixo, a conta é (entradas até aquele mês &minus; saídas até aquele mês) dividido pelas entradas até
-              aquele mês — as duas pontas contadas por pessoa, e só sobre quem entrou depois de jun/2022. O
-              denominador cresce ao longo do eixo, conforme novas turmas tomam posse. Só o filtro de especialidade
-              vale aqui: o de tipo de saída não, porque esconder um tipo transformaria quem saiu por ele em alguém que
-              ficou.
+              <span className="text-gray-300">
+                Do total de Auditores que entraram pelo concurso de 2021, quantos ainda restam?
+              </span>{' '}
+              Em cada competência do eixo, a conta é (entradas até aquele mês &minus; saídas até aquele mês) dividido
+              pelas entradas até aquele mês — as duas pontas contadas por pessoa. O denominador cresce ao longo do
+              eixo, conforme novas turmas tomam posse.{' '}
+              <span className="text-gray-300">Esta curva não acompanha os filtros acima</span>: é sempre a coorte de
+              2021 inteira. Recortá-la por tipo de saída transformaria quem saiu em alguém que ficou, e ela mentiria
+              para cima.
             </p>
             {!graficoPermanencia.vazio ? (
               <EvasionChart
@@ -573,7 +579,7 @@ const App: React.FC = () => {
                 maximoRotulosX={14}
               />
             ) : (
-              semDados('Sem base suficiente para traçar a curva neste recorte.')
+              semDados('Sem base suficiente para traçar a curva.')
             )}
             <p className="mt-2 text-xs text-gray-500">
               Eixo horizontal: competências do calendário, de ago/2022 até a última do SIAPE.
