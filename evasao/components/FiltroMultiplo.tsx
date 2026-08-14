@@ -48,13 +48,15 @@ const FiltroMultiplo: React.FC<FiltroMultiploProps> = ({ titulo, opcoes, selecio
           {todosMarcados ? 'limpar' : 'marcar todas'}
         </button>
       </legend>
-      <div className="flex flex-wrap gap-2">
+      {/* Uma caixinha por linha: com os três grupos lado a lado, empilhar na
+          vertical é o que deixa cada coluna legível de cima a baixo. */}
+      <div className="flex flex-col gap-2">
         {opcoes.map((opcao) => {
           const marcado = marcados.has(opcao.valor);
           return (
             <label
               key={opcao.valor}
-              className={`inline-flex cursor-pointer select-none items-center gap-2 rounded border px-2.5 py-1 text-sm transition-colors ${
+              className={`flex cursor-pointer select-none items-center gap-2 rounded border px-2.5 py-1 text-sm transition-colors ${
                 marcado
                   ? 'border-red-500 bg-red-500/15 text-gray-100'
                   : 'border-gray-700 bg-gray-800/60 text-gray-400 hover:border-gray-600 hover:text-gray-300'
@@ -73,7 +75,9 @@ const FiltroMultiplo: React.FC<FiltroMultiploProps> = ({ titulo, opcoes, selecio
                   style={{ backgroundColor: opcao.cor, opacity: marcado ? 1 : 0.4 }}
                 />
               )}
-              <span>{opcao.rotulo}</span>
+              {/* `flex-1` empurra o total para a direita, alinhando os números
+                  numa coluna só em vez de deixá-los correndo atrás do rótulo. */}
+              <span className="flex-1">{opcao.rotulo}</span>
               {opcao.total !== undefined && (
                 <span className={marcado ? 'text-amber-400' : 'text-gray-600'}>{opcao.total}</span>
               )}

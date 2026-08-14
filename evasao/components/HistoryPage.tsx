@@ -23,7 +23,9 @@ const HistoryPage: React.FC = () => {
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState<string | null>(null);
 
-  const [filtro, setFiltro] = useState<Filtro>('todas');
+  // Abre em "Saídas": é o que o observatório existe para acompanhar. As
+  // entradas continuam a um clique, no botão ao lado.
+  const [filtro, setFiltro] = useState<Filtro>('saida');
   const [busca, setBusca] = useState('');
   const [mesesVisiveis, setMesesVisiveis] = useState(12);
 

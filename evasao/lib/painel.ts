@@ -25,7 +25,7 @@ import {
   PontoSerieMensal,
   RegistroAuditor,
 } from '../types';
-import { LinhaCsv, baseDoSite, distanciaEmMeses } from './dados';
+import { LinhaCsv, baseDoSite } from './dados';
 
 /** Converte as linhas cruas do CSV no tipo do painel. Sem validação: o CSV é derivado. */
 export const comoRegistros = (linhas: LinhaCsv[]): RegistroAuditor[] =>
@@ -204,31 +204,6 @@ export const agregarPorMotivoResumido = (registros: RegistroAuditor[], mesMinimo
 };
 
 /**
- * Saídas agrupadas por unidade de lotação, com a quebra por coorte.
- *
- * A unidade vem do `dados.csv` já normalizada pelo CÓDIGO da UORG — nunca pelo
- * nome, que muda de grafia entre meses e infla a contagem. Até a Fase 3 este
- * agrupamento só olhava `EXONERADO`; agora considera toda saída.
- */
-export const agregarPorUnidade = (registros: RegistroAuditor[], limite = 12) => {
-  const grupos = contarPor(saidas(registros), (registro) => registro.UNIDADE || 'Não informada');
-  const ordenados = [...grupos].sort((a, b) => b.total - a.total);
-  return ordenados.slice(0, limite);
-};
-
-/**
- * Saídas agrupadas por UF de exercício.
- *
- * `UF` vazia quer dizer que a sub-unidade não permite deduzir o estado. Note que
- * o Portal só passou a preencher `UF_EXERCICIO` no fim de 2023 — este corte é
- * por unidade de LOTAÇÃO, que existe desde 202206.
- */
-export const agregarPorUf = (registros: RegistroAuditor[]) => {
-  const grupos = contarPor(saidas(registros), (registro) => registro.UF || '—');
-  return [...grupos].sort((a, b) => b.total - a.total);
-};
-
-/**
  * Saídas agrupadas por órgão de destino.
  *
  * Quem não tem destino registrado cai em "Destino não identificado" — que não é
@@ -255,62 +230,63 @@ export const agregarPorDestino = (registros: RegistroAuditor[]) => {
   return [...grupos].sort((a, b) => ordem(a.rotulo) - ordem(b.rotulo) || b.total - a.total);
 };
 
-/** Um ponto da curva de permanência: `t` meses após a entrada. */
+/** Um ponto da curva de permanência, numa competência do calendário. */
 export interface PontoPermanencia {
-  /** Meses decorridos desde a entrada. */
-  mes: number;
-  /** Quantas pessoas já foram observadas por pelo menos `mes` meses. */
-  base: number;
-  /** Quantas dessas ainda estavam na CGU. */
+  /** Competência, no formato `AAAAMM`. */
+  mes: string;
+  /** Quantas pessoas já haviam entrado até `mes`, inclusive. */
+  entradas: number;
+  /** Quantas dessas já haviam saído até `mes`, inclusive. */
+  saidas: number;
+  /** `entradas - saidas`: quantas ainda estavam na CGU no fim de `mes`. */
   restantes: number;
-  /** `restantes / base`, em pontos percentuais. */
-  percentual: number;
+  /** `restantes / entradas`, em pontos percentuais. `null` antes da primeira entrada. */
+  percentual: number | null;
 }
 
 /**
- * Curva de permanência de uma coorte: % ainda na CGU a cada mês desde a entrada.
+ * Permanência de uma coorte mês a mês do calendário.
  *
- * A base encolhe conforme `mes` cresce, porque quem entrou em 2025 ainda não
- * completou 40 meses de observação — por isso cada ponto carrega o próprio
- * denominador, e a curva para onde a base fica pequena demais para significar
- * alguma coisa. Sem esse cuidado, o rabo da curva viraria ruído: no limite,
- * 100% de uma pessoa só.
+ * Em cada competência `t`: quantas pessoas da coorte já tinham entrado até `t`
+ * (ENTRADAS), quantas dessas já tinham saído até `t` (SAÍDAS), e o quociente
+ * `(ENTRADAS - SAÍDAS) / ENTRADAS` — a fração da coorte que ainda estava lá.
  *
- * "Ainda na CGU no mês `t`" = não tem competência de saída, ou a saída é
- * posterior a `t` (D13: a saída é o primeiro mês de AUSÊNCIA).
+ * Duas escolhas que mudam o número e por isso ficam escritas:
+ *
+ * 1. Entradas e saídas são contadas por PESSOA, sobre `dados.csv`, e não pelos
+ *    campos `ENTRADAS`/`SAIDAS` de `serie_mensal.csv`. Aqueles são EVENTOS: as
+ *    seis pessoas que somem do SIAPE por alguns meses e voltam (D13) aparecem
+ *    lá duas vezes, e o denominador ficaria maior que o tamanho da coorte.
+ * 2. O numerador só desconta saídas de quem é DA COORTE. Descontar as saídas de
+ *    todo mundo — veteranos inclusive — de um denominador que só tem entrantes
+ *    daria um número que não é permanência de ninguém.
+ *
+ * Diferente da curva por tempo-desde-a-entrada que existia aqui antes, o
+ * denominador CRESCE ao longo do eixo: quem entrou em 2023 entra na conta a
+ * partir de 2023. Por isso cada ponto carrega `entradas` — sem isso, uma queda
+ * causada por um lote novo de posses passaria por evasão.
  */
 export const curvaDePermanencia = (
   registros: RegistroAuditor[],
   idConcurso: string,
-  ultimoMes: string,
-  baseMinima = 50
+  meses: readonly string[]
 ): PontoPermanencia[] => {
   const coorte = registros.filter((registro) => registro.CONCURSO === idConcurso && registro.MES_ENTRADA);
-  if (coorte.length === 0) return [];
 
-  const observados = coorte.map((registro) => ({
-    // Quantos meses a pessoa já pôde ser observada.
-    janela: distanciaEmMeses(registro.MES_ENTRADA, ultimoMes),
-    // Em que mês da própria trajetória ela sumiu; `Infinity` = nunca sumiu.
-    saidaEm: registro.MES_SAIDA ? distanciaEmMeses(registro.MES_ENTRADA, registro.MES_SAIDA) : Number.POSITIVE_INFINITY,
-  }));
-
-  const janelaMaxima = Math.max(...observados.map((pessoa) => pessoa.janela));
-  const pontos: PontoPermanencia[] = [];
-
-  for (let mes = 0; mes <= janelaMaxima; mes += 1) {
-    const naBase = observados.filter((pessoa) => pessoa.janela >= mes);
-    if (naBase.length < baseMinima) break;
-    const restantes = naBase.filter((pessoa) => pessoa.saidaEm > mes).length;
-    pontos.push({
+  return meses.map((mes) => {
+    const entrantes = coorte.filter((registro) => registro.MES_ENTRADA <= mes);
+    // D13: `MES_SAIDA` é o primeiro mês de AUSÊNCIA, então quem saiu em `mes`
+    // já não está na CGU no fim de `mes`.
+    const saidas = entrantes.filter((registro) => registro.MES_SAIDA && registro.MES_SAIDA <= mes).length;
+    const restantes = entrantes.length - saidas;
+    return {
       mes,
-      base: naBase.length,
+      entradas: entrantes.length,
+      saidas,
       restantes,
-      percentual: (100 * restantes) / naBase.length,
-    });
-  }
-
-  return pontos;
+      percentual: entrantes.length === 0 ? null : (100 * restantes) / entrantes.length,
+    };
+  });
 };
 
 /** Saídas por competência, para cruzar com a série mensal. */

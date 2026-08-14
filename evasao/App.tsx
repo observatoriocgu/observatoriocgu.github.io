@@ -39,8 +39,6 @@ import {
 import {
   agregarPorDestino,
   agregarPorMotivoResumido,
-  agregarPorUf,
-  agregarPorUnidade,
   areaDe,
   comoRegistros,
   comoSerie,
@@ -78,7 +76,6 @@ const App: React.FC = () => {
   const [coortes, setCoortes] = useState<string[]>([ID_CONCURSO_2021]);
   const [areas, setAreas] = useState<string[]>([]);
   const [motivos, setMotivos] = useState<string[]>([...MOTIVOS_PADRAO]);
-  const [corteGeografico, setCorteGeografico] = useState<'unidade' | 'uf'>('unidade');
 
   useEffect(() => {
     let montado = true;
@@ -246,60 +243,38 @@ const App: React.FC = () => {
   );
   const foraDoGrafico = saidasFiltradas.length - noGrafico;
 
-  // === Gráfico por unidade / UF ===
-
-  const seriesPorCoorte = (grupos: { rotulo: string; itens: RegistroAuditor[] }[]): SerieGrafico[] =>
-    COORTES.filter((id) => coortes.includes(id)).map((id) => ({
-      rotulo: rotuloDoConcurso(id),
-      cor: COR_POR_CONCURSO[id],
-      valores: grupos.map((grupo) => grupo.itens.filter((registro) => registro.CONCURSO === id).length),
-      detalhes: grupos.map((grupo) =>
-        grupo.itens
-          .filter((registro) => registro.CONCURSO === id)
-          .map((registro) => `${registro.NOME} — ${formatarCompetenciaLonga(registro.MES_SAIDA)}`)
-      ),
-    }));
-
-  const graficoGeografico = useMemo(() => {
-    const grupos =
-      corteGeografico === 'unidade' ? agregarPorUnidade(saidasFiltradas) : agregarPorUf(saidasFiltradas);
-    return {
-      rotulos: grupos.map((grupo) => grupo.rotulo),
-      series: seriesPorCoorte(grupos),
-      vazio: grupos.length === 0,
-    };
-  }, [saidasFiltradas, corteGeografico, coortes]);
-
   // === Curva de permanência ===
 
   const graficoPermanencia = useMemo(() => {
-    if (!ultimoMes) return { rotulos: [], series: [] as SerieGrafico[], vazio: true };
+    if (!ultimoMes) return { rotulos: [], completos: [], series: [] as SerieGrafico[], vazio: true };
 
-    // Só o filtro de especialidade se aplica. O de coorte, não: o gráfico existe
-    // para pôr as duas lado a lado. O de tipo de saída, muito menos — excluir um
-    // tipo transformaria quem saiu por ele em alguém que ficou, e a curva
-    // mentiria para cima.
+    // Só o filtro de especialidade se aplica. O de tipo de saída, não: excluir
+    // um tipo transformaria quem saiu por ele em alguém que ficou, e a curva
+    // mentiria para cima. O de coorte também não — o gráfico é, por definição,
+    // só de quem entrou depois de jun/2022.
     const porArea = registros.filter((registro) => areas.includes(areaDe(registro)));
-
-    const curvas = COORTES.map((id) => ({ id, pontos: curvaDePermanencia(porArea, id, ultimoMes.mes) }));
-    const comprimento = Math.max(0, ...curvas.map((curva) => curva.pontos.length));
-    if (comprimento === 0) return { rotulos: [], series: [] as SerieGrafico[], vazio: true };
+    const meses = listarCompetencias(MES_INICIO_GRAFICO_SAIDAS, ultimoMes.mes);
+    const pontos = curvaDePermanencia(porArea, ID_CONCURSO_2021, meses);
+    if (pontos.every((ponto) => ponto.percentual === null)) {
+      return { rotulos: [], completos: [], series: [] as SerieGrafico[], vazio: true };
+    }
 
     return {
-      rotulos: Array.from({ length: comprimento }, (_, indice) => String(indice)),
-      series: curvas
-        .filter((curva) => curva.pontos.length > 0)
-        .map((curva) => ({
-          rotulo: rotuloDoConcurso(curva.id),
-          cor: COR_POR_CONCURSO[curva.id],
+      rotulos: meses.map(formatarCompetencia),
+      completos: meses.map(formatarCompetenciaLonga),
+      series: [
+        {
+          rotulo: rotuloDoConcurso(ID_CONCURSO_2021),
+          cor: COR_POR_CONCURSO[ID_CONCURSO_2021],
           tipo: 'linha' as const,
           sufixo: '%',
-          valores: Array.from({ length: comprimento }, (_, indice) => curva.pontos[indice]?.percentual ?? null),
-          detalhes: Array.from({ length: comprimento }, (_, indice) => {
-            const ponto = curva.pontos[indice];
-            return ponto ? [`${numero(ponto.restantes)} de ${numero(ponto.base)} ainda na CGU`] : [];
-          }),
-        })),
+          valores: pontos.map((ponto) => ponto.percentual),
+          detalhes: pontos.map((ponto) => [
+            `${numero(ponto.restantes)} de ${numero(ponto.entradas)} ainda na CGU`,
+            `${numero(ponto.saidas)} já ${ponto.saidas === 1 ? 'havia saído' : 'haviam saído'}`,
+          ]),
+        },
+      ],
       vazio: false,
     };
   }, [registros, areas, ultimoMes]);
@@ -462,21 +437,10 @@ const App: React.FC = () => {
             />
           </section>
 
-          <section className="mb-6 space-y-4 rounded-xl border border-gray-800 bg-gray-900/60 p-5">
-            <FiltroMultiplo titulo="Coorte" opcoes={opcoesCoorte} selecionados={coortes} aoMudar={setCoortes} />
-            <FiltroMultiplo titulo="Especialidade" opcoes={opcoesArea} selecionados={areas} aoMudar={setAreas} />
-            <FiltroMultiplo titulo="Tipo de saída" opcoes={opcoesMotivo} selecionados={motivos} aoMudar={setMotivos} />
-            <p className="text-xs text-gray-500">
-              O número ao lado de cada caixinha é o total de saídas daquela opção em toda a série, e não no recorte
-              atual — assim ele não muda a cada clique. A especialidade vem do Edital CGU nº 5, de 13/06/2022,
-              publicado no DOU; veteranos não têm edital de onde tirá-la e caem em &ldquo;{AREA_DESCONHECIDA}&rdquo;.
-            </p>
-          </section>
-
           <section className="mb-8">
             <h2 className="mb-1 text-lg font-semibold text-red-300">Saídas mês a mês</h2>
             <p className="mb-3 text-sm text-gray-400">
-              Quantos Auditores deixaram a CGU em cada competência, no recorte escolhido acima. A série começa em
+              Quantos Auditores deixaram a CGU em cada competência, no recorte escolhido abaixo. A série começa em
               agosto de 2022, primeira competência em que alguém da coorte de 2022 poderia aparecer ausente.
               {!carregando && (
                 <>
@@ -498,66 +462,45 @@ const App: React.FC = () => {
                 maximoRotulosX={14}
               />
             ) : (
-              semDados('Nenhuma saída neste recorte. Marque mais alguma caixinha acima.')
+              semDados('Nenhuma saída neste recorte. Marque mais alguma caixinha abaixo.')
             )}
           </section>
 
-          <section className="mb-8">
-            <div className="mb-3 flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-center">
-              <div>
-                <h2 className="text-lg font-semibold text-red-300">
-                  {corteGeografico === 'unidade' ? 'Saídas por unidade de lotação' : 'Saídas por UF'}
-                </h2>
-                <p className="mt-1 text-sm text-gray-400">
-                  {corteGeografico === 'unidade'
-                    ? 'As 12 unidades que mais perderam Auditores. A unidade é contada pelo código da UORG, não pelo nome.'
-                    : 'UF da unidade de lotação. O traço agrupa sub-unidades cujo nome não permite deduzir o estado.'}
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setCorteGeografico(corteGeografico === 'unidade' ? 'uf' : 'unidade')}
-                className="rounded bg-amber-500 px-4 py-2 font-bold text-black transition-colors hover:bg-amber-600 focus:outline-none focus:ring-2 focus:ring-amber-300"
-              >
-                {corteGeografico === 'unidade' ? 'Ver por UF' : 'Ver por unidade'}
-              </button>
-            </div>
-            {!graficoGeografico.vazio ? (
-              <EvasionChart
-                rotulos={graficoGeografico.rotulos}
-                series={graficoGeografico.series}
-                altura={380}
-                empilhar
-                rotacionarRotulos
-              />
-            ) : (
-              semDados('Nenhuma saída neste recorte.')
-            )}
+          {/* Os filtros ficam DEPOIS do gráfico: quem chega vê primeiro o quadro
+              inteiro, e só então o recorta. Os três grupos lado a lado, com as
+              caixinhas empilhadas dentro de cada um. */}
+          <section className="mb-8 grid grid-cols-1 gap-6 rounded-xl border border-gray-800 bg-gray-900/60 p-5 sm:grid-cols-3">
+            <FiltroMultiplo titulo="Coorte" opcoes={opcoesCoorte} selecionados={coortes} aoMudar={setCoortes} />
+            <FiltroMultiplo titulo="Especialidade" opcoes={opcoesArea} selecionados={areas} aoMudar={setAreas} />
+            <FiltroMultiplo titulo="Tipo de saída" opcoes={opcoesMotivo} selecionados={motivos} aoMudar={setMotivos} />
           </section>
 
           <section className="mb-8">
             <h2 className="mb-1 text-lg font-semibold text-red-300">Curva de permanência</h2>
             <p className="mb-3 text-sm text-gray-400">
-              Que percentual de cada coorte ainda estava na CGU a cada mês desde a própria entrada. A curva para onde
-              restam menos de 50 pessoas observadas — daí para a frente ela seria ruído, não tendência. Só o filtro de
-              especialidade vale aqui: o de coorte não, porque o gráfico existe para comparar as duas; e o de tipo de
-              saída muito menos, porque esconder um tipo transformaria quem saiu por ele em alguém que ficou.
+              Que percentual de quem entrou depois de jun/2022 ainda estava na CGU em cada competência. Em cada mês do
+              eixo, a conta é (entradas até aquele mês &minus; saídas até aquele mês) dividido pelas entradas até
+              aquele mês — as duas pontas contadas por pessoa, e só sobre quem entrou depois de jun/2022. O
+              denominador cresce ao longo do eixo, conforme novas turmas tomam posse. Só o filtro de especialidade
+              vale aqui: o de tipo de saída não, porque esconder um tipo transformaria quem saiu por ele em alguém que
+              ficou.
             </p>
             {!graficoPermanencia.vazio ? (
               <EvasionChart
                 rotulos={graficoPermanencia.rotulos}
+                rotulosCompletos={graficoPermanencia.completos}
                 series={graficoPermanencia.series}
                 altura={300}
                 eixoEsquerdaComZero={false}
                 maximoEixoEsquerda={100}
                 tituloEixoEsquerda="% ainda na CGU"
-                maximoRotulosX={13}
+                maximoRotulosX={14}
               />
             ) : (
               semDados('Sem base suficiente para traçar a curva neste recorte.')
             )}
             <p className="mt-2 text-xs text-gray-500">
-              Eixo horizontal: meses desde a entrada de cada pessoa, não datas do calendário.
+              Eixo horizontal: competências do calendário, de ago/2022 até a última do SIAPE.
             </p>
           </section>
 
