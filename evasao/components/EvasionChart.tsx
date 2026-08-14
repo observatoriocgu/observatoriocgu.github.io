@@ -1,252 +1,207 @@
 import React from 'react';
 import {
-  Chart as ChartJS,
-  CategoryScale,
-  LinearScale,
+  BarController,
   BarElement,
+  CategoryScale,
+  Chart as ChartJS,
+  Filler,
+  Legend,
+  LineController,
+  LineElement,
+  LinearScale,
+  PointElement,
   Title,
   Tooltip,
-  Legend,
 } from 'chart.js';
-import { Bar } from 'react-chartjs-2';
+import { Chart } from 'react-chartjs-2';
 
-ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend);
+ChartJS.register(
+  CategoryScale,
+  LinearScale,
+  BarController,
+  BarElement,
+  LineController,
+  LineElement,
+  PointElement,
+  Filler,
+  Title,
+  Tooltip,
+  Legend
+);
 
-interface Point {
-  label: string;
-  tipo: string;
-  value: number;
+/**
+ * Uma série do gráfico.
+ *
+ * `valores` tem exatamente o comprimento de `rotulos`; `null` é buraco, e o
+ * Chart.js não desenha ponto nem barra — que é o que se quer para `ENTRADAS` e
+ * `SAIDAS` na primeira competência da série, onde não existe mês anterior.
+ */
+export interface SerieGrafico {
+  rotulo: string;
+  cor: string;
+  valores: (number | null)[];
+  tipo?: 'barra' | 'linha';
+  eixo?: 'esquerda' | 'direita';
+  /** Séries de fundo/contexto ficam fora da legenda sem sair do gráfico. */
+  ocultaDaLegenda?: boolean;
+  /** Linhas de texto por categoria, exibidas no tooltip abaixo do valor. */
+  detalhes?: string[][];
+  /** Sufixo do valor no tooltip, ex.: `%`. */
+  sufixo?: string;
 }
 
 interface EvasionChartProps {
-  points: Point[];
-  height?: number;
-  details?: Record<string, { name: string; date?: string | null; area?: string | null }[]>;
-  // optional background (total) points to render as faint bars behind the primary points
-  backgroundPoints?: Point[];
-  // pontos específicos para aposentadorias e afastamentos
-  inactivityPoints?: Point[];
-  // detalhes específicos para aposentadorias e afastamentos
-  inactivityDetails?: Record<string, { name: string; date?: string | null; area?: string | null }[]>;
-  // pontos de background para aposentadorias (todas as áreas)
-  backgroundInactivityPoints?: Point[];
+  rotulos: string[];
+  series: SerieGrafico[];
+  altura?: number;
+  /** Empilha as barras. Linhas nunca empilham. */
+  empilhar?: boolean;
+  rotacionarRotulos?: boolean;
+  /** Rótulo por extenso de cada categoria, quando `rotulos` veio abreviado. */
+  rotulosCompletos?: string[];
+  tituloEixoEsquerda?: string;
+  tituloEixoDireita?: string;
+  /** `false` deixa o eixo esquerdo se ajustar aos dados — o efetivo vive entre 1.500 e 1.800. */
+  eixoEsquerdaComZero?: boolean;
+  /** Teto do eixo esquerdo, para curvas em pontos percentuais. */
+  maximoEixoEsquerda?: number;
+  /** Quantos rótulos de x mostrar no máximo; o resto o Chart.js pula. */
+  maximoRotulosX?: number;
 }
 
-const EvasionChart: React.FC<EvasionChartProps> = ({ points, height = 220, details = {}, backgroundPoints, inactivityPoints, inactivityDetails = {}, backgroundInactivityPoints }) => {
-  // Detectar se é gráfico por unidade
-  const isUnidadeChart = points.length > 0 && points[0].tipo === 'unidade';
-  
-  // Função para truncar labels em gráficos de unidade
-  const truncateLabel = (label: string, maxLength: number = 15): string => {
-    if (isUnidadeChart && label.length > maxLength) {
-      return label.substring(0, maxLength) + '...';
-    }
-    return label;
-  };
-  
-  // Construir datasets: alinhar labels ao background (total) quando disponível
-  // Preferir labels do background (total) para garantir alinhamento vertical entre barras
-  const baseLabels = (backgroundPoints && backgroundPoints.length > 0)
-    ? backgroundPoints.map(p => p.label)
-    : points.map(p => p.label);
-  
-  const labels = baseLabels.map(label => truncateLabel(label));
+/** Quantas linhas de detalhe cabem num tooltip antes de virar parede de texto. */
+const LIMITE_DETALHES = 10;
 
-  const bgMap = new Map<string, number>((backgroundPoints ?? []).map(p => [p.label, p.value]));
-  const filteredMap = new Map<string, number>(points.map(p => [p.label, p.value]));
-  const inactivityMap = new Map<string, number>((inactivityPoints ?? []).map(p => [p.label, p.value]));
-  const backgroundInactivityMap = new Map<string, number>((backgroundInactivityPoints ?? []).map(p => [p.label, p.value]));
+const EvasionChart: React.FC<EvasionChartProps> = ({
+  rotulos,
+  series,
+  altura = 260,
+  empilhar = false,
+  rotacionarRotulos = false,
+  rotulosCompletos,
+  tituloEixoEsquerda,
+  tituloEixoDireita,
+  eixoEsquerdaComZero = true,
+  maximoEixoEsquerda,
+  maximoRotulosX,
+}) => {
+  const usaEixoDireita = series.some((serie) => serie.eixo === 'direita');
 
-  // Construir datasets empilhados
-  const datasets: any[] = [];
-
-  // Série de exonerações/desistências (vermelha)
-  datasets.push({
-    label: 'Exonerações',
-    data: baseLabels.map(l => filteredMap.get(l) ?? 0),
-    backgroundColor: '#dc2626',
-    borderRadius: 6,
-    barPercentage: 0.95,
-    categoryPercentage: 0.95,
-    stack: 'stack1',
+  const datasets = series.map((serie) => {
+    const ehLinha = serie.tipo === 'linha';
+    return {
+      type: ehLinha ? ('line' as const) : ('bar' as const),
+      label: serie.rotulo,
+      data: serie.valores,
+      backgroundColor: serie.cor,
+      borderColor: serie.cor,
+      borderWidth: ehLinha ? 2 : 0,
+      borderRadius: ehLinha ? 0 : 4,
+      pointRadius: ehLinha ? 0 : undefined,
+      pointHoverRadius: ehLinha ? 4 : undefined,
+      tension: ehLinha ? 0.25 : undefined,
+      fill: false,
+      barPercentage: 0.95,
+      categoryPercentage: 0.9,
+      yAxisID: serie.eixo === 'direita' ? 'y2' : 'y',
+      stack: empilhar && !ehLinha ? 'principal' : undefined,
+      spanGaps: false,
+    };
   });
 
-  // Série de aposentadorias e afastamentos filtradas (dourada)
-  datasets.push({
-    label: 'Aposentadorias e Afastamentos',
-    data: baseLabels.map(l => inactivityMap.get(l) ?? 0),
-    backgroundColor: '#d4af37',
-    borderRadius: 6,
-    barPercentage: 0.95,
-    categoryPercentage: 0.95,
-    stack: 'stack1',
-  });
+  const ocultas = new Set(series.filter((serie) => serie.ocultaDaLegenda).map((serie) => serie.rotulo));
 
-  // Série de aposentadorias de outras áreas (dourada transparente)
-  if (backgroundInactivityPoints && backgroundInactivityPoints.length > 0) {
-    datasets.push({
-      label: 'Aposentadorias (outras áreas)',
-      data: baseLabels.map(l => Math.max((backgroundInactivityMap.get(l) ?? 0) - (inactivityMap.get(l) ?? 0), 0)),
-      backgroundColor: 'rgba(212,175,55,0.3)',
-      borderRadius: 6,
-      barPercentage: 0.95,
-      categoryPercentage: 0.95,
-      stack: 'stack1',
-    });
-  }
-
-  // Série restante de exonerações: total - filtrado (transparente)
-  if (backgroundPoints && backgroundPoints.length > 0) {
-    const totalInactivity = backgroundInactivityPoints ? backgroundInactivityMap : new Map();
-    datasets.push({
-      label: 'Exonerações (outras áreas)',
-      data: baseLabels.map(l => Math.max((bgMap.get(l) ?? 0) - (filteredMap.get(l) ?? 0) - (totalInactivity.get(l) ?? 0), 0)),
-      backgroundColor: 'rgba(220,38,38,0.15)',
-      borderRadius: 6,
-      barPercentage: 0.95,
-      categoryPercentage: 0.95,
-      stack: 'stack1',
-    });
-  }
-
-  const data = { labels, datasets };
-
-  const options: any = {
+  const opcoes: any = {
     responsive: true,
     maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
     plugins: {
-      legend: { 
-        display: true,
+      legend: {
+        display: series.length > 1,
         position: 'top',
         labels: {
           color: '#d1d5db',
-          font: {
-            size: 12
-          },
-          padding: 15,
+          font: { size: 12 },
+          padding: 14,
           usePointStyle: true,
-          filter: function(legendItem: any) {
-            // Ocultar séries de background/transparentes da legenda
-            return !['Exonerações (outras áreas)', 'Aposentadorias (outras áreas)'].includes(legendItem.text);
-          }
-        }
+          filter: (item: any) => !ocultas.has(item.text),
+        },
       },
       title: { display: false },
       tooltip: {
         callbacks: {
-          title: (context: any) => {
-            // Se for gráfico de unidades, mostrar o nome completo da unidade no tooltip
-            if (isUnidadeChart && context.length > 0) {
-              const labelTruncado = context[0].label as string;
-              // Encontrar o label original correspondente ao truncado
-              const labelOriginal = baseLabels[context[0].dataIndex];
-              return labelOriginal || labelTruncado;
-            }
-            return context.length > 0 ? context[0].label : '';
+          title: (contexto: any[]) => {
+            if (contexto.length === 0) return '';
+            const indice = contexto[0].dataIndex;
+            return rotulosCompletos?.[indice] ?? contexto[0].label;
           },
-          label: (context: any) => {
-            const datasetLabel = context.dataset.label;
-            const value = context.parsed.y;
-            
-            if (datasetLabel === 'Aposentadorias e Afastamentos') {
-              return `${value} aposentadorias/afastamentos`;
-            } else if (datasetLabel === 'Exonerações') {
-              return `${value} exonerações`;
-            } else {
-              return `${value} outros`;
-            }
+          label: (contexto: any) => {
+            const serie = series[contexto.datasetIndex];
+            const valor = contexto.parsed.y;
+            if (valor === null || valor === undefined) return '';
+            const formatado = Number.isInteger(valor) ? valor : valor.toFixed(1);
+            return `${serie.rotulo}: ${formatado}${serie.sufixo ?? ''}`;
           },
-          afterBody: (ctx: any) => {
-
-
-            try {
-              if (!ctx || ctx.length === 0) return [];
-              
-              // Para gráficos de unidade com apenas 2 datasets, encontrar qual está sendo apontado
-              // verificando qual é o dataset renderizado por último (mais próximo do mouse nas barras empilhadas)
-              let targetContext = ctx[0];
-              
-              if (isUnidadeChart && ctx.length > 1) {
-                // Nos gráficos de unidade, os datasets estão em ordem: Exonerações (idx 0), Aposentadorias (idx 1)
-                // O dataset sendo apontado é o que tem maior datasetIndex entre os visíveis
-                const maxDatasetIndex = Math.max(...ctx.map((c: any) => c.datasetIndex));
-                targetContext = ctx.find((c: any) => c.datasetIndex === maxDatasetIndex) || ctx[0];
+          afterBody: (contexto: any[]) => {
+            const linhas: string[] = [];
+            for (const item of contexto) {
+              const serie = series[item.datasetIndex];
+              const detalhes = serie?.detalhes?.[item.dataIndex];
+              if (!detalhes || detalhes.length === 0) continue;
+              if (contexto.length > 1) linhas.push('', serie.rotulo);
+              linhas.push(...detalhes.slice(0, LIMITE_DETALHES));
+              if (detalhes.length > LIMITE_DETALHES) {
+                linhas.push(`… e mais ${detalhes.length - LIMITE_DETALHES}`);
               }
-              
-              const labelTruncado = targetContext.label as string;
-              const labelOriginal = isUnidadeChart ? baseLabels[targetContext.dataIndex] : labelTruncado;
-              const datasetLabel = targetContext.dataset.label;
-              
-              let rows: any[] = [];
-              
-              // Escolher os dados corretos baseado no dataset
-              if (datasetLabel === 'Aposentadorias e Afastamentos') {
-                rows = (inactivityDetails[labelOriginal] ?? []).slice();
-              } else if (datasetLabel === 'Exonerações') {
-                rows = (details[labelOriginal] ?? []).slice();
-              }
-
-              console.log(inactivityDetails);
-              console.log(details);
-
-              console.log(rows);
-              
-              if (rows.length === 0) return [];
-              
-              // ordena por data asc (mais antigo primeiro)
-              const parseBrazilDate = (d: any): Date | null => {
-                if (!d || typeof d !== 'string') return null;
-                const parts = d.split('/');
-                if (parts.length !== 3) return null;
-                const day = Number(parts[0]);
-                const month = Number(parts[1]) - 1;
-                const year = Number(parts[2]);
-                if (Number.isNaN(day) || Number.isNaN(month) || Number.isNaN(year)) return null;
-                return new Date(year, month, day);
-              };
-              
-              rows.sort((a: any, b: any) => {
-                const da = parseBrazilDate(a.date);
-                const db = parseBrazilDate(b.date);
-                if (da && db) return da.getTime() - db.getTime();
-                if (da && !db) return -1;
-                if (!da && db) return 1;
-                return a.name.localeCompare(b.name);
-              });
-              
-              // map to lines like 'Name — DD/MM/YYYY'
-              return rows.map((r: any) => `${r.name} — ${r.date ?? '—'}`);
-            } catch (e) {
-              return [];
             }
-          }
+            return linhas;
+          },
         },
       },
     },
     scales: {
       x: {
-        ticks: { 
-          color: '#d1d5db', 
-          maxRotation: isUnidadeChart ? 90 : 0, 
-          minRotation: isUnidadeChart ? 90 : 0 
+        stacked: empilhar,
+        ticks: {
+          color: '#d1d5db',
+          maxRotation: rotacionarRotulos ? 90 : 0,
+          minRotation: rotacionarRotulos ? 90 : 0,
+          autoSkip: true,
+          maxTicksLimit: maximoRotulosX,
         },
         grid: { display: false },
       },
       y: {
-        beginAtZero: true,
+        stacked: empilhar,
+        beginAtZero: eixoEsquerdaComZero,
+        max: maximoEixoEsquerda,
         ticks: { color: '#9ca3af' },
         grid: { color: '#374151' },
-        stacked: true,
+        title: tituloEixoEsquerda
+          ? { display: true, text: tituloEixoEsquerda, color: '#9ca3af' }
+          : undefined,
       },
+      ...(usaEixoDireita
+        ? {
+            y2: {
+              position: 'right',
+              beginAtZero: true,
+              ticks: { color: '#9ca3af' },
+              grid: { display: false },
+              title: tituloEixoDireita
+                ? { display: true, text: tituloEixoDireita, color: '#9ca3af' }
+                : undefined,
+            },
+          }
+        : {}),
     },
   };
 
   return (
-    <div style={{ width: '100%', height }} className="bg-gray-900/50 rounded border border-gray-800">
-      <Bar data={data} options={options} />
+    <div style={{ width: '100%', height: altura }} className="bg-gray-900/50 rounded border border-gray-800 p-2">
+      <Chart type="bar" data={{ labels: rotulos, datasets }} options={opcoes} />
     </div>
   );
 };
 
 export default EvasionChart;
-

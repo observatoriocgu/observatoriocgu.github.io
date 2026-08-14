@@ -1,6 +1,0 @@
-NOME;CONCURSO;CARGO;MODALIDADE;POSICAO;IGNORAR;OBSERVAÇÃO;RENUNCIOU;FIM_DE_FILA
-AUDITOR EXEMPLO 01;TCU;Auditor Federal de Controle Externo;Ampla Concorrência;42;FALSE;EXEMPLO — dado fictício;FALSE;FALSE
-AUDITOR EXEMPLO 01;BACEN;Analista do Banco Central;Ampla Concorrência;118;FALSE;EXEMPLO — dado fictício, mesma pessoa em dois concursos;FALSE;FALSE
-AUDITOR EXEMPLO 02;RECEITA FEDERAL;Auditor-Fiscal da Receita Federal;Ampla Concorrência;250;FALSE;EXEMPLO — dado fictício;FALSE;FALSE
-AUDITOR EXEMPLO 07;AGU;Advogado da União;Ampla Concorrência;33;FALSE;EXEMPLO — dado fictício;FALSE;FALSE
-AUDITOR EXEMPLO 09;TCU;Auditor Federal de Controle Externo;Ampla Concorrência;87;FALSE;EXEMPLO — dado fictício, veterano aprovado em outro concurso;FALSE;FALSE

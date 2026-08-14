@@ -1,444 +1,259 @@
 import React, { useEffect, useMemo, useState } from 'react';
 
-type Change = {
-  masp?: string;
-  inscricao?: string;
-  nome: string;
-  fromSituacao: string;
-  toSituacao: string;
-  orgaoDestino: string | null;
-  before: Record<string, string>;
-  after: Record<string, string>;
-};
+import { rotuloDoConcurso } from '../constants';
+import { AlteracaoRegistro, LogDeAlteracoes, MesDeAlteracoes, RegistroAuditor } from '../types';
+import { carregarCsv, carregarJsonPublico, formatarCompetenciaLonga, formatarDataIsoParaBr } from '../lib/dados';
+import { comoRegistros, motivoDe, urlDoAto } from '../lib/painel';
+import { SelosDaLinha } from './Selos';
 
-type CommitInfo = {
-  hash: string;
-  date: string;
-  author: string;
-  message: string;
-};
+type Filtro = 'todas' | 'saida' | 'entrada';
 
-type HistoryItem = {
-  commit: CommitInfo;
-  changeCount: number;
-  changes: Change[];
-};
-
-type HistoryRow = Change & {
-  commitDate: string;
-  currentOrgaoDestino?: string;
-  currentDataExoneracao?: string;
-};
-
-type CurrentRecord = Record<string, string | null>;
-
-const analisarDataBrasil = (d: any): Date | null => {
-  if (!d || typeof d !== 'string') return null;
-  const partes = d.split('/');
-  if (partes.length !== 3) return null;
-  const dia = Number(partes[0]);
-  const mes = Number(partes[1]) - 1;
-  const ano = Number(partes[2]);
-  if (Number.isNaN(dia) || Number.isNaN(mes) || Number.isNaN(ano)) return null;
-  return new Date(ano, mes, dia);
-};
-
-const formatDate = (dateString: string | undefined | null): string => {
-  if (!dateString) return '—';
-
-  const isoMatch = dateString.match(
-    /^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})(?::(\d{2}))?(?:\.\d+)?(?:Z|([+-]\d{2}):?(\d{2}))?$/,
-  );
-
-  if (isoMatch) {
-    const date = new Date(dateString);
-    return new Intl.DateTimeFormat('pt-BR', {
-      timeZone: 'America/Sao_Paulo',
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    }).format(date);
-  }
-
-  const date = analisarDataBrasil(dateString);
-  if (date) {
-    return new Intl.DateTimeFormat('pt-BR', {
-      timeZone: 'America/Sao_Paulo',
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    }).format(date);
-  }
-
-  return dateString;
-};
-
-const parseCsv = (texto: string): CurrentRecord[] => {
-  const cleanText = texto.replace(/^\uFEFF/, '');
-  const linhas = cleanText.split(/\r?\n/).filter(l => l.trim() !== '');
-  if (linhas.length === 0) return [];
-
-  const normalizeHeader = (header: string) => header.replace(/^\uFEFF/, '').trim();
-  const canonicalHeader = (header: string) => {
-    const normalized = normalizeHeader(header).toUpperCase();
-    if (normalized === 'HGV-0') return 'MASP';
-    return normalized;
-  };
-
-  const analisarLinha = (linha: string) => {
-    const partes: string[] = [];
-    let atual = '';
-    let entreAspas = false;
-    for (let i = 0; i < linha.length; i++) {
-      const caractere = linha[i];
-      if (caractere === '"') {
-        if (entreAspas && linha[i + 1] === '"') {
-          atual += '"';
-          i++;
-        } else {
-          entreAspas = !entreAspas;
-        }
-        continue;
-      }
-      if (caractere === ';' && !entreAspas) {
-        partes.push(atual);
-        atual = '';
-        continue;
-      }
-      atual += caractere;
-    }
-    partes.push(atual);
-    return partes;
-  };
-
-  const cabecalhos = analisarLinha(linhas[0]).map(coluna => canonicalHeader(coluna));
-  const registros: CurrentRecord[] = [];
-
-  for (let i = 1; i < linhas.length; i++) {
-    const linha = linhas[i];
-    const partes = analisarLinha(linha);
-    while (partes.length < cabecalhos.length) partes.push('');
-    const objeto: CurrentRecord = {};
-    for (let j = 0; j < cabecalhos.length; j++) {
-      objeto[cabecalhos[j]] = partes[j] ? partes[j].trim() : null;
-    }
-    registros.push(objeto);
-  }
-
-  return registros;
-};
-
-const normalizeKey = (value: string | null | undefined) => String(value ?? '').trim().toUpperCase();
-
-const pickFirstNonEmpty = (...values: Array<string | null | undefined>) => {
-  for (const value of values) {
-    if (value != null) {
-      const trimmed = String(value).trim();
-      if (trimmed !== '') return trimmed;
-    }
-  }
-  return '';
-};
-
-const buildCurrentRecordMap = (currentRecords: CurrentRecord[]) => {
-  const map = new Map<string, CurrentRecord>();
-  for (const registro of currentRecords) {
-    const key = normalizeKey(pickFirstNonEmpty(registro['INSCRICAO'], registro['MASP'], registro['HGV-0'], registro['NOME']));
-    if (!key) continue;
-    map.set(key, registro);
-  }
-  return map;
-};
-
-const normalizeSituacao = (valor: string | null | undefined) => {
-  const situacao = String(valor ?? '').trim().toUpperCase();
-  if (situacao === 'EXONERAÇÃO' || situacao === 'EXONERACAO') return 'EXONERADO';
-  return situacao;
-};
-
-const formatDescription = (change: Change, currentOrgaoDestino?: string): React.ReactNode => {
-  const situacao = normalizeSituacao(change.toSituacao);
-  const destino = currentOrgaoDestino?.trim() || change.orgaoDestino?.trim();
-  const pessoa = <strong className="text-amber-400">{change.nome}</strong>;
-  let description: React.ReactNode;
-
-  if (situacao === 'EXONERADO') {
-    description = <>Exoneração de {pessoa}.</>;
-  } else if (situacao === 'DESISTENTE') {
-    description = <>{pessoa} desistiu de tomar posse.</>;
-  } else if (situacao === 'APOSENTADO') {
-    description = <>Aposentadoria de {pessoa}.</>;
-  } else if (situacao === 'AFASTAMENTO PRELIMINAR À APOSENTADORIA') {
-    description = <>Afastamento de {pessoa}.</>;
-  } else {
-    description = <>{pessoa} teve alteração de situação para {change.toSituacao}.</>;
-  }
-
-  if (destino && situacao !== 'APOSENTADO') {
-    description = <>{description} Órgão de destino: <strong className="text-amber-400">{destino}</strong>.</>;
-  }
-
-  return description;
-};
-
-const isRetirement = (row: HistoryRow | Change) => {
-  const situacao = ((row as HistoryRow).toSituacao ?? (row as Change).toSituacao ?? '').trim().toUpperCase();
-  return situacao === 'APOSENTADO' || situacao === 'AFASTAMENTO PRELIMINAR À APOSENTADORIA';
-};
-
-const extractLatestChanges = (history: HistoryItem[], currentMap: Map<string, CurrentRecord>): HistoryRow[] => {
-  console.log('[HistoryPage] extractLatestChanges: iniciando', history.length, 'history items');
-  const latestMap = new Map<string, { change: Change; commit: CommitInfo }>();
-  const sorted = [...history].sort((a, b) => b.commit.date.localeCompare(a.commit.date));
-
-  for (const item of sorted) {
-    for (const change of item.changes) {
-      const key = normalizeKey(pickFirstNonEmpty(change.inscricao, change.masp, change.nome));
-      if (!key) {
-        console.log('[HistoryPage] extractLatestChanges: change sem key', change);
-        continue;
-      }
-      if (!latestMap.has(key)) {
-        latestMap.set(key, { change, commit: item.commit });
-      }
-    }
-  }
-
-  const latestRows: HistoryRow[] = Array.from(latestMap.values())
-    .map(({ change, commit }) => {
-      const key = normalizeKey(pickFirstNonEmpty(change.inscricao, change.masp, change.nome));
-      const current = currentMap.get(key);
-      if (!current) {
-        console.log('[HistoryPage] extractLatestChanges: currentMap não encontrou registro para', key, change.nome, change.toSituacao);
-      }
-      const currentOrgaoDestino = current?.['ORGAO_DESTINO'] ?? undefined;
-      const currentDataExoneracao = current?.['DATA_EXONERACAO'] ?? current?.['DATA_INATIVIDADE'] ?? undefined;
-      return {
-        ...change,
-        commitDate: commit.date,
-        currentOrgaoDestino,
-        currentDataExoneracao,
-      };
-    });
-
-  console.log('[HistoryPage] extractLatestChanges: latestRows count', latestRows.length);
-
-  const latestRowByKey = new Map<string, HistoryRow>();
-  for (const row of latestRows) {
-    const key = normalizeKey(pickFirstNonEmpty(row.inscricao, row.masp, row.nome));
-    latestRowByKey.set(key, row);
-  }
-
-  const retirementRows: HistoryRow[] = [];
-  const addedRetirementKeys = new Set<string>();
-  for (const item of sorted) {
-    for (const change of item.changes) {
-      if (!isRetirement(change)) continue;
-      const key = normalizeKey(pickFirstNonEmpty(change.inscricao, change.masp, change.nome));
-      if (!key || addedRetirementKeys.has(key)) continue;
-      const existing = latestRowByKey.get(key);
-      if (existing && isRetirement(existing)) {
-        console.log('[HistoryPage] extractLatestChanges: já existe aposentadoria para', key, change.nome);
-        continue;
-      }
-
-      if (!currentMap.has(key)) {
-        console.log('[HistoryPage] extractLatestChanges: retirement key sem currentMap', key, change.nome, change.toSituacao);
-      }
-      const current = currentMap.get(key);
-      const currentOrgaoDestino = current?.['ORGAO_DESTINO'] ?? undefined;
-      const currentDataExoneracao = current?.['DATA_EXONERACAO'] ?? current?.['DATA_INATIVIDADE'] ?? undefined;
-      retirementRows.push({
-        ...change,
-        commitDate: item.commit.date,
-        currentOrgaoDestino,
-        currentDataExoneracao,
-      });
-      addedRetirementKeys.add(key);
-    }
-  }
-
-  console.log('[HistoryPage] extractLatestChanges: retirementRows count', retirementRows.length);
-  return [...latestRows, ...retirementRows].sort((a, b) => b.commitDate.localeCompare(a.commitDate));
-};
-
+/**
+ * O histórico de alterações.
+ *
+ * Até a Fase 2 este log era reconstruído do histórico do Git do `dados.csv` —
+ * arqueologia de commits, com a data do commit no lugar da data do fato. Agora
+ * ele vem do diff mês a mês do SIAPE: cada bloco é uma competência, e a data é
+ * a do dado, não a de quem o publicou. Por isso não existe mais `hash`, `autor`
+ * nem `mensagem` aqui.
+ */
 const HistoryPage: React.FC = () => {
-  const [historyRows, setHistoryRows] = useState<HistoryRow[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [historySource, setHistorySource] = useState<string | null>(null);
+  const [log, setLog] = useState<LogDeAlteracoes | null>(null);
+  const [registrosPorId, setRegistrosPorId] = useState<Map<string, RegistroAuditor>>(new Map());
+  const [carregando, setCarregando] = useState(true);
+  const [erro, setErro] = useState<string | null>(null);
+
+  const [filtro, setFiltro] = useState<Filtro>('todas');
+  const [busca, setBusca] = useState('');
+  const [mesesVisiveis, setMesesVisiveis] = useState(12);
 
   useEffect(() => {
-    const caminhos = [
-      '/data/dados.csv',
-      '/evasao/data/dados.csv',
-      'data/dados.csv',
-      './data/dados.csv',
-      '/evasao/dist/data/dados.csv',
-      '/evasao/dist/assets/dados.csv',
-      '/evasao/dados.csv',
-      '/dados.csv',
-      'dist/data/dados.csv',
-      'assets/dados.csv',
-    ];
+    let montado = true;
 
-    const criarUrlSemCache = (baseUrl: string) => baseUrl + (baseUrl.includes('?') ? '&' : '?') + 'v=' + Date.now();
-
-    const fetchCurrentData = async () => {
-      console.log('[HistoryPage] fetchCurrentData: iniciando');
-      for (const caminho of caminhos) {
-        try {
-          console.log('[HistoryPage] fetchCurrentData: tentando', caminho);
-          const response = await fetch(criarUrlSemCache(caminho), { cache: 'no-store', headers: { 'cache-control': 'no-cache' } as any });
-          console.log('[HistoryPage] fetchCurrentData: resposta', caminho, response.status);
-          if (!response.ok) continue;
-          let texto = await response.text();
-          texto = texto.replace(/^\uFEFF/, '');
-          const registros = parseCsv(texto);
-          console.log('[HistoryPage] fetchCurrentData: registros extraídos', caminho, registros.length);
-          if (registros.length === 0) continue;
-          return registros;
-        } catch (erro) {
-          console.log('[HistoryPage] fetchCurrentData: falha', caminho, erro);
-          continue;
-        }
-      }
-      console.log('[HistoryPage] fetchCurrentData: nenhum arquivo atual encontrado');
-      return [] as CurrentRecord[];
-    };
-
-    const loadHistory = async () => {
+    (async () => {
       try {
-        console.log('[HistoryPage] loadHistory: iniciando');
-        const baseUrl = import.meta.env.BASE_URL ?? './';
-        const caminhosHistorico = [
-          `${baseUrl}alteracoes-registros.json`,
-          'alteracoes-registros.json',
-          '/alteracoes-registros.json',
-          '/evasao/alteracoes-registros.json',
-        ];
-        console.log('[HistoryPage] loadHistory: baseUrl=', baseUrl, 'caminhosHistorico=', caminhosHistorico);
-
-        const [currentRecords, historyResponse] = await Promise.all([
-          fetchCurrentData(),
-          (async () => {
-            let response: Response | null = null;
-            for (const caminho of caminhosHistorico) {
-              try {
-                console.log('[HistoryPage] loadHistory: tentando histórico', caminho);
-                response = await fetch(criarUrlSemCache(caminho), { cache: 'no-store', headers: { 'cache-control': 'no-cache' } as any });
-                console.log('[HistoryPage] loadHistory: resposta histórico', caminho, response?.status);
-                if (response.ok) {
-                  setHistorySource(caminho);
-                  return response;
-                }
-              } catch (erro) {
-                console.log('[HistoryPage] loadHistory: falha histórico', caminho, erro);
-                // tentar próximo caminho
-              }
-            }
-            return response;
-          })(),
+        // O CSV é opcional: sem ele o histórico ainda se lê, só perde o motivo e
+        // o link do ato. O JSON, não — sem ele não há o que mostrar.
+        const [logCarregado, linhas] = await Promise.all([
+          carregarJsonPublico<LogDeAlteracoes>('alteracoes-registros.json'),
+          carregarCsv('dados.csv').catch(() => []),
         ]);
-
-        if (!historyResponse || !historyResponse.ok) {
-          throw new Error(`Falha ao carregar histórico (status ${historyResponse?.status ?? 'sem resposta'})`);
-        }
-
-        const payload = await historyResponse.json();
-        const historyData: HistoryItem[] = Array.isArray(payload.history)
-          ? payload.history
-          : Array.isArray(payload)
-            ? payload
-            : [];
-        console.log('[HistoryPage] loadHistory: historyData items', historyData.length);
-        if (historyData.length > 0) {
-          console.log('[HistoryPage] loadHistory: first item', historyData[0]);
-        }
-
-        const currentMap = buildCurrentRecordMap(currentRecords);
-        console.log('[HistoryPage] loadHistory: currentMap size', currentMap.size);
-        setHistoryRows(extractLatestChanges(historyData, currentMap));
-      } catch (e) {
-        setError(e instanceof Error ? e.message : 'Erro desconhecido ao carregar o histórico.');
+        if (!montado) return;
+        setLog(logCarregado);
+        // Junta pelo Id_SERVIDOR_PORTAL, e só por ele (D12): a cadeia
+        // INSCRICAO → MASP → HGV-0 → NOME que existia aqui está revogada, e
+        // casar por nome atribuiria ato de uma pessoa a seu homônimo.
+        setRegistrosPorId(
+          new Map(comoRegistros(linhas).map((registro) => [registro.ID_SERVIDOR_PORTAL, registro]))
+        );
+      } catch (falha) {
+        if (montado) setErro(falha instanceof Error ? falha.message : 'Erro ao carregar o histórico.');
       } finally {
-        setLoading(false);
+        if (montado) setCarregando(false);
       }
-    };
+    })();
 
-    loadHistory();
+    return () => {
+      montado = false;
+    };
   }, []);
 
-  const retirementCount = useMemo(() => historyRows.filter(isRetirement).length, [historyRows]);
+  const normalizar = (valor: string) =>
+    String(valor ?? '').normalize('NFD').replace(/\p{Diacritic}/gu, '').toLocaleLowerCase('pt-BR').trim();
 
-  const summaryText = useMemo(() => {
-    if (loading) return 'Carregando histórico de alterações...';
-    if (error) return 'Não foi possível carregar o histórico.';
-    return `Hisórico de alterações do Observatório das Evasões`;
-  }, [historyRows.length, retirementCount, loading, error]);
+  const meses: MesDeAlteracoes[] = useMemo(() => {
+    if (!log) return [];
+    const termo = normalizar(busca);
+    return log.history
+      .map((mes) => ({
+        ...mes,
+        changes: mes.changes.filter(
+          (mudanca) =>
+            (filtro === 'todas' || mudanca.tipo === filtro) &&
+            (!termo || normalizar(mudanca.nome).includes(termo))
+        ),
+      }))
+      .filter((mes) => mes.changes.length > 0);
+  }, [log, filtro, busca]);
+
+  useEffect(() => setMesesVisiveis(12), [filtro, busca]);
+
+  const totalFiltrado = meses.reduce((soma, mes) => soma + mes.changes.length, 0);
+
+  const descrever = (mudanca: AlteracaoRegistro): React.ReactNode => {
+    const pessoa = <strong className="text-amber-400">{mudanca.nome}</strong>;
+    const registro = registrosPorId.get(mudanca.id);
+
+    if (mudanca.tipo === 'entrada') {
+      return (
+        <>
+          {pessoa} entrou em exercício na CGU ({mudanca.unidade || 'unidade não informada'}), coorte{' '}
+          {rotuloDoConcurso(mudanca.concurso)}.
+        </>
+      );
+    }
+
+    const motivo = registro ? motivoDe(registro) : mudanca.toSituacao;
+    const destino = registro?.ORGAO_DESTINO || mudanca.orgaoDestino;
+
+    return (
+      <>
+        {pessoa} deixou a CGU ({mudanca.unidade || 'unidade não informada'}) — {motivo.toLocaleLowerCase('pt-BR')}
+        {destino ? (
+          <>
+            , para <strong className="text-amber-400">{destino}</strong>
+          </>
+        ) : null}
+        .
+      </>
+    );
+  };
+
+  const botao = (valor: Filtro, rotulo: string) => (
+    <button
+      key={valor}
+      type="button"
+      onClick={() => setFiltro(valor)}
+      aria-pressed={filtro === valor}
+      className={`rounded px-3 py-1 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-red-400 ${
+        filtro === valor
+          ? 'bg-red-500 text-white shadow-lg'
+          : 'border border-gray-700 bg-gray-800 text-gray-300 hover:bg-gray-700'
+      }`}
+    >
+      {rotulo}
+    </button>
+  );
 
   return (
-    <div className="min-h-screen bg-gray-950 text-gray-200 p-4 sm:p-6 lg:p-8">
-      <div className="max-w-6xl mx-auto">
-        <header className="mb-10 text-center">
-          <h1 className="text-4xl md:text-5xl font-extrabold text-red-400">Histórico de Alterações</h1>
+    <div className="min-h-screen bg-gray-950 p-4 text-gray-200 sm:p-6 lg:p-8">
+      <div className="mx-auto max-w-5xl">
+        <header className="mb-8 text-center">
+          <h1 className="text-4xl font-extrabold text-red-400 md:text-5xl">Histórico de alterações</h1>
+          <p className="mt-2 text-lg font-medium text-amber-400">
+            Auditores Federais de Finanças e Controle &mdash; CGU
+          </p>
         </header>
 
-        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-6">
+        <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <p className="text-gray-300">{summaryText}</p>
-            {historySource && !loading && !error}
+            <p className="text-gray-300">
+              {carregando
+                ? 'Carregando o histórico...'
+                : erro
+                  ? 'Não foi possível carregar o histórico.'
+                  : log
+                    ? `${log.totalChangeCount.toLocaleString('pt-BR')} movimentações entre ${formatarCompetenciaLonga(log.primeiroMes)} e ${formatarCompetenciaLonga(log.ultimoMes)}.`
+                    : ''}
+            </p>
+            {log && !carregando && !erro && <p className="mt-1 text-sm text-gray-500">Fonte: {log.fonte}.</p>}
           </div>
-          <div className="flex flex-wrap gap-3 justify-center sm:justify-end">
-            <a
-              href="./index.html"
-              className="inline-flex items-center px-5 py-3 rounded-lg bg-gray-800 border border-gray-700 text-sm font-semibold text-white hover:bg-gray-700 transition-colors"
-            >
-              Voltar ao dashboard
-            </a>
-          </div>
+          <a
+            href="./index.html"
+            className="inline-flex items-center justify-center rounded-lg border border-gray-700 bg-gray-800 px-5 py-3 text-sm font-semibold text-white transition-colors hover:bg-gray-700"
+          >
+            Voltar ao dashboard
+          </a>
         </div>
 
-        {loading && (
-          <div className="rounded-2xl border border-gray-800 bg-gray-900 p-8 text-center text-gray-400">Carregando histórico de alterações...</div>
+        {!carregando && !erro && (
+          <div className="mb-6 flex flex-wrap items-end gap-3">
+            <div className="flex flex-wrap gap-2">
+              {botao('todas', 'Todas')}
+              {botao('saida', 'Saídas')}
+              {botao('entrada', 'Entradas')}
+            </div>
+            <input
+              type="search"
+              value={busca}
+              onChange={(evento) => setBusca(evento.target.value)}
+              placeholder="Buscar por nome..."
+              className="w-full rounded-lg border border-gray-700 bg-gray-950 px-3 py-2 text-sm text-gray-200 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-red-400 sm:w-72"
+            />
+            <span className="pb-2 text-sm text-gray-500">
+              {totalFiltrado.toLocaleString('pt-BR')} no recorte
+            </span>
+          </div>
         )}
 
-        {error && (
+        {erro && (
           <div className="rounded-2xl border border-red-700 bg-red-950/40 p-6 text-center text-red-300">
-            <strong>Erro:</strong> {error}
+            <strong>Erro:</strong> {erro}
           </div>
         )}
 
-        {!loading && !error && historyRows.length === 0 && (
+        {!carregando && !erro && meses.length === 0 && (
           <div className="rounded-2xl border border-gray-800 bg-gray-900 p-8 text-center text-gray-400">
-            Não há alterações de situação relevantes registradas no histórico.
+            Nenhuma movimentação neste recorte.
           </div>
         )}
 
-        {!loading && !error && historyRows.length > 0 && (
-          <div className="overflow-x-auto rounded-3xl border border-gray-800 bg-gray-900 shadow-xl">
-            <table className="min-w-full divide-y divide-gray-800 text-left">
-              <thead className="bg-gray-950">
-                <tr>
-                  <th className="px-4 py-4 text-sm font-semibold uppercase tracking-wider text-gray-400">Data / Hora</th>
-                  <th className="px-4 py-4 text-sm font-semibold uppercase tracking-wider text-gray-400">Alteração</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-800 bg-gray-900">
-                {historyRows.map((row, index) => (
-                  <tr key={`${row.masp}-${row.commitDate}-${index}`}>
-                    <td className="whitespace-nowrap px-4 py-4 text-sm text-gray-300">{formatDate(row.commitDate)}</td>
-                    <td className="px-4 py-4 text-sm text-gray-300">{formatDescription(row, row.currentOrgaoDestino)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+        <div className="space-y-4">
+          {meses.slice(0, mesesVisiveis).map((mes) => (
+            <section key={mes.mes} className="overflow-hidden rounded-2xl border border-gray-800 bg-gray-900">
+              <header className="flex items-baseline justify-between border-b border-gray-800 bg-gray-950 px-5 py-3">
+                <h2 className="text-lg font-semibold text-amber-400">{formatarCompetenciaLonga(mes.mes)}</h2>
+                <span className="text-sm text-gray-500">
+                  {mes.changes.length} de {mes.changeCount} movimentação(ões)
+                </span>
+              </header>
+              <ul className="divide-y divide-gray-800">
+                {mes.changes.map((mudanca) => {
+                  const registro = registrosPorId.get(mudanca.id);
+                  const ato = registro ? urlDoAto(registro) : '';
+                  return (
+                    <li key={`${mes.mes}-${mudanca.id}`} className="flex flex-wrap items-baseline gap-2 px-5 py-3 text-sm">
+                      <span
+                        className={`rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase ${
+                          mudanca.tipo === 'saida'
+                            ? 'bg-red-500/15 text-red-300'
+                            : 'bg-emerald-500/15 text-emerald-300'
+                        }`}
+                      >
+                        {mudanca.tipo === 'saida' ? 'saída' : 'entrada'}
+                      </span>
+                      <span className="text-gray-300">{descrever(mudanca)}</span>
+                      {mudanca.tipo === 'saida' && registro && (
+                        <SelosDaLinha
+                          fonte={registro.ORGAO_DESTINO ? registro.FONTE_DESTINO : registro.FONTE_MOTIVO}
+                          verificado={registro.VERIFICADO === 'SIM'}
+                          compacto
+                        />
+                      )}
+                      {ato && (
+                        <a
+                          href={ato}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          title={registro?.ATO_SAIDA_TITULO}
+                          className="text-xs text-amber-400 hover:text-amber-300"
+                        >
+                          ato de {formatarDataIsoParaBr(registro?.DATA_PUBLICACAO_SAIDA ?? '') || 'data não informada'}
+                        </a>
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
+            </section>
+          ))}
+        </div>
+
+        {meses.length > mesesVisiveis && (
+          <div className="mt-6 text-center">
+            <button
+              type="button"
+              onClick={() => setMesesVisiveis((atual) => atual + 12)}
+              className="rounded-lg border border-gray-700 bg-gray-800 px-5 py-3 text-sm font-semibold text-white transition-colors hover:bg-gray-700"
+            >
+              Carregar mais 12 competências
+            </button>
           </div>
         )}
+
+        <p className="mt-8 text-center text-sm text-gray-500">
+          Cada bloco é uma competência do SIAPE. A data é a do dado, não a de quando o observatório o publicou.
+        </p>
       </div>
     </div>
   );

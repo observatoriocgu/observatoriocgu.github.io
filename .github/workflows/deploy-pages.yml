@@ -12,12 +12,15 @@ on:
   push:
     branches:
       - main
-  # O push feito pelo workflow de histórico usa o GITHUB_TOKEN e, por regra do
-  # GitHub, não dispara outros workflows. Sem este gatilho, uma atualização do
-  # dados.csv nunca chegaria ao site publicado.
+  # O push do crawler do DOU usa o GITHUB_TOKEN e, por regra do GitHub, não
+  # dispara outros workflows. Sem este gatilho, uma atualização do
+  # dias_sem_perder_affc.json nunca chegaria ao site publicado.
+  #
+  # O gatilho do antigo "Atualizar registros de alterações" saiu junto com o
+  # workflow: o alteracoes-registros.json não é mais reconstruído do histórico
+  # do Git, e sim gerado pelo diff mensal do SIAPE, em construir_painel.py.
   workflow_run:
     workflows:
-      - "Atualizar histórico de alterações do dados.csv"
       - "Atualizar saídas do DOU (AFFC)"
     types:
       - completed
@@ -75,12 +78,17 @@ jobs:
           mkdir -p _site/evasao/data
           cp evasao/data/*.csv _site/evasao/data/
 
-          # Trechos do DOU arquivados: são o destino dos links do card
-          # "dias sem perder um Auditor". Sem esta cópia, os links dão 404.
-          if [ -d evasao/data/dias_sem_perder_AFFC ]; then
-            mkdir -p _site/evasao/data/dias_sem_perder_AFFC
-            cp evasao/data/dias_sem_perder_AFFC/*.html _site/evasao/data/dias_sem_perder_AFFC/ 2>/dev/null || true
-          fi
+          # Trechos do DOU arquivados. O `cp evasao/data/*.csv` acima é um glob
+          # RASO: subpasta não entra sozinha, e sem estas cópias os links dos
+          # atos dão 404.
+          #   dias_sem_perder_AFFC/ -> links do card de dias sem perder
+          #   saidas_dou/           -> ato de cada saída, na tabela e no gráfico
+          for pasta in dias_sem_perder_AFFC saidas_dou; do
+            if [ -d "evasao/data/$pasta" ]; then
+              mkdir -p "_site/evasao/data/$pasta"
+              cp "evasao/data/$pasta"/*.html "_site/evasao/data/$pasta/" 2>/dev/null || true
+            fi
+          done
 
           # Conteúdo herdado do projeto original. A Fase 5 do PLANO.md decide
           # removê-lo; até lá, é copiado para não sumir do ar sem aviso.
