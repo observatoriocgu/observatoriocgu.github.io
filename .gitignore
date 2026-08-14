@@ -18,6 +18,12 @@ pnpm-debug.log*
 .env.*
 !.env.example
 
+# Snapshots mensais do Portal da Transparência. Os CSVs brutos do portal têm
+# ~420 MB cada (o GitHub recusa acima de 100 MB) e os filtrados por AFFC somam
+# ~70 MB — dado de trabalho, regenerável, não pertence ao repo.
+# Gerar com: python evasao/scripts/filtrar_affc.py
+evasao/data/historico_transparencia_cgu/
+
 # Python (evasao/scripts/, evasao/data/processador.ipynb)
 __pycache__/
 *.py[cod]

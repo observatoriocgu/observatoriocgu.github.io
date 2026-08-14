@@ -190,8 +190,87 @@ const construirChaveTripla = (concurso: string, cargo: string, modalidade: strin
   return [normalizeKey(concurso), normalizeKey(cargo), normalizeKey(modalidade)].join('||');
 };
 
+/**
+ * Saídas de AFFC da CGU publicadas no DOU, geradas por
+ * `evasao/scripts/dou_saidas_affc.py`. O JSON guarda datas, nunca a contagem de
+ * dias — quem conta é o navegador, para o card não congelar no dia do crawler.
+ */
+interface EventoSaidaDou {
+  tipo: 'vacancia' | 'aposentadoria' | 'exoneracao';
+  rotulo: string;
+  titulo: string;
+  dataPublicacao: string; // AAAA-MM-DD
+  urlDou: string;
+  arquivo: string | null;
+}
+
+interface SaidasDou {
+  geradoEm: string;
+  dataMaisRecente: string;
+  tipoMaisRecente: string;
+  eventos: EventoSaidaDou[];
+}
+
+const TIPOS_SAIDA_DOU: Array<{ tipo: EventoSaidaDou['tipo']; rotuloCurto: string }> = [
+  { tipo: 'vacancia', rotuloCurto: 'Vacância' },
+  { tipo: 'aposentadoria', rotuloCurto: 'Aposentadoria' },
+  { tipo: 'exoneracao', rotuloCurto: 'Exoneração' },
+];
+
+const diasDesde = (dataIso: string): number | null => {
+  const [ano, mes, dia] = dataIso.split('-').map(Number);
+  if (!ano || !mes || !dia) return null;
+  // Meio-dia UTC dos dois lados: evita que o fuso do Brasil jogue a conta um dia
+  // para trás ou para frente.
+  const evento = Date.UTC(ano, mes - 1, dia, 12);
+  const agora = new Date();
+  const hoje = Date.UTC(agora.getFullYear(), agora.getMonth(), agora.getDate(), 12);
+  return Math.max(0, Math.round((hoje - evento) / 86400000));
+};
+
+const formatarDataBr = (dataIso: string): string => {
+  const [ano, mes, dia] = dataIso.split('-');
+  return `${dia}/${mes}/${ano}`;
+};
+
 const App: React.FC = () => {
   const [diasDesdeUltimaEvasao, setDiasDesdeUltimaEvasao] = useState<number | null>(null);
+  const [saidasDou, setSaidasDou] = useState<SaidasDou | null>(null);
+  const [erroSaidasDou, setErroSaidasDou] = useState<string | null>(null);
+
+  // Saídas de AFFC no DOU — alimenta o card "dias sem perder um Auditor".
+  useEffect(() => {
+    let montado = true;
+    const base = (import.meta as any).env?.BASE_URL ?? './';
+    const caminhos = [
+      `${base}dias_sem_perder_affc.json`,
+      'dias_sem_perder_affc.json',
+      '/evasao/dias_sem_perder_affc.json',
+    ];
+
+    (async () => {
+      for (const caminho of caminhos) {
+        try {
+          const resposta = await fetch(`${caminho}?v=${Date.now()}`);
+          if (!resposta.ok) continue;
+          const dados = (await resposta.json()) as SaidasDou;
+          if (!dados?.dataMaisRecente) continue;
+          if (montado) {
+            setSaidasDou(dados);
+            setErroSaidasDou(null);
+          }
+          return;
+        } catch {
+          // tenta o próximo caminho
+        }
+      }
+      if (montado) setErroSaidasDou('Não foi possível carregar as saídas do DOU.');
+    })();
+
+    return () => {
+      montado = false;
+    };
+  }, []);
 
   const [dadosBrutos, setDadosBrutos] = useState<any[]>([]);
   const [dadosAprovacoesOutrosConcursos, setDadosAprovacoesOutrosConcursos] = useState<AprovacaoOutroConcursoRaw[]>([]);
@@ -1299,6 +1378,17 @@ const App: React.FC = () => {
     }
   }
 
+  const baseUrlApp = (import.meta as any).env?.BASE_URL ?? './';
+
+  const eventosDouPorTipo = new Map(
+    (saidasDou?.eventos ?? []).map((evento) => [evento.tipo, evento])
+  );
+
+  const diasSemPerderAuditor = saidasDou ? diasDesde(saidasDou.dataMaisRecente) : null;
+  const eventoMaisRecente = saidasDou
+    ? (saidasDou.eventos ?? []).find((e) => e.dataPublicacao === saidasDou.dataMaisRecente)
+    : undefined;
+
   const IconeCalendario = () => <FontAwesomeIcon icon={faCalendarAlt} className="h-10 w-10 md:h-12 md:w-12 text-red-400" />;
 
   const IconePessoas = () => <FontAwesomeIcon icon={faUsers} className="h-10 w-10 md:h-12 md:w-12 text-red-400" />;
@@ -1328,11 +1418,58 @@ const App: React.FC = () => {
         <main>
           <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
             <CounterCard
-              value={diasDesdeUltimaEvasao ?? 0}
-              label={`Dia${(diasDesdeUltimaEvasao ?? 0) > 1 ? 's' : ''} sem perder um Auditor`}
+              value={diasSemPerderAuditor ?? '—'}
+              label={`Dia${(diasSemPerderAuditor ?? 0) === 1 ? '' : 's'} sem perder um Auditor`}
               icon={<IconeCalendario />}
-              footer={<div><div>Por data de publicação.</div><div>Última publicação de exoneração, afastamento ou aposentadoria: <b>{dataUltimaExoneracaoFormatada}</b></div> <div className="text-xs text-amber-400 mt-2">Nosso recorde é {diasRecorde} dias</div></div>}
-              estaCarregando={estaCarregando || diasDesdeUltimaEvasao === null}
+              footer={
+                <div className="space-y-2">
+                  {erroSaidasDou ? (
+                    <div className="text-gray-500">{erroSaidasDou}</div>
+                  ) : (
+                    <>
+                      <div>Por data de publicação no Diário Oficial da União.</div>
+                      {eventoMaisRecente && (
+                        <div>
+                          Última saída: <b>{eventoMaisRecente.rotulo}</b> em{' '}
+                          <b>{formatarDataBr(eventoMaisRecente.dataPublicacao)}</b>
+                        </div>
+                      )}
+                      <div className="flex flex-wrap gap-2 justify-center pt-1">
+                        {TIPOS_SAIDA_DOU.map(({ tipo, rotuloCurto }) => {
+                          const evento = eventosDouPorTipo.get(tipo);
+                          if (!evento) {
+                            return (
+                              <span
+                                key={tipo}
+                                className="px-2 py-1 rounded border border-gray-800 text-gray-600"
+                                title="Nenhum ato deste tipo encontrado nos últimos 12 meses"
+                              >
+                                {rotuloCurto}: —
+                              </span>
+                            );
+                          }
+                          const href = evento.arquivo
+                            ? `${baseUrlApp}data/dias_sem_perder_AFFC/${evento.arquivo}`
+                            : evento.urlDou;
+                          return (
+                            <a
+                              key={tipo}
+                              href={href}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              title={evento.titulo}
+                              className="px-2 py-1 rounded border border-amber-500/40 text-amber-400 hover:bg-amber-500/10 hover:border-amber-400 transition-colors"
+                            >
+                              {rotuloCurto}: {formatarDataBr(evento.dataPublicacao)}
+                            </a>
+                          );
+                        })}
+                      </div>
+                    </>
+                  )}
+                </div>
+              }
+              estaCarregando={!saidasDou && !erroSaidasDou}
             />
             <CounterCard
               value={contagemEvasoes}

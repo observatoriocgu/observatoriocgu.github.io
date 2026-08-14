@@ -1,0 +1,52 @@
+name: Atualizar saídas do DOU (AFFC)
+
+# Roda o crawler do Diário Oficial da União e atualiza o card
+# "dias sem perder um Auditor".
+#
+# O JSON gerado guarda DATAS, não a contagem de dias — o navegador calcula
+# "faz N dias" ao renderizar. Por isso o card continua correto mesmo se este
+# workflow falhar por alguns dias: ele só ficaria sem descobrir uma saída nova.
+
+on:
+  schedule:
+    # 09:00 UTC = 06:00 em Brasília, depois da publicação do DOU do dia.
+    - cron: '0 9 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: saidas-dou
+  cancel-in-progress: false
+
+jobs:
+  atualizar:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Buscar saídas no DOU
+        run: python scripts/dou_saidas_affc.py --meses 12
+        working-directory: evasao
+
+      - name: Commit e push do que mudou
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add evasao/public/dias_sem_perder_affc.json evasao/data/dias_sem_perder_AFFC
+          if ! git diff --cached --quiet; then
+            git commit -m "Atualiza saídas de AFFC publicadas no DOU"
+            git push
+          else
+            echo "Nenhuma saída nova no DOU"
+          fi
+        shell: bash
