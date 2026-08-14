@@ -14,6 +14,8 @@ interface FiltroMultiploProps {
   opcoes: OpcaoFiltro[];
   selecionados: string[];
   aoMudar: (selecionados: string[]) => void;
+  /** O que dizer quando o filtro de cima não deixou nenhuma opção aqui. */
+  mensagemVazia?: string;
 }
 
 /**
@@ -22,16 +24,34 @@ interface FiltroMultiploProps {
  * Seleção vazia mostra nada, e não tudo: com marcar e desmarcar, "nenhuma
  * marcada" é uma escolha deliberada do leitor, e fazer o gráfico voltar a
  * mostrar o conjunto inteiro nesse caso confundiria mais do que ajudaria.
+ *
+ * `selecionados` pode conter valor que não está em `opcoes` — e ele sobrevive a
+ * qualquer clique daqui. Os filtros são encadeados (coorte manda na
+ * especialidade, que manda no tipo de saída), então uma opção some da lista
+ * quando o filtro de cima muda. Se o clique reescrevesse a seleção só com o que
+ * está à vista, marcar uma especialidade apagaria em silêncio a escolha que o
+ * leitor tinha feito nas que sumiram — e ela não voltaria ao reabrir a coorte.
  */
-const FiltroMultiplo: React.FC<FiltroMultiploProps> = ({ titulo, opcoes, selecionados, aoMudar }) => {
+const FiltroMultiplo: React.FC<FiltroMultiploProps> = ({
+  titulo,
+  opcoes,
+  selecionados,
+  aoMudar,
+  mensagemVazia,
+}) => {
   const marcados = new Set(selecionados);
+  const daLista = new Set(opcoes.map((opcao) => opcao.valor));
+  const ocultos = selecionados.filter((valor) => !daLista.has(valor));
+
+  /** Emite a seleção visível pedida, sem perder o que está fora da lista. */
+  const emitir = (visiveis: string[]) => aoMudar([...visiveis, ...ocultos]);
 
   const alternar = (valor: string) => {
     const novo = new Set(marcados);
     if (novo.has(valor)) novo.delete(valor);
     else novo.add(valor);
     // Preserva a ordem em que as opções são exibidas, não a de clique.
-    aoMudar(opcoes.filter((opcao) => novo.has(opcao.valor)).map((opcao) => opcao.valor));
+    emitir(opcoes.filter((opcao) => novo.has(opcao.valor)).map((opcao) => opcao.valor));
   };
 
   const todosMarcados = opcoes.length > 0 && opcoes.every((opcao) => marcados.has(opcao.valor));
@@ -40,14 +60,21 @@ const FiltroMultiplo: React.FC<FiltroMultiploProps> = ({ titulo, opcoes, selecio
     <fieldset className="min-w-0">
       <legend className="mb-1.5 flex items-baseline gap-2 text-sm text-gray-300">
         {titulo}
-        <button
-          type="button"
-          onClick={() => aoMudar(todosMarcados ? [] : opcoes.map((opcao) => opcao.valor))}
-          className="text-xs text-gray-500 underline decoration-dotted hover:text-amber-400"
-        >
-          {todosMarcados ? 'limpar' : 'marcar todas'}
-        </button>
+        {opcoes.length > 0 && (
+          <button
+            type="button"
+            onClick={() => emitir(todosMarcados ? [] : opcoes.map((opcao) => opcao.valor))}
+            className="text-xs text-gray-500 underline decoration-dotted hover:text-amber-400"
+          >
+            {todosMarcados ? 'limpar' : 'marcar todas'}
+          </button>
+        )}
       </legend>
+      {opcoes.length === 0 && mensagemVazia && (
+        <p className="rounded border border-dashed border-gray-700 px-2.5 py-1 text-sm text-gray-500">
+          {mensagemVazia}
+        </p>
+      )}
       {/* Uma caixinha por linha: com os três grupos lado a lado, empilhar na
           vertical é o que deixa cada coluna legível de cima a baixo. */}
       <div className="flex flex-col gap-2">

@@ -16,7 +16,6 @@ import { SelosDaLinha } from './components/Selos';
 
 import {
   AREAS_SEM_ESPECIALIDADE,
-  AREA_VETERANO,
   COR_POR_CONCURSO,
   COR_POR_MOTIVO,
   ID_CONCURSO_2021,
@@ -127,22 +126,23 @@ const App: React.FC = () => {
   }, []);
 
   // === Opções das caixinhas ===
+  //
+  // Os três filtros são encadeados: a coorte manda na especialidade, e as duas
+  // juntas mandam no tipo de saída. Cada grupo só lista o que existe no recorte
+  // que vem de cima — "Veterano" não é especialidade de quem fez o concurso de
+  // 2021, e "Falecimento" não é opção se ninguém na fatia saiu por isso.
+  //
+  // Só a coorte mostra número. Abaixo dela o número mudaria a cada clique no
+  // filtro de cima, e um total que dança confunde mais do que informa: o que
+  // responde "quantos?" é o gráfico, não a caixinha.
 
   const todasAsSaidas = useMemo(() => saidas(registros), [registros]);
 
-  /** Contagem por opção sobre TODAS as saídas, e não sobre o recorte: um número
-   *  que muda a cada clique em outra caixinha faz o leitor duvidar do filtro. */
-  const contar = (chave: (registro: RegistroAuditor) => string) => {
-    const mapa = new Map<string, number>();
-    for (const registro of todasAsSaidas) {
-      const valor = chave(registro);
-      mapa.set(valor, (mapa.get(valor) ?? 0) + 1);
-    }
-    return mapa;
-  };
-
   const opcoesCoorte = useMemo((): OpcaoFiltro[] => {
-    const totais = contar((registro) => registro.CONCURSO);
+    const totais = new Map<string, number>();
+    for (const registro of todasAsSaidas) {
+      totais.set(registro.CONCURSO, (totais.get(registro.CONCURSO) ?? 0) + 1);
+    }
     return COORTES.map((id) => ({
       valor: id,
       rotulo: rotuloDoConcurso(id),
@@ -151,61 +151,73 @@ const App: React.FC = () => {
     }));
   }, [todasAsSaidas]);
 
+  /** Todo mundo da(s) coorte(s) marcada(s) — a base dos dois filtros de baixo. */
+  const registrosDaCoorte = useMemo(
+    () => registros.filter((registro) => coortes.includes(registro.CONCURSO)),
+    [registros, coortes]
+  );
+
   const opcoesArea = useMemo((): OpcaoFiltro[] => {
-    const totais = contar(areaDe);
-    // Toda área que exista em alguém, tenha ou não saída — senão uma
+    // Toda área que exista em alguém da coorte, tenha ou não saída — senão uma
     // especialidade sem nenhuma evasão simplesmente sumiria do filtro.
-    const encontradas = new Set(registros.map(areaDe));
+    const encontradas = new Set(registrosDaCoorte.map(areaDe));
     const especialidades = Array.from(encontradas)
       .filter((area) => !AREAS_SEM_ESPECIALIDADE.includes(area))
       .sort((a, b) => a.localeCompare(b, 'pt-BR'));
     // As duas que não são especialidade vão para o fim, na ordem da constante:
     // primeiro o veterano, que é "não se aplica", e só depois a lacuna.
     const ordenadas = [...especialidades, ...AREAS_SEM_ESPECIALIDADE.filter((area) => encontradas.has(area))];
-    return ordenadas.map((area) => ({ valor: area, rotulo: area, total: totais.get(area) ?? 0 }));
-  }, [registros, todasAsSaidas]);
+    return ordenadas.map((area) => ({ valor: area, rotulo: area }));
+  }, [registrosDaCoorte]);
 
   const opcoesMotivo = useMemo((): OpcaoFiltro[] => {
-    const totais = contar(motivoDe);
-    return MOTIVOS_SAIDA.filter((motivo) => totais.has(motivo)).map((motivo) => ({
+    const encontrados = new Set(
+      saidas(registrosDaCoorte)
+        .filter((registro) => areas.includes(areaDe(registro)))
+        .map(motivoDe)
+    );
+    // A ordem é a da constante, não a do dado: é a mesma da legenda do gráfico.
+    return MOTIVOS_SAIDA.filter((motivo) => encontrados.has(motivo)).map((motivo) => ({
       valor: motivo,
       rotulo: motivo,
       cor: COR_POR_MOTIVO[motivo],
-      total: totais.get(motivo) ?? 0,
     }));
-  }, [todasAsSaidas]);
+  }, [registrosDaCoorte, areas]);
 
   // As especialidades só se sabem depois que o CSV chega, então a marcação
   // inicial é aplicada aqui, uma vez, sem sobrescrever escolha do leitor.
   //
-  // Nasce desmarcada só "Veterano": o painel abre na coorte de 2021, e uma
-  // caixinha marcada que não acrescenta nada ao recorte faz o leitor procurar
-  // no gráfico um número que não está lá. "Sem área identificada" continua
-  // marcada — ali há Auditor de 2021 de verdade, e desmarcá-la os tiraria do
-  // gráfico de abertura sem que ninguém tivesse pedido.
+  // Marca TODAS as áreas da base, e não só as da coorte inicial. A seleção aqui
+  // é a intenção do leitor, não o que está à vista: guardar "Veterano" marcado
+  // desde o começo é o que faz a especialidade já vir junto quando ele abre a
+  // coorte dos veteranos, em vez de abrir uma coorte que não mostra ninguém.
   const [areasIniciadas, setAreasIniciadas] = useState(false);
   useEffect(() => {
-    if (areasIniciadas || opcoesArea.length === 0) return;
-    setAreas(opcoesArea.map((opcao) => opcao.valor).filter((area) => area !== AREA_VETERANO));
+    if (areasIniciadas || registros.length === 0) return;
+    setAreas(Array.from(new Set(registros.map(areaDe))));
     setAreasIniciadas(true);
-  }, [opcoesArea, areasIniciadas]);
+  }, [registros, areasIniciadas]);
 
   // === Recorte ===
 
   const recorte = useMemo(() => ({ coortes, areas, motivos }), [coortes, areas, motivos]);
   const saidasFiltradas = useMemo(() => filtrarSaidas(registros, recorte), [registros, recorte]);
 
-  /** O que dizer ao lado de "Filtros" enquanto o card está fechado. */
+  /**
+   * O que dizer ao lado de "Filtros" enquanto o card está fechado.
+   *
+   * Conta só o que está à vista em cada grupo: a seleção guarda também opções
+   * que o filtro de cima escondeu, e "5 de 4" não faria sentido nenhum.
+   */
   const resumoDoRecorte = useMemo(() => {
     const parte = (selecionados: string[], opcoes: OpcaoFiltro[], singular: string, plural: string) => {
       if (opcoes.length === 0) return '';
-      if (selecionados.length === 0) return `nenhum${singular === 'coorte' ? 'a' : ''} ${singular}`;
+      const visiveis = opcoes.filter((opcao) => selecionados.includes(opcao.valor));
+      if (visiveis.length === 0) return `nenhum${singular === 'coorte' ? 'a' : ''} ${singular}`;
       // Um só: vale mais dizer qual do que dizer quantos.
-      if (selecionados.length === 1) {
-        return opcoes.find((opcao) => opcao.valor === selecionados[0])?.rotulo ?? selecionados[0];
-      }
-      if (selecionados.length === opcoes.length) return `${plural}: todas`;
-      return `${plural}: ${selecionados.length} de ${opcoes.length}`;
+      if (visiveis.length === 1) return visiveis[0].rotulo;
+      if (visiveis.length === opcoes.length) return `${plural}: todas`;
+      return `${plural}: ${visiveis.length} de ${opcoes.length}`;
     };
     return [
       parte(coortes, opcoesCoorte, 'coorte', 'coortes'),
@@ -522,8 +534,20 @@ const App: React.FC = () => {
             {/* Os três grupos lado a lado, com as caixinhas empilhadas dentro de cada um. */}
             <div className="grid grid-cols-1 gap-6 px-5 pb-5 sm:grid-cols-3">
               <FiltroMultiplo titulo="Coorte" opcoes={opcoesCoorte} selecionados={coortes} aoMudar={setCoortes} />
-              <FiltroMultiplo titulo="Especialidade" opcoes={opcoesArea} selecionados={areas} aoMudar={setAreas} />
-              <FiltroMultiplo titulo="Tipo de saída" opcoes={opcoesMotivo} selecionados={motivos} aoMudar={setMotivos} />
+              <FiltroMultiplo
+                titulo="Especialidade"
+                opcoes={opcoesArea}
+                selecionados={areas}
+                aoMudar={setAreas}
+                mensagemVazia="Marque uma coorte ao lado."
+              />
+              <FiltroMultiplo
+                titulo="Tipo de saída"
+                opcoes={opcoesMotivo}
+                selecionados={motivos}
+                aoMudar={setMotivos}
+                mensagemVazia="Nenhuma saída na coorte e na especialidade marcadas."
+              />
             </div>
           </details>
 
