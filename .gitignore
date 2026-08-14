@@ -24,7 +24,11 @@ pnpm-debug.log*
 # Gerar com: python evasao/scripts/filtrar_affc.py
 evasao/data/historico_transparencia_cgu/
 
-# Python (evasao/scripts/, evasao/data/processador.ipynb)
+# Cache das páginas do DOU. Ato publicado é imutável, então o cache só evita
+# rebaixar as mesmas ~3.000 páginas do backfill — é acelerador local, não dado.
+evasao/data/cache_dou/
+
+# Python (evasao/scripts/)
 __pycache__/
 *.py[cod]
 .ipynb_checkpoints/
@@ -47,3 +51,6 @@ desktop.ini
 repomix-output.xml
 .claude/settings.local.json
 *.local
+
+# Worktrees do Claude Code: repositórios git próprios, não pertencem a este.
+.claude/worktrees/

@@ -3,11 +3,20 @@
 Cada fase é independente e termina com o site funcionando (`npm run build` OK em `evasao/`).
 Regra do CLAUDE.md: **uma fase por vez**.
 
-## Escopo (revisado em 13/08/2026)
+## Escopo (revisado em 14/08/2026)
 
-O observatório acompanha **apenas Auditores Federais de Finanças e Controle (AFFC)** do concurso
-CGU 2021 (FGV). **Técnicos Federais de Finanças e Controle (TFFC) ficam fora** — não entram nos
-dados, nos filtros, nos textos nem nas contagens.
+O observatório acompanha **apenas Auditores Federais de Finanças e Controle (AFFC)** da CGU, em duas
+coortes: `CGU-2021` (concurso FGV) e `VETERANO` (quem já estava na CGU em jun/2022). **Técnicos
+Federais de Finanças e Controle (TFFC) ficam fora** — não entram nos dados, nos filtros, nos textos
+nem nas contagens.
+
+**Revisão de 14/08/2026 (D11, D16, D17):** a fonte primária passou a ser a **diferença mês a mês do
+SIAPE** (Portal da Transparência). O universo é **quem saiu efetivamente da CGU**, apurado pelo
+SIAPE e confirmado no DOU. Os 49 snapshots viram uma **base consolidada empilhada**
+(`historico_mensal.csv`, **D16**), que é o banco do observatório. A **área do concurso de entrada
+fica dentro do escopo** e vem do próprio DOU (**D17**) — o que ficou para a Fase 7 é o concurso de
+**destino** ("para onde o fulano foi", "quem está estudando pra sair"). Isso superou a Fase 2 (v1)
+e absorveu a Fase 4 — ambas ficam no plano como registro, marcadas.
 
 Consequência direta: como só existe um cargo, **não há coluna `CARGO`** e o termo genérico para
 pessoa é **"Auditor"**, não "servidor".
@@ -40,11 +49,25 @@ Todas as decisões abaixo estão **fechadas**. As fases podem ser executadas sem
 | D8 | Publicação do site | Fase 1.5 | GitHub Actions builda e publica; `evasao/dist/` sai do versionamento |
 | D9 | Veteranos e múltiplos concursos | Fases 2-4 | coluna **`CONCURSO`** própria (`CGU-2021`, `CGU-2026`, … , `VETERANO`), separada de `AREA`. Tudo num arquivo só. Um concurso novo = um valor novo, não um arquivo novo |
 | D10 | Card "dias sem perder um Auditor" | Fase 2.5 | fonte passa a ser o **DOU**, não o `dados.csv`. Conta só atos **da CGU** (exclui AFFC cedidos, cujo ato sai por outro órgão). O trecho arquivado é **HTML** do ato, não PDF. Recorde de dias **removido** do card |
+| D11 | Fonte primária do painel | Fases 2-4 | a **diferença mês a mês do SIAPE** (Portal da Transparência) é a espinha do observatório. Todos os arquivos de dado passam a ser **derivados**, nunca editados à mão. *(Revisado em 14/08/2026: o **resultado final do concurso entra**, mas pelo **DOU**, não pelo site da FGV — ver D17. O que fica fora é concurso de **destino**, para onde a pessoa foi depois de sair.)* |
+| D16 | Base consolidada para a UI | Fases 2-3 | `historico_transparencia_cgu/` é empilhada em **`data/historico_mensal.csv`** — uma linha por (competência × pessoa), 17 colunas das 43, com `MES`, `CONCURSO` e `AREA` acrescentados. É **a** base do observatório; `dados.csv` e `serie_mensal.csv` passam a ser derivados dela |
+| D17 | Área do concurso | Fase 2 | vem do **DOU**, não de crawler de banca: o `Edital CGU nº 5 de 13/06/2022` traz, **numa requisição**, inscrição, nome, nota, classificação, modalidade e área de especialização dos 488 aprovados AFFC. Vale igual para o CGU-2026 quando o edital sair |
+| D12 | Chave de identidade | Fases 2-3 | **`Id_SERVIDOR_PORTAL`**, e só ele. **Revoga** a cadeia `INSCRICAO → MASP → HGV-0 → NOME` e o par `CONCURSO + INSCRICAO` da D9. Nome **nunca** é chave (homônimos) |
+| D13 | Definição de "saiu da CGU" | Fase 2 | ausência do conjunto CGU (`COD_ORG_LOTACAO = 59000`) **a partir da última presença**, nunca por diff par a par. Saída detectada no snapshot mais novo nasce **provisória** |
+| D14 | Procedência da informação | Fases 2-3 | todo campo enriquecido carrega **`FONTE_*`** (SIAPE/DOU/RANKING/BUSCA/MANUAL) e a linha carrega **`VERIFICADO`** (SIM/NÃO, preenchido por gente). **Não existe nota de confiança automática** — a máquina diz de onde tirou e se alguém conferiu; ela não se autoavalia |
+| D15 | Atualização mensal | Fase 2 | **um comando local** (`atualizar.py`), resultado commitado; o Actions só builda e publica. Assunção adotada por padrão — migrar para cron no CI é reversível e não muda a arquitetura |
+
+**Efeito das decisões novas sobre as antigas:**
+
+- **D9 sobrevive parcialmente.** `CONCURSO` continua coluna própria, separada de `AREA`, com `VETERANO` como valor. Muda a **origem**: a coorte passa a ser derivada da primeira aparição na série mensal, não da lista da FGV. A parte da D9 sobre chave de identidade é revogada pela **D12**.
+- **D10 sobrevive inteira.** O card "dias sem perder um Auditor" continua vindo do crawler de frase da Fase 2.5, e seus padrões de classificação — validados ato a ato — são **reaproveitados sem reescrita** pelo crawler por nome da Fase 2.
+- **D5 fica em suspenso.** Sem `CADASTRO DE RESERVA`/`DESISTENTE` no universo (**D11**), o card de custo perde parte do sentido original; decidir na Fase 3 se volta e sobre qual base.
 
 **Pendências operacionais que essas decisões geram** (não bloqueiam nenhuma fase):
 
 - D1 — criar/verificar a caixa `observatoriocgu@gmail.com` no FormSubmit; até lá o formulário de colaboração não entrega mensagens.
 - D5 — levantar uma estimativa de custo com fonte citável para reativar o card em algum momento futuro.
+- D14 — definir quem faz a curadoria e com que cadência; sem gente conferindo, `VERIFICADO` fica `NÃO` para sempre e o selo perde a função.
 
 ---
 
@@ -92,7 +115,7 @@ renomeação da Fase 3.
   - ⚠️ Sobrou em `evasao/table.html:24,30` — arquivo **fora do build**, marcado para exclusão na Fase 6.
 - [x] `/index.css` inexistente — removido de `index.html`, `dados_detalhados.html` e `historico_alteracoes.html` (estava nas 3). O aviso do build sumiu.
 - [x] Links internos absolutos → relativos: `App.tsx:1444,1481`, e o mesmo defeito em `DetailedTableApp.tsx:574` e `HistoryPage.tsx:398`.
-  - Os `fetch` de CSV (`App.tsx:331`, `DetailedTableApp.tsx:188`, `HistoryPage.tsx:281`…) **continuam absolutos de propósito** — têm lista de fallback e mexer neles é lógica de dados (Fase 4).
+  - Os `fetch` de CSV (`App.tsx:331`, `DetailedTableApp.tsx:188`, `HistoryPage.tsx:281`…) **continuam absolutos de propósito** — têm lista de fallback e mexer neles é lógica de dados (Fase 3, §3.1: a lista de fallback vira uma só, no `lib/dados.ts`).
 - [x] `README.md` (raiz) — passa a descrever o Observatório CGU. (Conteúdo completo fica na Fase 6.)
 - [x] `.gitignore` na raiz — criado.
 - [x] ~~`ranking/` — mesmo e-mail FormSubmit~~ — pulado: **D6** remove a pasta inteira na Fase 5.
@@ -152,9 +175,21 @@ caminhos de dados em runtime. Nenhum 404.
 
 ---
 
-## [x] Fase 2 — Novo esquema de dados ✅ concluída em 13/08/2026
+## [x] Fase 2 (v1) — Novo esquema de dados ✅ concluída em 13/08/2026 · ⚠️ **SUPERADA pela D11**
 
-**Objetivo:** definir o contrato de dados CGU e um `dados.csv` de EXEMPLO para validar a UI. A UI ainda **não** é adaptada (isso é Fase 3) — esta fase pode deixar o dashboard com números zerados/errados, desde que o build passe.
+> **Leia isto antes de usar esta seção.** Ela fica no plano como **registro histórico**, não como
+> tarefa. Em 14/08/2026 chegaram os 49 snapshots mensais do Portal da Transparência, e a **D11**
+> inverteu a fonte primária: o painel deixa de ser preenchido a partir da lista da FGV e passa a ser
+> **derivado da diferença mês a mês do SIAPE**. O esquema de 18 colunas descrito abaixo e o
+> `dados.csv` de 14 linhas de EXEMPLO **não valem mais** — foram substituídos pelo esquema da
+> **Fase 2 (v2)**, logo depois da Fase 2.5.
+>
+> **O que desta fase continua valendo:** a separação entre `CONCURSO` e `AREA` (**D9**), o
+> `types.ts`/`constants.ts` como lugar do catálogo de concursos, e os três achados registrados no
+> fim da seção (`vite build` não faz typecheck; os 6 erros de tipagem pré-existentes; o changelog
+> falso do `generate-alteracoes.js`).
+
+**Objetivo (histórico):** definir o contrato de dados CGU e um `dados.csv` de EXEMPLO para validar a UI. A UI ainda **não** é adaptada (isso é Fase 3) — esta fase pode deixar o dashboard com números zerados/errados, desde que o build passe.
 
 ### O problema do modelo de MG: veteranos e concursos (D9)
 
@@ -280,7 +315,8 @@ linha `VETERANO` tem `INSCRICAO` ou `POSICAO_CONCURSO` preenchidos, e nenhuma li
   - Correção agendada na Fase 6.
 - ⚠️ **`generate-alteracoes.js` vai gerar um changelog falso** no primeiro commit do `dados.csv` novo:
   ele diffa o histórico git do arquivo, e a troca de 3.570 linhas de MG por 14 de EXEMPLO parece
-  3.570 remoções + 14 inclusões. Tratar na Fase 4, junto com a regeneração dos JSONs.
+  3.570 remoções + 14 inclusões. ~~Tratar na Fase 4~~ → **resolvido por descarte**: a Fase 2 (v2)
+  aposenta o `generate-alteracoes.js`, e o changelog passa a vir do diff mensal do SIAPE.
 
 ---
 
@@ -363,7 +399,7 @@ resolvendo para arquivo existente**.
 ### Pendências
 
 - [ ] O número do card vem do DOU; os outros 3 cards e as tabelas continuam vindo do `dados.csv` de
-  EXEMPLO. Coerência entre as duas fontes é assunto da Fase 4.
+  EXEMPLO. Coerência entre as duas fontes é assunto da **Fase 2 (v2)**.
 - [ ] `diasRecorde` (`App.tsx:1289-1298`) ficou **sem uso** depois que o recorde saiu do card.
   Remover na Fase 3.
 - [ ] A busca cobre 12 meses por execução. Se a CGU passar mais de 12 meses sem um tipo de saída,
@@ -375,54 +411,661 @@ resolvendo para arquivo existente**.
 **Delimitação de escopo (D10):** este crawler existe **só para o número de dias e os 3 links**. Ele
 não é — e não precisa virar — fonte de contagem de evasões: para de varrer assim que acha o ato mais
 recente de cada tipo, então nunca soube quantas saídas houve no total. A **série completa vem da
-base mensal do SIAPE** (Portal da Transparência), na Fase 4. Consequência prática: não faz sentido
+base mensal do SIAPE** (Portal da Transparência), na Fase 2 (v2). Consequência prática: não faz sentido
 auditar a cobertura do crawler nem medir recall; o que importa é a **precisão** dos 3 atos exibidos,
 que foi conferida um a um.
 
 ---
 
-## [ ] Fase 3 — Adaptar `App.tsx` e componentes ao novo esquema
+## [x] Fase 2 (v2) — Pipeline SIAPE → saídas → DOU ✅ **concluída em 14/08/2026**
 
-**Objetivo:** dashboard coerente com os dados de exemplo da Fase 2.
+**Resultado.** Todos os critérios de aceitação bateram. Os arquivos de dado do observatório passaram
+a ser gerados por um comando, a partir de fonte pública, e cada saída carrega o ato que a comprova.
 
-- [ ] **Situações** (`App.tsx:1145-1148`) — revisar os literais `EXONERADO`, `DESISTENTE`, `APOSENTADO`, `AFASTAMENTO PRELIMINAR À APOSENTADORIA`. Verificar se "afastamento preliminar à aposentadoria" existe no regime federal ou se some. `POSSE JUDICIAL` e `INAPTO ADMISSIONAL` também aparecem no CSV atual.
-- [ ] **Filtro de área** (`App.tsx:1414-1425`) — hoje monta os botões a partir de `FISCALIZAÇÃO / TI / TRIBUTAÇÃO / VETERANO`, misturando as duas dimensões. Passa a listar só as áreas, e **as áreas dependem do concurso selecionado** (**D9**). Idem `DetailedTableApp.tsx:6,415-424`, que tem `'FISCALIZAÇÃO'` hardcoded como área padrão.
-- [ ] **Filtro de concurso** (novo, **D9**) — segundo seletor: `Todos` · `CGU-2021` · `VETERANO` · (`CGU-2026` quando existir). Define quais áreas o filtro de área oferece.
-- [ ] **"VETERANO"** — deixa de ser valor de `AREA` e vira `CONCURSO = 'VETERANO'` (**D9**). Os `if (areaSelecionada === 'VETERANO')` do `DetailedTableApp.tsx` (`:481, 666, 714, 723, 738`) e do `DetailedTable.tsx` (`:253, 288, 297, 310`) viram uma regra honesta: **se o concurso é `VETERANO`, esconder as colunas `INSCRICAO` e `POSICAO_CONCURSO`** (que são sempre vazias), em vez de trocar o layout inteiro da tabela.
-- [ ] **Agregadores por concurso** — cards e gráficos precisam decidir, um a um, se contam só concursados, só veteranos ou os dois. No modelo MG isso era acidental (dependia de a linha ter `POSICAO_CONCURSO`); agora é escolha explícita.
-- [ ] **Card de custo** (`CounterCard`) — usar `CUSTO_POR_AUDITOR`; ocultar o card enquanto o valor for `null` (**D5**).
-- [ ] **Gráfico por Unidade** (`agregarPorUnidade`, `App.tsx:783-853`) — validar com as unidades CGU do CSV de exemplo.
-- [ ] `DetailedTableApp.tsx` (836 linhas) e `DetailedTable.tsx` — colunas exibidas, ordenação e filtros passam a refletir `SIAPE`.
-- [ ] `relatorio_impressao.tsx` — mesmas colunas.
-- [ ] `chave` de identificação: `App.tsx:67` usa `INSCRICAO → MASP → HGV-0 → NOME`. Trocar `MASP` por `SIAPE`, eliminar o `'HGV-0'` (resíduo sem origem no CSV) e — **importante (D9)** — nunca usar `INSCRICAO` sozinha: com dois concursos os números **colidem**. A chave passa a ser `SIAPE`, senão `CONCURSO + INSCRICAO`. O mesmo padrão se repete em `HistoryPage.tsx:88,150,200,213,232,241` e `:433`.
-- [ ] **Strings de data herdadas da Fase 1** — "Desde Janeiro de 2024" (`App.tsx:1350`), "desde Janeiro/2024" (`:1454`) e "a partir de Janeiro de 2024" (`:1490`) precisam acompanhar a troca de `DATA_INICIO_OBSERVACAO` para `2022-06-14`. Ideal: derivar da constante em vez de repetir o texto.
+| | |
+|---|---|
+| `historico_mensal.csv` | **88.421 linhas**, 19 colunas, 20,8 MB |
+| `dados.csv` | **2.009 pessoas**, **268 saídas** (2 provisórias) |
+| `serie_mensal.csv` | 49 linhas |
+| Saídas **com motivo** | **255 (95%)** |
+| Saídas **com destino** | 126 (47%) — camada frágil, ver §2.3.3 |
+| `AREA` preenchida | **422 de 450** da coorte CGU-2021 (93,8%) — 410 automáticas + 12 por curadoria |
+| Atos arquivados | 251 HTML, 1,2 MB |
+| Teste de regressão | **30 invariantes**, todos passando |
+| `npm run build` | verde · `tsc --noEmit`: os 6 pré-existentes, **nenhum novo** |
 
-> Renomear identificadores `Auditor*` **saiu desta fase**: com a D7, `AuditorDetail`, `AuditorRow`,
-> `allAuditors` e `mapaAuditoresEmExercicio` passaram a descrever corretamente o domínio.
+**Motivos das 268 saídas:** 153 vacância por posse em outro cargo · 78 aposentadoria ·
+14 exoneração · 6 falecimento · 3 mudança de órgão na carreira (via SIAPE, sem crawler) ·
+1 desligamento · 13 sem ato identificado.
 
-**Concluída quando:** `npm run build` OK e os 4 cards, o gráfico e as 3 tabelas mostram números consistentes com as ~10 linhas de exemplo.
+**Destinos (126):** TCU 67 · Senado Federal 31 · Câmara dos Deputados 15 · Ministério da Fazenda 5 ·
+Executivo Federal 3 · AGU 2 · TRF-3, Transportes e Trabalho 1 cada.
+
+**D18 — a demissão não vai ao ar** *(decisão do usuário, 14/08/2026)*. Demissão é penalidade de
+processo disciplinar; o observatório mede **evasão**, e quem é demitido não escolheu sair. O
+classificador continua reconhecendo o tipo — sem isso a pessoa cairia em "saída sem ato
+identificado", o crawler tentaria de novo todo mês e o site afirmaria não saber o que sabe. O que
+muda é o que se **grava**: `SITUACAO = DESLIGADO`, sem motivo detalhado, **sem título, sem URL e sem
+cópia arquivada do ato** — porque `saidas_dou.csv` e a pasta `saidas_dou/` vão para o repositório
+público e para o site. Implementado em `dou.MOTIVOS_NAO_PUBLICADOS`.
+> ⚠️ Efeito colateral a conhecer: `DESLIGADO` é a **única** linha nessa situação entre 268. Um
+> leitor atento nota que ela destoa das outras seis categorias. A alternativa — classificá-la como
+> "saída sem ato identificado" — foi descartada por ser **falsa**: o ato existe e foi encontrado.
+
+**Curadoria aplicada.** Das 15 sugestões de casamento com o edital, **12 foram conferidas contra o
+Edital CGU nº 5 e aplicadas** em `curadoria.csv`, com a razão de cada uma registrada na
+`OBSERVACAO` (erro de digitação no edital, partícula omitida, apóstrofo, sobrenome acrescentado ou
+trocado após o concurso). **3 foram recusadas** e seguem em `curadoria_sugestoes.csv`:
+- `LUIZ AUGUSTO GENTILUCCI ALVES` × `LUIZ AUGUSTO DA SILVA ALVES` — nome do meio **diferente**, não
+  é erro de grafia nem acréscimo de sobrenome.
+- `LEONARDO VIEIRA E SILVA` — **dois** candidatos no edital, e um deles (`LEONARDO SILVA PINHEIRO`)
+  já casou exatamente com outra pessoa do SIAPE.
+
+⚠️ **Pendências que a Fase 3 herda:**
+- **Destino é indício, não fato** (§2.3.3) — não usar em número agregado de card sem curadoria.
+- **`SITUACAO = DESLIGADO` não pode ganhar rótulo que revele o motivo** na interface (**D18**).
+- **3 linhas em `curadoria_sugestoes.csv`** aguardando decisão humana.
+- **O dashboard está quebrado até a Fase 3**: o `App.tsx` ainda lê `MASP`, `INSCRICAO` e os dois
+  CSVs de outros concursos, que deixaram de existir. O build passa porque o Vite não valida CSV.
 
 ---
 
-## [ ] Fase 4 — Pipeline de dados
+### Especificação original da fase
 
-**Objetivo:** repor a esteira de atualização, agora contra fontes federais.
+**Objetivo:** transformar os 49 snapshots mensais do Portal da Transparência num painel derivado,
+com as **268 saídas** identificadas, o **motivo** de cada uma confirmado num ato do DOU e o
+**destino** quando houver fonte.
 
-- [ ] `evasao/data/processador.ipynb` — hoje consome os snapshots `Auditores_YYYYMM.csv` do portal de MG (43 colunas, `masp,nome,descsitser,...`). Reescrever para o **Portal da Transparência federal** (formato de "Servidores Civis" — layout e nomes de coluna totalmente diferentes). **Filtrar só AFFC** (**D7**).
-- [ ] `evasao/data/historico transparencia_legado_sefmg/` — 27 CSVs mensais de MG (`202312`–`202602`). Remover ou arquivar; a série da CGU já recomeçou (ver abaixo).
-- [x] **Série da CGU já baixada e filtrada** — `evasao/data/historico_transparencia_cgu/` tem 49 snapshots mensais (`202206`–`202606`) do Portal da Transparência, reduzidos a só os AFFC por `evasao/scripts/filtrar_affc.py`.
-  - Os CSVs brutos do portal têm **~420 MB cada** (o GitHub recusa acima de 100 MB); filtrados, os 49 somam ~70 MB. A pasta está **no `.gitignore`**: é dado de trabalho regenerável, não pertence ao repo.
-  - O filtro casa o cargo `AUDITOR FEDERAL DE FINANCAS E CONTROLE` de forma normalizada (sem acento, espaços colapsados), o que exclui o TFFC por construção (**D7**). Encoding de entrada é **latin-1** — ler como UTF-8 quebra no primeiro "ç".
-  - É esta base, e não o crawler do DOU da Fase 2.5, que deve produzir a contagem de evasões (**D10**).
-- [ ] `evasao/data/mudancas/` — 26 diffs `.txt` derivados dos anteriores. Idem.
-- [ ] `evasao/scripts/reorder_dados.py` — ajustar à nova ordem de colunas.
-- [ ] `evasao/scripts/generate-alteracoes.js` (249 linhas) — lê o histórico **git** do `dados.csv` para montar o log de alterações. Verificar as referências a colunas (`MASP`) e o comportamento no primeiro commit do CSV novo.
-- [ ] Regenerar `evasao/public/alteracoes.json` e `alteracoes-registros.json` — os atuais contêm 182 commits com autor `observatoriosefmg` e mensagens do projeto antigo.
-- [ ] Carregar a lista de aprovados do **Resultado Final FGV de 13/06/2022** (fonte no CLAUDE.md) para popular o `dados.csv` real — **apenas as listas de AFFC**, descartando as de TFFC (**D7**). Essas linhas nascem com `CONCURSO = CGU-2021`.
-- [ ] **Derivar os veteranos** (**D9**) — regra: quem aparece como AFFC da CGU no Portal da Transparência e **não** está na lista da FGV entrou antes, logo `CONCURSO = VETERANO`, com `INSCRICAO` e `POSICAO_CONCURSO` vazios. O cruzamento é por nome normalizado enquanto não houver SIAPE nas duas pontas — validar a taxa de acerto antes de confiar, porque homônimos existem.
-  - Fonte para a `AREA` dos veteranos: verificar se o Portal expõe algo aproveitável. Se não expuser, deixar vazio — **não inventar** (regra do CLAUDE.md). O modelo suporta o campo vazio.
+Substitui a Fase 2 (v1). O observatório deixa de depender de lista de aprovados e de preenchimento
+manual: quem saiu da CGU passa a ser **deduzido da diferença entre um mês e o outro** (**D11**),
+fato verificável e reproduzível a partir de fonte pública.
 
-**Concluída quando:** `npm run build` OK e o `dados.csv` real (não-EXEMPLO) renderiza corretamente.
+### Escopo desta rodada
+
+**Quem saiu efetivamente da CGU**, pelo SIAPE e pelo DOU, mais a **área do concurso de entrada**
+(**D17**). O que fica para a **Fase 7** é o concurso de **destino**: rankingdosconcursos, bancas
+(FGV/Cespe/FCC) e "AFFCs que estão estudando para sair".
+
+Duas consequências que precisam estar claras antes de começar:
+
+- **Somem `CADASTRO DE RESERVA` e `DESISTENTE`** do vocabulário de `SITUACAO`: são situações de quem
+  nunca tomou posse. O edital (**D17**) dá o **denominador** (488 aprovados AFFC, 450 empossados =
+  92,2%), mas quem nunca entrou **não vira linha** do painel.
+- **Sai a seção "aguardando nomeação em outros concursos"** — é exatamente o tema adiado.
+
+### O que a base já mostrou
+
+Números levantados diretamente dos 49 snapshots em 14/08/2026 — **não são estimativas**, e servem
+de teste de aceitação do pipeline. Todos os recortes usam **uma regra só**, a da **D13** (primeira e
+última presença).
+
+| Fato | Valor |
+|---|---|
+| Snapshots | 49, `202206`→`202606`, **sem lacunas** |
+| Linhas empilhadas na base consolidada (**D16**) | **88.421** |
+| Pessoas distintas vistas na CGU no período | 2.009 |
+| Efetivo CGU `202206` → `202606` | 1.559 → **1.741** |
+| **Saídas confirmadas no período** | **268** |
+| Cedidos hoje (`SITUACAO_VINCULO = ATIVO EM OUTRO ORGAO`) | **183** |
+
+> ⚠️ **Correção.** Uma versão anterior desta tabela dizia 319 cedidos. Aquele número contava **todos
+> os AFFC**, inclusive os ~825 do Ministério da Fazenda — exatamente o erro contra o qual o achado 1
+> adverte. Restrito à CGU (`COD_ORG_LOTACAO = 59000`), são **183**.
+
+| Recorte | Pessoas | Saíram | % |
+|---|---|---|---|
+| **Entraram depois de `202206`** | 450 | **164** | **36,4%** |
+| Leva inicial de posse (`202207`+`202208`) | 296 | 123 | 41,6% |
+| Veteranos (já presentes em `202206`) | 1.559 | 104 | 6,7% |
+| **Total** | **2.009** | **268** | 13,3% |
+
+> ⚠️ **Correção de 14/08/2026.** Uma versão anterior desta seção trazia *"coorte de 321 pessoas,
+> 136 saíram (42,4%)"*. Aquele recorte agrupava por `DATA_INGRESSO_ORGAO`, que é regra **diferente**
+> da **D13** e mistura quem tomou posse em 2022 com quem apareceu depois. Os números acima
+> substituem aquele — não reintroduzir o 42,4%.
+
+**Quatro achados que a arquitetura tem de respeitar:**
+
+1. **AFFC ≠ CGU.** A carreira é compartilhada: além da CGU (`COD_ORG_LOTACAO = 59000`, ~1.750),
+   há ~825 AFFC no Ministério da Fazenda/Economia (`17600`/`17000`). O filtro é pelo **código** —
+   o nome muda de grafia entre meses (`Ministério da Economia` → `MINISTERIO DA FAZENDA`, acentos
+   somem). Filtrar por nome perde gente em silêncio.
+2. **`Id_SERVIDOR_PORTAL` é chave estável** — zero nomes com mais de um id em 49 meses (**D12**).
+3. **Existem 6 "ressurreições"** — pessoas que somem por 1 a 6 meses e voltam (uma delas ausente de
+   `202302` a `202307`). Um diff par a par publicaria 6 saídas falsas sobre gente que nunca saiu.
+   É por isso que a regra é **última presença** (**D13**).
+4. **`DATA_INGRESSO_ORGAO` muta para 6 pessoas** em 2.009 — usar o valor **modal** da série, não o
+   do último snapshot.
+
+### Três armadilhas que a base consolidada cria
+
+Medidas nesta rodada. As três produzem gráfico plausível e **errado** se ninguém souber delas.
+
+1. **"Mudou de unidade" fica 3× inflado se contado por nome.** `UORG_LOTACAO` muda para **1.229**
+   pessoas; `COD_UORG_LOTACAO`, para **410**. A diferença é **regrafia entre meses**, não
+   movimentação (34 códigos para 38 grafias). Contar sempre pelo **código**.
+2. **`UF_EXERCICIO` não existia até o fim de 2023.** O valor `-1` cobre **100%** das linhas em
+   `202206`, 1.839 em `202306`, e cai para 615 hoje. Contado cru, muda para 1.452 pessoas;
+   ignorando `-1`, para **114**. Uma série temporal de "auditores por UF" mostraria uma explosão
+   fictícia em 2023/2024 que é só o Portal passando a preencher o campo. **Não há série de UF antes
+   de 2024**; `-1` é *desconhecido*, não é UF, e não conta como mudança.
+3. **Não existe dado de comissão.** `FUNCAO`, `SIGLA_FUNCAO` e `NIVEL_FUNCAO` são
+   `Sem informação`/`-1` em **todas** as 88.421 linhas. O análogo federal de `desccomi`/`cdcomi` da
+   SEF-MG **não tem fonte** neste arquivo — a análise "auditores em cargo comissionado" não é
+   possível, e nenhuma tela deve prometê-la.
+
+### O que o DOU entrega quando se busca por nome (validado na prática)
+
+Uma requisição por `"Rafael Roza de Oliveira"` com `s=todos` devolveu 20 atos de uma vez, entre eles:
+
+- **Portaria CGU 2.331 de 15/09/2022** — *"EXONERAR, a pedido, RAFAEL ROZA DE OLIVEIRA do cargo de
+  Auditor Federal de Finanças e Controle"*. O motivo da saída, com ato citável.
+- **Portaria CGU 1.293 de 30/06/2022** — a nomeação, com posição e lotação.
+- **Edital CGU nº 5 de 13/06/2022** — o resultado final homologado. Ver o quadro abaixo: é a fonte
+  da `AREA` (**D17**), e **não é mais assunto de Fase 7**.
+
+### O edital do concurso, medido (D17)
+
+Uma requisição a `edital-cgu-n-5-de-13-de-junho-de-2022-407806622` devolve 41.555 caracteres com o
+resultado final inteiro. A estrutura, já verificada:
+
+```
+II.1 RESULTADO FINAL DE APROVADOS - AMPLA CONCORRENCIA, POR ORDEM DE CLASSIFICACAO, DE ACORDO
+     COM OS CARGOS E AS UNIDADES DE LOTACAO E, NO CASO DE AFFC, AS AREAS DE ESPECIALIZACAO:
+  1. AUDITOR FEDERAL DE FINANCAS E CONTROLE - AUDITORIA E FISCALIZACAO
+    1.1. AC - REGIAO NORTE - ACRE
+      206081364, MAUREEN DA SILVA BRANDAO, 123.5, 1O / 206072821, JAIDIR ALVES COSTA DOS SANTOS, ...
+```
+
+| Fato | Valor |
+|---|---|
+| Registros AFFC no ato | **527** |
+| Pessoas distintas | **488** — quem concorre por cota aparece na ampla **e** na cota (39 casos) |
+| Distribuição por área (registros) | Auditoria e Fiscalização 273 · Correição 102 · Contabilidade 87 · TI 65 |
+| Por modalidade | Ampla Concorrência 402 · Negros 101 · PcD 24 |
+| Blocos no ato | **12** = 4 áreas × 3 modalidades (AC/negros/PcD), + **3 blocos TFFC descartados** (**D7**, 212 registros) |
+| Tomaram posse (série SIAPE) | 450 de 488 — **92,2%** |
+| **Casamento por nome normalizado** | **410 de 450 — 91,1%** |
+
+As 4 áreas batem **exatamente** com a lista do `CLAUDE.md`, o que é uma confirmação independente de
+que o ato certo foi encontrado.
+
+> ⚠️ **O edital tem erro de digitação, e ele custa um bloco inteiro.** Um dos cabeçalhos diz
+> `AUDITOR FEDERAL DE FINANCAAS E CONTROLE` — com dois "A". Um padrão exato acha **11** blocos em
+> vez de 12, perde a Contabilidade Pública da ampla concorrência e **subconta a área sem emitir
+> erro nenhum**. Por isso `PADRAO_CARGO_AFFC` usa `FINANCA+S`. Foi assim que a contagem por área
+> saiu errada na primeira medição desta fase.
+
+E a armadilha, no mesmo resultado: uma **Portaria PRE 213 do TRE-MG de 12/09/2025** que cita o nome
+dele — referindo-se à vacância do cargo que ele deixou no TRE **em 2022**, *antes* de entrar na CGU.
+Uma regra ingênua de "ato mais recente depois da saída = destino" publicaria *"foi para o TRE-MG em
+2025"*, que é falso, sobre pessoa real e nomeada. O classificador de destino tem de ser
+explicitamente defensivo contra isso.
+
+### 2.1 Camadas de dado
+
+O ponto central: **o que é derivado nunca se mistura com o que é enriquecido ou curado.** Senão
+rodar o pipeline de novo apaga o trabalho do crawler e da curadoria.
+
+| Camada | Arquivo | Git | Quem escreve |
+|---|---|---|---|
+| Fonte bruta | `data/historico_transparencia_cgu/*.csv` | ignorado (~70 MB) | download manual + `filtrar_affc.py` |
+| **Derivado (D16)** | **`data/historico_mensal.csv`** — 88.421 linhas, ~21 MB | commitado | `construir_painel.py` — regenerável do zero, **jamais editado à mão** |
+| Derivado | `data/dados.csv` — 2.009 linhas, uma por pessoa | commitado | idem |
+| Derivado | `data/serie_mensal.csv` — 49 linhas, uma por mês | commitado | idem |
+| **Enriquecido** | `data/saidas_dou.csv` | commitado | `enriquecer_saidas.py` — acumulativo, só acrescenta |
+| **Enriquecido (D17)** | `data/concurso_2021.csv` — 488 linhas | commitado | `concurso.py` |
+| **Curado** | `data/curadoria.csv` | commitado | **humano**. Vence sobre todos os anteriores |
+| Atos | `data/saidas_dou/*.html` | commitado | cópia arquivada do ato de cada saída |
+| Cache | `data/cache_dou/` | **ignorado** | páginas do DOU (imutáveis depois de publicadas) |
+
+Precedência do merge: **curadoria > DOU > SIAPE**.
+
+> **Assunção sobre carregamento (reversível, registrar):** o dashboard inicial lê só `dados.csv`
+> (~300 KB) e `serie_mensal.csv`; o `historico_mensal.csv` (2,8 MB gzipado) é carregado **sob
+> demanda**, nas páginas que precisam da série por pessoa. Se pesar, o mesmo pipeline emite o
+> **modelo de vigência** — uma linha por período estável em vez de uma por mês, **10.840 linhas
+> (12%)**, mesma informação — sem mudar mais nada no resto da arquitetura.
+
+### 2.2 Esquema do `historico_mensal.csv` (D16) — a base consolidada
+
+Uma linha por **(competência × pessoa)**: 88.421 linhas, 17 colunas das 43 originais.
+
+**Acrescentadas (3):** `MES` (AAAAMM) · `CONCURSO` · `AREA`
+
+**Mantidas da origem (14):** `ID_SERVIDOR_PORTAL` · `NOME` · `MATRICULA` · `CLASSE_CARGO` ·
+`PADRAO_CARGO` · `COD_UORG_LOTACAO` · `UORG_LOTACAO` · `COD_UORG_EXERCICIO` · `UORG_EXERCICIO` ·
+`COD_ORG_EXERCICIO` · `ORG_EXERCICIO` · `SITUACAO_VINCULO` · `UF_EXERCICIO` · `DATA_INGRESSO_ORGAO`
+
+**Descartadas (29)** — as 23 constantes ou sempre vazias já medidas (`DESCRICAO_CARGO`,
+`REFERENCIA_CARGO`, `NIVEL_CARGO`, `SIGLA_FUNCAO`, `NIVEL_FUNCAO`, `FUNCAO`, `CODIGO_ATIVIDADE`,
+`ATIVIDADE`, `OPCAO_PARCIAL`, `COD_ORG_LOTACAO`, `ORG_LOTACAO`, `COD_ORGSUP_*`, `ORGSUP_*`,
+`COD_TIPO_VINCULO`, `TIPO_VINCULO`, `REGIME_JURIDICO`, `DATA_INICIO_AFASTAMENTO`,
+`DATA_TERMINO_AFASTAMENTO`, `DATA_NOMEACAO_CARGOFUNCAO`, `DIPLOMA_*`,
+`DOCUMENTO_INGRESSO_SERVICOPUBLICO`, `DATA_DIPLOMA_INGRESSO_SERVICOPUBLICO`), mais `CPF`
+(mascarado, sem uso), `JORNADA_DE_TRABALHO` (muda para 10 pessoas em 2.009) e
+`DATA_INGRESSO_CARGOFUNCAO`.
+
+Regras de preenchimento:
+
+- `CONCURSO` é **derivado** (**D13**): primeira presença em `202206` → `VETERANO`; depois →
+  `CGU-2021`. Quando o CGU-2026 chegar, é só mais um valor (**D9**).
+- `AREA` vem do `concurso_2021.csv` (**D17**), por casamento de nome. **Fica vazia quando não
+  casar** — não chutar (regra do `CLAUDE.md`).
+- `CONCURSO` e `AREA` são atributos da **pessoa**, constantes em todas as linhas dela.
+  Ficam **desnormalizados** de propósito: é o que torna a base usável direto pela UI, sem join.
+- A base é **CGU por construção** (`COD_ORG_LOTACAO = 59000`), e é por isso que essa coluna sai.
+  Os 3 casos de "mudou de órgão na carreira" saem do conjunto e são tratados no `dados.csv`, que lê
+  o arquivo AFFC completo.
+- Contagens de unidade usam **`COD_UORG_*`**, nunca o nome (armadilha 1). `UF_EXERCICIO = -1` é
+  **desconhecido** (armadilha 2).
+
+### 2.2.1 Esquema do `dados.csv` publicado
+
+Uma linha por pessoa que esteve na CGU no período (~2.009). **Derivado do
+`historico_mensal.csv`**, não dos snapshots.
+
+- **Identidade e coorte** — `ID_SERVIDOR_PORTAL` (chave, **D12**) · `NOME` · `CONCURSO`
+  (`VETERANO` | `CGU-2021`) · `AREA` (**D17**) · `MES_ENTRADA` (AAAAMM) · `DATA_POSSE`
+- **Concurso de entrada (D17, vazios para `VETERANO`)** — `INSCRICAO` · `POSICAO_CONCURSO` ·
+  `NOTA` · `MODALIDADE` (AC / PcD / negros) · `UF_VAGA`
+- **Situação e lotação** — `SITUACAO` · `UNIDADE` (de `UORG_LOTACAO`, normalizada) · `UF` ·
+  `CEDIDO` (SIM/NÃO) · `ORGAO_EXERCICIO`
+- **Saída** — `MES_SAIDA` · `SAIDA_PROVISORIA` · `MOTIVO_SAIDA` · `FONTE_MOTIVO` · `DATA_SAIDA`
+  (data de efeito do ato) · `DATA_PUBLICACAO_SAIDA` · `ATO_SAIDA_TITULO` · `ATO_SAIDA_URL` ·
+  `ATO_SAIDA_ARQUIVO`
+- **Destino** — `ORGAO_DESTINO` · `CARGO_DESTINO` · `DATA_DESTINO` · `FONTE_DESTINO` · `URL_DESTINO`
+- **Procedência (D14)** — `VERIFICADO` (SIM/NÃO) · `VERIFICADO_EM` · `OBSERVACAO`
+
+**Vocabulário novo de `SITUACAO`:** `EM EXERCÍCIO` · `EXONERADO` · `VACÂNCIA` (posse em outro cargo
+inacumulável) · `APOSENTADO` · `FALECIDO` · **`DEMITIDO`** (penalidade disciplinar — ver achado 3
+da §2.3.1, tem decisão editorial pendente) · `SAÍDA SEM ATO IDENTIFICADO` · `MUDOU DE ÓRGÃO NA
+CARREIRA`. Somem `DESISTENTE`, `CADASTRO DE RESERVA`, `AFASTAMENTO PRELIMINAR À APOSENTADORIA`,
+`POSSE JUDICIAL` e `INAPTO ADMISSIONAL`.
+
+`FONTE_*` ∈ `SIAPE` | `DOU` | `RANKING` | `BUSCA` | `MANUAL` | vazio.
+
+### 2.3 Tarefas
+
+Tudo **stdlib only**: o CI não roda `pip install`, e nem `requests` nem `bs4` estão instalados na
+máquina. Os dois crawlers atuais já são stdlib pura (urllib + fallback `curl`).
+
+- [ ] **`scripts/dou.py`** (nova biblioteca) — extrair de `dou_saidas_affc.py` o que já é genérico e
+      **está validado**, sem reescrever: `normalizar()` (`:132-136`), `baixar()` com o fallback
+      `curl` (`:139-167`), o parse do JSON embutido em `BuscaDouPortlet_params` (`:187-198`),
+      `extrair_texto()` (`:206-215`), `salvar_ato()`/`nome_arquivo()` (`:254-306`). Parametrizar
+      `buscar_janela()` (`:170-198`) para receber o `q` e `e_da_cgu()` (`:201-203`) para receber o
+      órgão. **Acrescentar o que não existe hoje:** `time.sleep` entre requisições (não há
+      **nenhum** rate limit) e cache em disco por `urlTitle` (não há cache algum).
+      `dou_saidas_affc.py` passa a importar daqui, com o comportamento da Fase 2.5 intacto.
+- [ ] **`scripts/painel.py`** (nova biblioteca) — a derivação, isolada e testável:
+  - filtra `COD_ORG_LOTACAO == '59000'`; `presenca[id]` = meses em que a pessoa aparece
+  - `MES_ENTRADA` = primeira presença · `MES_SAIDA` = mês seguinte à **última** presença
+  - **saída ⟺ última presença ≠ último snapshot** — as 6 ressurreições dissolvem sozinhas, que é a
+    razão de a regra ser essa e não diff par a par (**D13**)
+  - `SAIDA_PROVISORIA = SIM` quando `MES_SAIDA` é o snapshot mais novo — um mês de ausência não é
+    prova, e os 6 casos históricos provam
+  - **subcaso resolvido sem crawler:** some do conjunto CGU mas continua no arquivo AFFC com outro
+    `COD_ORG_LOTACAO` (3 casos) → `MOTIVO_SAIDA = MUDOU DE ÓRGÃO NA CARREIRA`, `ORGAO_DESTINO` = o
+    órgão novo, `FONTE_DESTINO = SIAPE`
+  - coorte: `MES_ENTRADA == 202206` → `VETERANO`; senão `CGU-2021`
+  - **empilha** os snapshots em `historico_mensal.csv` (**D16**), com `MES`, `CONCURSO` e `AREA`
+  - normalizar `UORG_LOTACAO` (38 grafias para 34 códigos) com tabela de-para explícita:
+    `CONTROLADORIA-GERAL DA UNIAO` e `CGU` → mesma unidade sede; `CONTR REGIONAL DO ESTADO - RJ` →
+    `CGU-Regional/RJ`. **A identidade da unidade é o `COD_UORG_LOTACAO`** — o nome é só rótulo
+    (armadilha 1)
+- [ ] **`scripts/concurso.py`** (CLI, **D17**) — baixa **um** ato do DOU e produz
+      `data/concurso_2021.csv`. Parametrizado por ato, para que o CGU-2026 caia pronto.
+  - Ato: `https://www.in.gov.br/web/dou/-/edital-cgu-n-5-de-13-de-junho-de-2022-407806622`.
+    Reusar `baixar()` e `extrair_texto()` da `dou.py` — **nada de HTTP novo**.
+  - Estrutura já verificada: bloco `N. AUDITOR FEDERAL DE FINANCAS E CONTROLE - <ÁREA>`, depois
+    `N.N. <região/UF da vaga>`, depois registros `<inscrição>, <NOME>, <nota>, <classificação>º`
+    separados por `/`. A modalidade (AC / PcD / negros) vem do cabeçalho `II.N`.
+  - **Descartar os 3 blocos `TECNICO FEDERAL`** (**D7**).
+  - Saída: `INSCRICAO` · `NOME` · `AREA` · `NOTA` · `POSICAO_CONCURSO` · `MODALIDADE` · `UF_VAGA`.
+  - **Casamento com o SIAPE por nome normalizado.** Fica em **91,1%** (410 de 450).
+    ⚠️ **A meta de ">97%" que esta tarefa trazia foi retirada: é inatingível, e não por bug.**
+    Os 40 que faltam foram investigados um a um e se dividem em:
+    - **nomes que mudaram entre 2022 e hoje** — `VITORIA TEIXEIRA ROCHA` no edital é
+      `VITORIA TEIXEIRA ROCHA TUMER` no SIAPE; `ISABELLE BENLOLO DE AZEVEDO` é
+      `ISABELLE BENLOLO RODRIGUES`. Casamento aproximado automático resolveria — e atribuiria
+      área e nota à pessoa errada quando errasse. **Não fazemos isso** (**D12**/**D14**);
+    - **gente que não está no ato mesmo** — 6 com posse em 2016 (vieram por outra via, não pelo
+      concurso), e os demais provavelmente de retificação posterior.
+    O que não casa fica **vazio**, e cada quase-casamento vira uma linha em
+    `data/curadoria_sugestoes.csv` para conferência humana. **Nada dali é aplicado sozinho.**
+  - **Homônimo (D12):** nome **não** é chave. Casamento ambíguo (dois aprovados com o mesmo nome
+    normalizado) fica vazio e vai para `curadoria.csv` resolver à mão.
+- [ ] **`scripts/construir_painel.py`** (CLI) — roda `painel.py`, faz o merge das camadas e escreve
+      `historico_mensal.csv` (**D16**), `dados.csv`, `serie_mensal.csv` e
+      `public/alteracoes-registros.json`. Determinístico e idempotente.
+- [ ] **`scripts/enriquecer_saidas.py`** (CLI) — para cada saída ainda sem `MOTIVO_SAIDA`:
+  1. **Uma requisição por pessoa:** `q="<NOME COMPLETO>"`, `s=todos`, `exactDate=all`. Sem
+     janelamento — um nome não chega perto do teto de 50 (o caso testado devolveu 20 na vida
+     inteira); se vierem exatamente 50, aí sim refazer por janelas. **`s=todos` é obrigatório**:
+     atos de pessoal saem na Seção 2, e o crawler da Fase 2.5 varre por frase, não por nome.
+  2. **Motivo** — só atos com CGU no `hierarchyList`, que casem `PADRAO_CARGO` e citem o nome.
+     Classificar com os padrões **já validados** da Fase 2.5 (`PADROES`, `PADRAO_VACANCIA_MOTIVO`,
+     `PADROES_NAO_E_SAIDA`, `PADRAO_EXONERACAO_EFETIVA`), preservando as duas invariantes
+     documentadas lá: os padrões já vêm normalizados (não passar por `normalizar()`, senão `\s` vira
+     `\S`) e tipo descartado faz `continue`, **nunca** `return None`. Escolher o ato mais próximo de
+     `MES_SAIDA`. **Acrescentar `FALECIMENTO`** — publicar "exonerado" para quem morreu seria erro
+     grave.
+  3. **Guarda de homônimo (barata e real):** o Portal mascara a matrícula como `166****`, ou seja,
+     **os 3 primeiros dígitos do SIAPE ficam visíveis**, e os atos do DOU escrevem o SIAPE por
+     extenso (*"matrícula SIAPE nº 2576295"*). Quando o ato traz matrícula, exigir que os 3
+     primeiros dígitos batam.
+  4. **Destino** — um ato só é candidato se **todas** valerem: publicado **depois** do ato de saída;
+     `hierarchyList` **sem** CGU; o texto casa nomeação/posse (`NOMEAR`, `EMPOSSAR`, `TOMAR POSSE`)
+     com a pessoa como objeto; **não** é `declarar vago`/`dispensar`/`exonerar` (isso é o emprego
+     **anterior** liberando a pessoa — a armadilha do TRE); e a data está a **≤ 24 meses** da saída.
+     Órgão sai do `hierarchyStr`; `FONTE_DESTINO = DOU`.
+  5. Sem destino no DOU → estágio **opcional** `--externo`: `rankingdosconcursos.com.br` e busca web
+     → `FONTE_DESTINO = RANKING`/`BUSCA`, `VERIFICADO = NÃO`.
+     > ⚠️ **Risco conhecido:** o site tem "Busca por Nome", mas o endpoint **não é descobrível** pela
+     > página renderizada. **Fazer um spike antes de programar esse estágio**; se não render, ele
+     > fica de fora e o destino segue "não identificado". O resto da fase **não depende dele**.
+  6. Gravar em `saidas_dou.csv` + arquivar o HTML do ato em `data/saidas_dou/`.
+- [ ] **`scripts/atualizar.py`** (CLI) — o comando único da **D15**: `filtrar_affc` →
+      `construir_painel` → `enriquecer_saidas` → `construir_painel`.
+
+**Custo do backfill:** 268 nomes × (1 busca + ~10 atos) ≈ 3.000 requisições. A 1 req/s, ~50 minutos,
+uma vez só. Com o cache em disco, reexecutar fica quase instantâneo.
+
+> **Nota de arquitetura (D15):** o CI **não precisa** do histórico de 70 MB, porque o mês novo é
+> diffado contra as linhas `EM EXERCÍCIO` do próprio `dados.csv` commitado. Isso deixa a porta
+> aberta para automatizar depois sem refazer nada.
+
+### 2.3.1 Achados da execução (14/08/2026)
+
+Cinco defeitos encontrados ao rodar de verdade. **Nenhum quebrava o script** — todos os cinco
+produziriam um site plausível e errado, que é o modo de falha que este projeto já conhece.
+
+1. **Zero à esquerda na matrícula anulava a guarda de homônimo — ao contrário.**
+   O Portal mascara a matrícula em 7 posições **preservando o zero** (`014****`); o DOU escreve o
+   número **sem ele** (`149262`). Comparado cru, o ato certo era tido como *de outra pessoa* e
+   descartado. Uma aposentadoria real sumiu por isso. Agora os dois lados vão a `zfill(7)`.
+   Medido: 6 de 6 casam com o ajuste, 5 de 6 sem ele.
+2. **A posse no destino costuma vir ANTES do ato de saída da CGU.** A pessoa toma posse no TCU em
+   outubro, a CGU declara o cargo vago em dezembro. A janela original exigia ato **posterior** à
+   saída e perdia justamente os destinos mais bem documentados. Agora a janela é
+   **[-6, +24] meses**. Reconferido: a armadilha do TRE (ato de 2025 sobre saída de 2022) continua
+   corretamente recusada, porque os atos daquele órgão ou estão fora da janela ou são de
+   desligamento (`declarar vago`/`dispensar`), nunca de nomeação.
+3. **Faltava o tipo `demissao`.** Demissão é penalidade de processo disciplinar (art. 132 da Lei
+   8.112/90), não exoneração, e o ato **não cita o cargo** — diz só "aplicar a penalidade de
+   demissão ao servidor Fulano, matrícula SIAPE nº…". Como `classificar` exigia o cargo, esses
+   casos caíam em "saída sem ato identificado". Agora existe o tipo, e a prova do cargo é
+   dispensada **quando a matrícula já provou a identidade** (sem matrícula, a exigência continua:
+   nome sozinho casa homônimo).
+   > ⚠️ **Decisão pendente para o usuário:** publicar `DEMITIDO`, com link para o ato, é afirmação
+   > pública sobre penalidade disciplinar de pessoa nomeada. O ato é público (DOU), mas a escolha
+   > de exibi-lo na interface é editorial, não técnica. Enquanto não se decidir, o dado fica no
+   > `dados.csv` e **a Fase 3 decide se e como mostra**.
+4. **`SAIDA_PROVISORIA` nunca era marcada.** A condição comparava o mês da saída com o mês
+   *seguinte* ao último snapshot — que por construção não existe. As 2 saídas mais recentes eram
+   tratadas como definitivas com um único mês de ausência observado. Corrigido para comparar com o
+   próprio último snapshot; essas saídas agora ficam **fora do crawl** até o mês seguinte confirmar.
+5. **O typo do edital** (`FINANCAAS`) — ver o quadro do D17 acima.
+6. **Dois falsos positivos de destino, achados conferindo os 95 à mão.** A distribuição das
+   distâncias entre o ato de destino e o mês da saída denunciou os dois: **90 dos 95 caem entre
+   −4 e +4 meses** (pico em −1/−2, exatamente o esperado — a posse vem antes da vacância), e havia
+   um **vazio limpo entre +4 e +13**. Os 5 do outro lado do vazio não se sustentaram:
+   - *"NOMEAR Fulano para exercer o **Cargo Comissionado Executivo**, CCE…"* no COAF/BCB — assumir
+     chefia em outro órgão não é "ter ido" para aquele órgão. É a mesma classe de erro que a Fase
+     2.5 pegou na exoneração, e a função de destino não tinha essa guarda;
+   - um **ato-lista** (resultado de concurso com dezenas de nomes e notas) em que o verbo "NOMEAR"
+     casava num canto e o nome da pessoa em outro, sem que o ato a nomeasse.
+   Correções: `e_ato_de_nomeacao` passou a rejeitar cargo em comissão e tabela de resultado, e a
+   janela superior caiu de **+24 para +6 meses** — corte dentro do vazio, que mantém todo o sinal
+   e descarta o ruído.
+   > **A primeira tentativa de corrigir isso estava errada, e vale registrar por quê.** Tentei
+   > barrar o ato-lista medindo a **distância** entre o verbo "nomear" e o nome: 400 caracteres.
+   > Derrubou **63 destinos legítimos** junto. Medindo os 85 destinos válidos, a mediana é de
+   > **802 caracteres** e não existe corte limpo — atos de nomeação são longos e trazem o nome
+   > bem depois do verbo. Distância era o instrumento errado; o que separa os dois casos é a
+   > **forma do ato**, e não o quão longe o nome está. O detector de tabela
+   > (`<inscrição>, <NOME>, <nota>` repetido 5+ vezes) resolve sem falso negativo.
+7. **`extrair_texto` caía para a página HTML inteira quando não achava a div do ato.** Algumas URLs
+   do DOU são **página-índice** (sumário do dia, várias matérias), sem `.texto-dou` — e o fallback
+   entregava ~27 mil caracteres de JavaScript de analytics adiante, como se fossem o ato. **Dois
+   destinos foram atribuídos a pessoas reais com base nesse lixo.** Medido: das 1.618 páginas de
+   ato no cache, **zero** dependiam do fallback. Agora devolve string vazia, e o ato é pulado.
+8. **Nome é prefixo de nome — limitação conhecida, não resolvida.** "LUIZ CARLOS DE ALMEIDA" está
+   contido em "LUIZ CARLOS DE ALMEIDA SOUZA", que é outra pessoa; foi assim que uma lista de 172 mil
+   registros do Judiciário virou "destino" de um auditor. Exigir palavra inteira **não resolve**: o
+   texto do DOU vem todo em caixa alta, e aí `ALMEIDA SOUZA` (outra pessoa) e `OLIVEIRA DO CARGO`
+   (a pessoa certa) ficam indistinguíveis pelo delimitador. Quem segura esse caso é o **conjunto** —
+   detector de tabela, guarda de matrícula e janela de datas —, nunca o casamento de nome sozinho.
+   Está documentado em `cita_nome()` para ninguém "consertar" achando que melhora.
+9. **Rótulo de destino genérico.** `hierarchyStr` começa pelo poder, não pelo órgão: publicar
+   *"foi para o Poder Judiciário"* é verdadeiro e inútil. `orgao_do_ato()` desce um nível quando o
+   primeiro é `Poder Legislativo`/`Poder Judiciário`/`Poder Executivo Federal`, e aí sai
+   "Senado Federal", "Superior Tribunal Militar".
+
+10. **A auditoria dos 87 destinos, um a um, achou mais 9 errados** — e mostrou que amostrar não
+    bastava. A distribuição de datas parecia limpa (todos entre −4 e +4 meses), mas
+    **lista de nomeação e lista de classificação são publicadas na mesma época e têm a mesma
+    forma**: uma sequência de nomes. A data não separa as duas. O que separa é **o que acompanha
+    o nome**:
+    ```
+    classificação : "BRENO HONORATO NASCIMENTO 346.35 9 PCD"          <- NOTA (decimal)
+    nomeação      : "JAIDIR ALVES COSTA DOS SANTOS 388260521 DRF - RIO BRANCO"
+                                                   ^matrícula  ^lotação
+    ```
+    Estar classificado num concurso não é ter sido nomeado nele. Seis auditores tinham destino
+    vindo de lista de classificação.
+11. **"Decorrente da posse de X" é ambíguo, e o nome desempata.** As duas redações existem:
+    - *"cargo VAGO EM DECORRÊNCIA DA POSSE DE **Hyago** em outro cargo"* → é o emprego anterior
+      do Hyago dando baixa. **Não é destino.**
+    - *"NOMEAR **André**, EM CARGO VAGO DECORRENTE DA POSSE DE (outra pessoa)"* → o André está
+      sendo nomeado na vaga que outro deixou. **É destino.**
+    Um padrão cego a nome erra os dois lados: rejeitava o André e aceitava o Hyago.
+    `descreve_saida_da_pessoa()` testa se **o nome da pessoa vem logo depois** de "posse de".
+12. **Rótulo de destino: a AGU pendura sob a Presidência da República.** Quem foi nomeado
+    Procurador Federal aparecia como *"foi para a Presidência da República"* — verdadeiro na
+    hierarquia do DOU e enganoso para o leitor. `PRESIDENCIA DA REPUBLICA` entrou na lista de
+    níveis guarda-chuva, e agora sai "Advocacia-Geral da União".
+
+> **Método que funcionou, para repetir nas próximas fases:** classificar *todos* os registros por
+> categoria automática, e conferir à mão **um exemplar de cada categoria** — não uma amostra
+> aleatória. Foi assim que os 9 apareceram; a amostra aleatória de 10 tinha passado por 4 deles
+> sem que a distribuição de datas denunciasse nada.
+
+### 2.3.3 A camada de DESTINO é a mais frágil das três — e por quê
+
+Isto é o achado mais importante da fase, e vale mais que qualquer número: **motivo e destino não
+têm o mesmo grau de confiabilidade, e tratá-los igual seria erro.**
+
+- **Motivo** é uma leitura direta: o ato é *da CGU*, cita a pessoa, e o verbo diz o que aconteceu
+  ("exonerar", "conceder aposentadoria", "declarar vago por posse em outro cargo"). 95% de
+  cobertura, e as conferências à mão não acharam um único erro.
+- **Destino** é uma *inferência*: "um ato publicado pelo órgão Y menciona X perto de um verbo de
+  nomeação, logo X foi para Y". Essa inferência é fraca, porque o DOU menciona pessoas por muitos
+  motivos além de nomeá-las.
+
+Formatos de falso positivo encontrados, **cada um numa rodada diferente de auditoria** — a lista
+não é hipotética, todos ocorreram nos dados reais:
+
+| O ato diz | Por que não é destino |
+|---|---|
+| "NOMEAR X para exercer o **Cargo Comissionado Executivo**, CCE 1.07" | assumir chefia não é ir para o órgão |
+| tabela `<inscrição>, <NOME>, <nota>` | estar classificado não é ser nomeado |
+| "CLASSIFICACAO CANDIDATO 10 (AMPLA) X" | idem, outro formato |
+| "cargo vago **em decorrência da posse de X**" | é o emprego anterior dando baixa |
+| "cargo **anteriormente ocupado por X**" | X é quem saiu; quem entra é outro |
+| "em vaga decorrente da **vacância do cargo de X**" | idem |
+| "**desistência** de nomeação ... candidatos: ..., X, ..." | o ato diz que X **não** foi |
+| "INTERESSADA: X. ASSUNTO: concurso. **Desistência**" | idem, outra redação |
+| "**TORNAR SEM EFEITO** a nomeação de X" | a nomeação foi anulada |
+| página-índice do DOU (sem `.texto-dou`) | não é ato nenhum |
+
+E um limite que **nenhum padrão resolve**: o `hierarchyStr` do próprio DOU às vezes está errado.
+Um ato que começa com "PORTARIA-TCU Nº 49" e nomeia para "Auditor Federal de Controle Externo do
+quadro desta Secretaria" vinha indexado sob *Ministério dos Transportes*. O órgão publicado sai da
+metadados do DOU, e a metadados erra.
+
+**Consequência prática, e é a razão de a D14 existir:** todo destino vai ao ar com
+`FONTE_DESTINO = DOU` e `VERIFICADO = NÃO`. A precisão residual **não está estabelecida** — o que
+se sabe é que 10 formatos de erro foram fechados e testados, não que não haja o 11º. A Fase 3 deve
+tratar destino como **indício com fonte**, nunca como fato apurado: mostrar o selo, linkar o ato, e
+**não** usar destino não verificado em número agregado de card. Quem fecha a conta é a curadoria
+humana, via `curadoria.csv`.
+
+### 2.3.2 Teste de regressão
+
+`scripts/testar_dou.py` — **25 invariantes, sem rede, sem dependência**. Cada caso é um erro que já
+aconteceu neste projeto. Rodar **sempre** que mexer nos padrões de `dou.py`; o `CLAUDE.md` registra
+essa obrigação. Cobre: exoneração de CCE que não é saída, o "declarar vago" que o DOU usa no lugar
+de "vacância", a aposentadoria que era engolida pelo teste de vacância, o zero à esquerda da
+matrícula, lista de classificação × lista de nomeação, as duas leituras de "decorrente da posse
+de", o rótulo de órgão sob poder/Presidência e o fallback de extração.
+
+### 2.4 Aposentar nesta fase
+
+- [ ] `data/processador.ipynb` — pandas (não instalado), reescreve `dados.csv` in place, caminhos
+      relativos frágeis. Substituído por `construir_painel.py`.
+- [ ] `scripts/generate-alteracoes.js` + `.github/workflows/update-alteracoes.yml` — o changelog
+      passa a vir do diff mensal, com data real, em vez de arqueologia de commits git. O script
+      já está quebrado de qualquer jeito: não existe mais coluna `MASP`, então `keyForRecord`
+      (`:100-105`) cai silenciosamente para `INSCRICAO`.
+- [ ] `scripts/reorder_dados.py` — `AREA_ORDER` (`:10`) ainda é de MG e o `dados.csv` passa a nascer
+      ordenado pelo pipeline.
+- [ ] `data/historico transparencia_legado_sefmg/` (27 CSVs) e `data/mudancas_legado/` (26 `.txt`).
+- [ ] `data/outros_concursos.csv` e `data/aprovacoes_outros_concursos.csv` — tema da Fase 7.
+
+**Concluída quando:**
+
+- `atualizar.py` roda de ponta a ponta sobre os 49 snapshots
+- `historico_mensal.csv` tem **88.421 linhas** e 17 colunas, e nenhuma das 29 descartadas reaparece
+- `dados.csv` tem ~2.009 linhas e 268 saídas; `serie_mensal.csv` tem 49 linhas
+- **os totais batem com as tabelas de "O que a base já mostrou"** — 2.009/268, 450/164, 296/123,
+  1.559/104. Divergência ali é **bug no pipeline**, não no dado
+- `concurso_2021.csv` tem **488 linhas AFFC**, nenhuma TFFC, distribuição 307/94/61/26, e casamento
+  com o SIAPE **> 97%**
+- **10 saídas conferidas à mão** — `ATO_SAIDA_URL` abre o ato certo, citando a pessoa, com o motivo
+  que o texto diz. Foi assim que a Fase 2.5 pegou 3 bugs silenciosos
+- **5 áreas conferidas à mão** contra o edital publicado
+
+---
+
+## [ ] Fase 3 — Dashboard sobre dado real *(reescrita em 14/08/2026)*
+
+**Objetivo:** o dashboard deixa de mostrar 14 linhas de EXEMPLO e passa a mostrar os 268 casos
+reais. Reaproveita a estrutura da SEF-MG onde ela serve e remove o que a **D11** deixou sem fonte.
+
+### 3.1 Base comum (fazer primeiro)
+
+Hoje existem **5 cópias** do parser de CSV e do parser de data (`App.tsx:83-127` e `:418-466`,
+`DetailedTableApp.tsx:196-240` e `:279-323`, `HistoryPage.tsx:80-133`,
+`relatorio_impressao.tsx:21-53`), com semânticas **divergentes** — célula vazia vira `null` no
+`App.tsx:121` e `''` no `DetailedTableApp.tsx:235`. Com o esquema mudando inteiro, manter 5 cópias
+é multiplicar o erro por 5.
+
+- [ ] `evasao/lib/dados.ts` — **um** parser `;`-CSV, **um** parser `DD/MM/AAAA`, e o `fetch` com a
+      lista de caminhos alternativos (hoje repetida 4 vezes, com até 10 candidatos cada). Todas as
+      páginas importam daqui.
+- [ ] `types.ts` — `RegistroAuditor` reescrito para o esquema da 2.2. Hoje o tipo existe e
+      **nenhum componente o usa** (tudo é `any`); passar a usá-lo de fato.
+- [ ] `constants.ts` — `SITUACOES` com o vocabulário novo; `CONCURSOS` mantém `CGU-2021` e
+      `VETERANO`, e as **áreas do `CGU-2021` passam a vir conferidas contra o edital** (**D17**):
+      `Auditoria e Fiscalização`, `Correição e Combate à Corrupção`, `TI` e `Contabilidade Pública
+      e Finanças` — as 4 que o ato traz, com 307/94/61/26 aprovados. Hoje só `DATA_INICIO_OBSERVACAO` é
+      importado de lá; os outros 7 símbolos não têm consumidor nenhum.
+
+### 3.2 Cards
+
+| # | Card | Fonte |
+|---|---|---|
+| 1 | **Dias sem perder um Auditor** | inalterado — DOU, Fase 2.5 (**D10**) |
+| 2 | **Saíram da CGU** — 268 desde jun/2022 | `dados.csv`; rodapé com a quebra por motivo |
+| 3 | **Evasão de quem entrou depois de jun/2022** — **36,4% (164 de 450)** | `dados.csv` filtrado por `CONCURSO` |
+| 4 | **Efetivo atual** — 1.741 (era 1.559 em jun/2022) | `serie_mensal.csv` |
+
+Sai o card "aguardando nomeação em outros concursos". `CounterCard.tsx` não muda — é puramente
+apresentacional.
+
+### 3.3 Gráficos
+
+- [ ] **Efetivo mensal + entradas/saídas** — `EvasionChart` sobre `serie_mensal.csv`. O componente
+      já empilha 4 séries e já tem modo de rótulo rotacionado; aproveitar.
+- [ ] **Saídas por motivo** — exoneração / vacância / aposentadoria / sem ato identificado.
+- [ ] **Destinos** — `EvasionTable`, agora com dado real. Cada destino exibe os **dois selos da
+      D14**: de onde veio a informação e se foi verificada por gente. Corrigir "DOE" → "DOU"
+      (`EvasionTable.tsx:99,101,103`).
+- [ ] **Por unidade / UF** — `agregarPorUnidade` (`App.tsx:849-920`) aproveitável quase como está;
+      hoje só considera `EXONERADO` (`App.tsx:1228`) e passa a considerar toda saída.
+- [ ] **Curva de permanência da coorte 2022** (novo) — % remanescente por mês desde a posse. É a
+      visualização que um observatório de evasão existe para mostrar, e a base agora dá.
+
+### 3.4 Tabela detalhada e histórico
+
+- [ ] `DetailedTableApp.tsx` — colunas do esquema novo; chave React por `ID_SERVIDOR_PORTAL`.
+      O **filtro de área continua existindo** (**D17** dá a fonte), mas com as áreas reais do
+      CGU-2021 — `Auditoria e Fiscalização` · `Correição e Combate à Corrupção` · `TI` ·
+      `Contabilidade Pública e Finanças` — e mais a opção "sem área" para veteranos e não-casados.
+      Entram também **coorte**, **unidade**, **motivo de saída** e **verificado**. Cai o layout
+      duplo `VETERANO` (9 colunas) × padrão (11) de `:669-707` — vira uma tabela só — e o default
+      `'FISCALIZAÇÃO'` (`:6`, `:415`, `:420`) some.
+- [ ] `HistoryPage.tsx` — `alteracoes-registros.json` passa a ser gerado pelo diff mensal; o bloco
+      `commit` (hash/autor/mensagem) vira `{ mes, data }`. Some o conteúdo de MG que **hoje aparece
+      na tela** (`observatoriosefmg`, `ISS BH`, `SEFAZ PE`) e que já não casa com nenhuma linha do
+      `dados.csv` atual.
+- [ ] `relatorio_impressao.tsx` — listas passam a ser por motivo de saída.
+- [ ] Limpar `console.log` de produção — `EvasionChart.tsx:189-192` dispara **a cada hover**;
+      `HistoryPage.tsx` tem ~15.
+
+### 3.5 Remover
+
+- [ ] `AprovadosOutrosConcursosTable.tsx` (335 linhas) · `agregarPorAprovacaoOutroConcurso`
+      (`App.tsx:983-1166`) · `contarAuditoresEmExercicioAguardandoNomeacao` (`App.tsx:1170-1221`)
+- [ ] `DetailedTable.tsx` (445 linhas, **não importado por ninguém**) · `Navigation.tsx` (idem)
+- [ ] `table.html` + `table.tsx` — **fora do build** (`vite.config.ts:15-20`) e ainda carregam o GA
+      `G-NZ84J0PJBF` que a **D2** mandou remover
+- [ ] Código morto de KPI: `diasDesdeUltimaEvasao` (`App.tsx:237`, `:392-399`),
+      `dataUltimaExoneracaoFormatada` (`:1326-1328`), `diasRecorde` (`:1354-1379` — pendência aberta
+      da Fase 2.5)
+
+### 3.6 Deploy
+
+- [ ] `deploy-pages.yml` copia `evasao/data/*.csv` com glob **raso** — subpasta não entra.
+      Acrescentar `data/saidas_dou/` do mesmo jeito que já se fez com `dias_sem_perder_AFFC/`,
+      senão os links dos atos dão 404.
+- [ ] Remover o `workflow_run` de `update-alteracoes.yml` junto com o workflow.
+
+**Concluída quando:** `npm run build` OK, `npx tsc --noEmit` sem erro **novo** (os 6 pré-existentes
+seguem para a Fase 6), os 4 cards e os 5 gráficos batem com `dados.csv`/`serie_mensal.csv`, e
+**nenhum destino aparece sem os dois selos da D14**.
+
+---
+
+## [x] ~~Fase 4 — Pipeline de dados~~ — **absorvida pela Fase 2 (v2)** em 14/08/2026
+
+Esta fase existia para "repor a esteira de atualização contra fontes federais". Com a **D11**, a
+esteira **é** o assunto da Fase 2 (v2) e foi especificada lá em detalhe. O que restava aqui:
+
+- `processador.ipynb`, `generate-alteracoes.js`, `reorder_dados.py`, as pastas de legado de MG e os
+  dois CSVs de outros concursos → **§2.4 da Fase 2 (v2)** ("Aposentar nesta fase").
+- Regenerar `alteracoes-registros.json` → passa a ser produto do `construir_painel.py`, a partir do
+  diff mensal, com data real em vez de arqueologia de commits git.
+- **Carregar a lista da FGV** e **derivar os veteranos por cruzamento de nome** → **cancelado**.
+  A coorte passa a ser derivada da primeira aparição na série mensal (**D11**/**D13**), que é dado
+  direto e não depende de casar nome normalizado entre duas pontas — cruzamento que a própria fase
+  já reconhecia como arriscado por homônimos, e que a **D12** agora proíbe.
+- A lista de aprovados volta na **Fase 7**, e por um caminho melhor: ela está publicada no próprio
+  DOU (Edital CGU nº 5 de 13/06/2022), com inscrição, nota e classificação.
+
+**Registro que continua valendo** (não repetir levantamento):
+
+- **Série da CGU baixada e filtrada** — `evasao/data/historico_transparencia_cgu/`, 49 snapshots
+  mensais (`202206`–`202606`), reduzidos aos AFFC por `evasao/scripts/filtrar_affc.py`.
+- Os CSVs brutos do portal têm **~420 MB cada** (o GitHub recusa acima de 100 MB); filtrados, os 49
+  somam ~70 MB. A pasta está **no `.gitignore`**: dado de trabalho regenerável, não pertence ao repo.
+- O filtro casa `AUDITOR FEDERAL DE FINANCAS E CONTROLE` normalizado (sem acento, espaços
+  colapsados), o que exclui o TFFC por construção (**D7**). Encoding de entrada é **latin-1** — ler
+  como UTF-8 quebra no primeiro "ç".
+- ⚠️ **Mas o filtro de cargo não basta:** o arquivo filtrado tem ~825 AFFC do Ministério da
+  Fazenda/Economia além dos ~1.750 da CGU. Ver achado 1 da Fase 2 (v2).
 
 ---
 
@@ -447,8 +1090,7 @@ Decisão **D6: opção A — remover**.
 - [ ] `evasao/metadata.json` — `name` e `description`.
 - [ ] `evasao/package.json:2` — `"name": "evasão-auditores-fiscais-mg"` → `observatorio-cgu`.
 - [ ] `evasao/vite.config.ts` — remover o `define` de `process.env.API_KEY` / `GEMINI_API_KEY`: **não há nenhum uso de Gemini no código**, é resto do scaffold.
-- [ ] `.github/workflows/update-alteracoes.yml` — nome do workflow e mensagem de commit em português já servem; revisar caminhos se a Fase 4 mudar a estrutura. (Os caminhos de `dist/` já saíram na Fase 1.5.)
-- [ ] `evasao/scripts/generate-alteracoes.js:8` — ainda escreve em `['public', 'dist']`. Como `dist/` virou artefato de build ignorado, deixar só `public`.
+- [x] ~~`.github/workflows/update-alteracoes.yml` — revisar caminhos~~ e ~~`generate-alteracoes.js:8` — ainda escreve em `['public', 'dist']`~~ → **caem por descarte**: os dois são aposentados na Fase 2 (v2), §2.4.
 - [ ] `evasao/tsconfig.json:13-15` — acrescentar `"vite/client"` ao `types` (hoje só `"node"`), que resolve os 3 erros de `import.meta.env`. Corrigir também os 3 `unknown → ReactNode` (`App.tsx:1205`, `DetailedTable.tsx:427`, `DetailedTableApp.tsx:653`). Meta: `npx tsc --noEmit` limpo.
 - [ ] Considerar rodar `tsc --noEmit` no `deploy-pages.yml` antes do build — hoje um erro de tipo passa direto para produção.
 - [ ] Remover `evasao/table.html` e `evasao/table.tsx` — **não estão no build** (`vite.config.ts` declara só 4 entradas), é código morto. `table.html:24,30` ainda carrega o GA `G-NZ84J0PJBF` e `:41` o `/index.css` inexistente — a remoção do arquivo resolve os dois.
@@ -456,3 +1098,35 @@ Decisão **D6: opção A — remover**.
 - [ ] Varredura final: `grep -ri "sef\|minas\|masp\|doe-mg\|tffc\|técnico" --exclude-dir=.git --exclude-dir=node_modules --exclude-dir=dist .` deve voltar vazio (fora de arquivos de legado explicitamente arquivados).
 
 **Concluída quando:** `npm run build` OK e a varredura final está limpa.
+
+---
+
+## [ ] Fase 7 — Concursos e bancas *(nova, adiada por decisão de 14/08/2026)*
+
+**Objetivo:** o concurso de **destino** — para onde a pessoa foi, e quem ainda está na CGU mas já
+está aprovado ou inscrito em outro concurso ("quem está estudando para sair").
+
+Fase **independente** e posterior: nada na Fase 2 (v2) ou na Fase 3 depende dela, e ela não reabre
+nenhuma decisão daquelas fases — só acrescenta colunas e telas.
+
+> **Encolheu em 14/08/2026.** A lista de aprovados do CGU-2021, a `AREA` e o cruzamento
+> aprovado × posse **saíram desta fase e entraram na Fase 2** (**D17**): estão todos no
+> `Edital CGU nº 5` publicado no DOU, a uma requisição de distância, e não precisavam de crawler de
+> banca nenhum. O que sobrou aqui é só o lado do **destino**.
+
+- [ ] **Crawlers de banca (FGV/Cespe/FCC) e `rankingdosconcursos.com.br`** — AFFCs inscritos ou
+      aprovados em outros concursos. É o tema dos antigos `outros_concursos.csv` /
+      `aprovacoes_outros_concursos.csv`, que a Fase 2 (v2) removeu; se voltar, volta com **fonte e
+      selo de verificação** (**D14**), não como planilha preenchida à mão.
+- [ ] **Aprovados do CGU-2021 que nunca tomaram posse** — 38 pessoas (488 aprovados − 450
+      empossados). Devolveria `CADASTRO DE RESERVA` e `DESISTENTE` ao vocabulário de `SITUACAO`.
+      Decidir se viram linha do painel: eles nunca foram da CGU, e o denominador do concurso
+      (92,2% de aproveitamento) já sai do `concurso_2021.csv` sem precisar disso.
+- [ ] **Concurso CGU 2026** — quando o edital sair, vira mais um valor na coluna `CONCURSO`
+      (**D9**) e uma entrada em `CONCURSOS` no `constants.ts`. A `AREA` e a classificação saem do
+      mesmo `concurso.py` (**D17**), só apontando para o ato novo. Nenhuma coluna nova, nenhum
+      arquivo novo, nenhum código novo.
+
+> ⚠️ Esta fase publica **previsão e intenção** ("fulano foi aprovado em X, pode sair"), não fato
+> consumado. Diferente das Fases 2-3, que só afirmam o que já aconteceu. A **D14** vale em dobro
+> aqui: nada sem fonte registrada.
