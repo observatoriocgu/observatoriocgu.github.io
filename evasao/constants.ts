@@ -14,6 +14,16 @@ export const DATA_INICIO_OBSERVACAO = new Date('2022-06-14T10:00:00Z');
 /** Primeira competência da série. Tudo que existe aqui já existia antes do observatório. */
 export const MES_INICIO_OBSERVACAO = '202206';
 
+/**
+ * Onde o gráfico de saídas mês a mês começa.
+ *
+ * A coorte CGU-2021 tomou posse em jul/2022, então ago/2022 é a primeira
+ * competência em que alguém dela poderia aparecer ausente. Antes disso o
+ * gráfico só teria os veteranos, e a comparação entre as duas coortes — que é
+ * o ponto — nasceria torta. Custa exatamente uma saída, a de jul/2022.
+ */
+export const MES_INICIO_GRAFICO_SAIDAS = '202208';
+
 // Identificador do pseudo-concurso que agrupa quem já estava na CGU no primeiro
 // snapshot (D9). Não é um concurso: é "entrou antes de a gente olhar".
 export const ID_CONCURSO_VETERANO = 'VETERANO';
@@ -121,15 +131,28 @@ export const SITUACOES_DE_SAIDA: readonly string[] = SITUACOES.filter(
  */
 export const MOTIVO_SEM_ATO = 'Sem ato identificado';
 
+export const MOTIVO_EXONERACAO = 'Exoneração';
+export const MOTIVO_VACANCIA = 'Vacância (posse em outro cargo)';
+
 export const MOTIVOS_SAIDA: readonly string[] = [
-  'Exoneração',
-  'Vacância (posse em outro cargo)',
+  MOTIVO_EXONERACAO,
+  MOTIVO_VACANCIA,
   'Aposentadoria',
   'Falecimento',
   'Demissão',
   SITUACAO_MUDOU_ORGAO,
   MOTIVO_SEM_ATO,
 ];
+
+/**
+ * Os dois motivos que o painel mostra por padrão.
+ *
+ * São as saídas em que o Auditor escolheu ir embora para outro cargo público —
+ * que é o fenômeno que o observatório existe para medir. Aposentadoria,
+ * falecimento e demissão também esvaziam a CGU, mas não são evasão no sentido
+ * que interessa aqui: continuam a um clique de distância, na caixinha.
+ */
+export const MOTIVOS_PADRAO: readonly string[] = [MOTIVO_EXONERACAO, MOTIVO_VACANCIA];
 
 /** Cor de cada motivo. Uma só definição, para gráfico e legenda não divergirem. */
 export const COR_POR_MOTIVO: Readonly<Record<string, string>> = {

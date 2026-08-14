@@ -91,6 +91,61 @@ export const detalharSaida = (registro: RegistroAuditor): DetalheSaida => ({
 export const porSaidaMaisRecente = (a: DetalheSaida, b: DetalheSaida): number =>
   b.mesSaida.localeCompare(a.mesSaida) || a.nome.localeCompare(b.nome, 'pt-BR');
 
+/**
+ * O recorte que os três grupos de caixinhas do painel produzem.
+ *
+ * Lista vazia em qualquer um dos três quer dizer "nenhum", não "todos" — é o
+ * que o leitor pediu ao desmarcar tudo.
+ */
+export interface RecorteDeSaidas {
+  coortes: readonly string[];
+  areas: readonly string[];
+  motivos: readonly string[];
+}
+
+/** As saídas que sobrevivem ao recorte. */
+export const filtrarSaidas = (
+  registros: RegistroAuditor[],
+  recorte: RecorteDeSaidas
+): RegistroAuditor[] =>
+  saidas(registros).filter(
+    (registro) =>
+      recorte.coortes.includes(registro.CONCURSO) &&
+      recorte.areas.includes(areaDe(registro)) &&
+      recorte.motivos.includes(motivoDe(registro))
+  );
+
+/**
+ * Saídas por competência e por motivo — a matriz que o gráfico principal desenha.
+ *
+ * Devolve, para cada motivo pedido, uma contagem por mês e os nomes por trás
+ * dela. Meses sem saída entram com zero: é o mês sem perda nenhuma, e ele conta
+ * a história tanto quanto o mês de pico.
+ */
+export const serieDeSaidasPorMotivo = (
+  saidasFiltradas: RegistroAuditor[],
+  meses: string[],
+  motivos: readonly string[]
+): { motivo: string; valores: number[]; nomes: string[][] }[] => {
+  const indicePorMes = new Map(meses.map((mes, indice) => [mes, indice]));
+
+  return motivos.map((motivo) => {
+    const valores = new Array(meses.length).fill(0);
+    const nomes: string[][] = meses.map(() => []);
+
+    for (const registro of saidasFiltradas) {
+      if (motivoDe(registro) !== motivo) continue;
+      const indice = indicePorMes.get(registro.MES_SAIDA);
+      if (indice === undefined) continue; // saída anterior ao início do gráfico
+      valores[indice] += 1;
+      nomes[indice].push(registro.NOME);
+    }
+
+    for (const lista of nomes) lista.sort((a, b) => a.localeCompare(b, 'pt-BR'));
+    return { motivo, valores, nomes };
+  });
+};
+
 /** Contagem por chave, preservando a ordem de `ordemPreferida` e jogando o resto ao fim. */
 const contarPor = (
   registros: RegistroAuditor[],

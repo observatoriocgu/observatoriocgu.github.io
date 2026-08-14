@@ -12,13 +12,18 @@ import CollaborationForm from './components/CollaborationForm';
 import CounterCard from './components/CounterCard';
 import EvasionChart, { SerieGrafico } from './components/EvasionChart';
 import EvasionTable from './components/EvasionTable';
+import FiltroMultiplo, { OpcaoFiltro } from './components/FiltroMultiplo';
 import { SelosDaLinha } from './components/Selos';
 
 import {
   AREA_DESCONHECIDA,
   COR_POR_CONCURSO,
+  COR_POR_MOTIVO,
   ID_CONCURSO_2021,
   ID_CONCURSO_VETERANO,
+  MES_INICIO_GRAFICO_SAIDAS,
+  MOTIVOS_PADRAO,
+  MOTIVOS_SAIDA,
   rotuloDoConcurso,
 } from './constants';
 import { PontoSerieMensal, RegistroAuditor, SaidasDou } from './types';
@@ -30,6 +35,7 @@ import {
   formatarCompetencia,
   formatarCompetenciaLonga,
   formatarDataIsoParaBr,
+  listarCompetencias,
 } from './lib/dados';
 import {
   agregarPorDestino,
@@ -42,10 +48,13 @@ import {
   curvaDePermanencia,
   detalharSaida,
   evasaoDaCoorte,
+  filtrarSaidas,
+  motivoDe,
   saidas,
+  serieDeSaidasPorMotivo,
 } from './lib/painel';
 
-const TODAS = 'TODAS';
+const COORTES = [ID_CONCURSO_2021, ID_CONCURSO_VETERANO];
 
 const TIPOS_SAIDA_DOU: Array<{ tipo: SaidasDou['eventos'][number]['tipo']; rotuloCurto: string }> = [
   { tipo: 'vacancia', rotuloCurto: 'Vacância' },
@@ -65,12 +74,13 @@ const App: React.FC = () => {
   const [erroSaidasDou, setErroSaidasDou] = useState<string | null>(null);
   const [carregando, setCarregando] = useState(true);
 
-  const [coorteSelecionada, setCoorteSelecionada] = useState<string>(TODAS);
-  const [areaSelecionada, setAreaSelecionada] = useState<string>(TODAS);
+  // Visão inicial: a coorte que entrou depois de jun/2022, todas as
+  // especialidades e só as saídas em que o Auditor foi para outro cargo.
+  const [coortes, setCoortes] = useState<string[]>([ID_CONCURSO_2021]);
+  const [areas, setAreas] = useState<string[]>([]);
+  const [motivos, setMotivos] = useState<string[]>([...MOTIVOS_PADRAO]);
   const [corteGeografico, setCorteGeografico] = useState<'unidade' | 'uf'>('unidade');
 
-  // Dado do painel: uma pessoa por linha e uma competência por linha. Os dois
-  // arquivos são derivados dos snapshots do SIAPE (D11/D16); a interface só lê.
   useEffect(() => {
     let montado = true;
 
@@ -119,28 +129,69 @@ const App: React.FC = () => {
     };
   }, []);
 
-  // === Recortes ===
+  // === Opções das caixinhas ===
 
-  const areasDisponiveis = useMemo(() => {
+  const todasAsSaidas = useMemo(() => saidas(registros), [registros]);
+
+  /** Contagem por opção sobre TODAS as saídas, e não sobre o recorte: um número
+   *  que muda a cada clique em outra caixinha faz o leitor duvidar do filtro. */
+  const contar = (chave: (registro: RegistroAuditor) => string) => {
+    const mapa = new Map<string, number>();
+    for (const registro of todasAsSaidas) {
+      const valor = chave(registro);
+      mapa.set(valor, (mapa.get(valor) ?? 0) + 1);
+    }
+    return mapa;
+  };
+
+  const opcoesCoorte = useMemo((): OpcaoFiltro[] => {
+    const totais = contar((registro) => registro.CONCURSO);
+    return COORTES.map((id) => ({
+      valor: id,
+      rotulo: rotuloDoConcurso(id),
+      cor: COR_POR_CONCURSO[id],
+      total: totais.get(id) ?? 0,
+    }));
+  }, [todasAsSaidas]);
+
+  const opcoesArea = useMemo((): OpcaoFiltro[] => {
+    const totais = contar(areaDe);
+    // Toda área que exista em alguém, tenha ou não saída — senão uma
+    // especialidade sem nenhuma evasão simplesmente sumiria do filtro.
     const encontradas = new Set(registros.map(areaDe));
-    // "Sem área identificada" vai sempre por último: é ausência de dado, não uma área.
-    const comArea = Array.from(encontradas).filter((area) => area !== AREA_DESCONHECIDA).sort((a, b) => a.localeCompare(b, 'pt-BR'));
-    return encontradas.has(AREA_DESCONHECIDA) ? [...comArea, AREA_DESCONHECIDA] : comArea;
-  }, [registros]);
+    const comArea = Array.from(encontradas)
+      .filter((area) => area !== AREA_DESCONHECIDA)
+      .sort((a, b) => a.localeCompare(b, 'pt-BR'));
+    const ordenadas = encontradas.has(AREA_DESCONHECIDA) ? [...comArea, AREA_DESCONHECIDA] : comArea;
+    return ordenadas.map((area) => ({ valor: area, rotulo: area, total: totais.get(area) ?? 0 }));
+  }, [registros, todasAsSaidas]);
 
-  const filtrados = useMemo(
-    () =>
-      registros.filter(
-        (registro) =>
-          (coorteSelecionada === TODAS || registro.CONCURSO === coorteSelecionada) &&
-          (areaSelecionada === TODAS || areaDe(registro) === areaSelecionada)
-      ),
-    [registros, coorteSelecionada, areaSelecionada]
-  );
+  const opcoesMotivo = useMemo((): OpcaoFiltro[] => {
+    const totais = contar(motivoDe);
+    return MOTIVOS_SAIDA.filter((motivo) => totais.has(motivo)).map((motivo) => ({
+      valor: motivo,
+      rotulo: motivo,
+      cor: COR_POR_MOTIVO[motivo],
+      total: totais.get(motivo) ?? 0,
+    }));
+  }, [todasAsSaidas]);
 
-  // === Cards ===
+  // As especialidades só se sabem depois que o CSV chega, então o "todas"
+  // inicial é aplicado aqui, uma vez, sem sobrescrever escolha do leitor.
+  const [areasIniciadas, setAreasIniciadas] = useState(false);
+  useEffect(() => {
+    if (areasIniciadas || opcoesArea.length === 0) return;
+    setAreas(opcoesArea.map((opcao) => opcao.valor));
+    setAreasIniciadas(true);
+  }, [opcoesArea, areasIniciadas]);
 
-  const totalSaidas = useMemo(() => saidas(registros).length, [registros]);
+  // === Recorte ===
+
+  const recorte = useMemo(() => ({ coortes, areas, motivos }), [coortes, areas, motivos]);
+  const saidasFiltradas = useMemo(() => filtrarSaidas(registros, recorte), [registros, recorte]);
+
+  // === Cards (acima dos filtros: são sempre o quadro inteiro) ===
+
   const motivosDoTotal = useMemo(() => agregarPorMotivo(registros), [registros]);
   const coorte2021 = useMemo(() => evasaoDaCoorte(registros, ID_CONCURSO_2021), [registros]);
   const coorteVeterana = useMemo(() => evasaoDaCoorte(registros, ID_CONCURSO_VETERANO), [registros]);
@@ -157,91 +208,75 @@ const App: React.FC = () => {
     ? (saidasDou.eventos ?? []).find((evento) => evento.dataPublicacao === saidasDou.dataMaisRecente)
     : undefined;
 
-  // === Gráfico 1: efetivo mensal, entradas e saídas ===
+  // === Gráfico principal: saídas mês a mês ===
 
-  const graficoEfetivo = useMemo((): { rotulos: string[]; completos: string[]; series: SerieGrafico[] } => {
-    const rotulos = serie.map((ponto) => formatarCompetencia(ponto.mes));
-    const completos = serie.map((ponto) => formatarCompetenciaLonga(ponto.mes));
+  const graficoSaidas = useMemo(() => {
+    if (!ultimoMes) return { rotulos: [], completos: [], series: [] as SerieGrafico[], vazio: true };
+
+    const meses = listarCompetencias(MES_INICIO_GRAFICO_SAIDAS, ultimoMes.mes);
+    const series = serieDeSaidasPorMotivo(saidasFiltradas, meses, motivos)
+      // Um motivo marcado mas sem nenhuma saída no recorte só polui a legenda.
+      .filter((linha) => linha.valores.some((valor) => valor > 0))
+      .map(
+        (linha): SerieGrafico => ({
+          rotulo: linha.motivo,
+          cor: COR_POR_MOTIVO[linha.motivo] ?? '#6b7280',
+          valores: linha.valores,
+          detalhes: linha.nomes,
+        })
+      );
+
     return {
-      rotulos,
-      completos,
-      series: [
-        {
-          rotulo: 'Auditores na CGU',
-          cor: '#d4af37',
-          tipo: 'linha',
-          valores: serie.map((ponto) => ponto.efetivo),
-        },
-        {
-          rotulo: 'Entradas',
-          cor: '#22c55e',
-          eixo: 'direita',
-          valores: serie.map((ponto) => ponto.entradas),
-        },
-        {
-          rotulo: 'Saídas',
-          cor: '#dc2626',
-          eixo: 'direita',
-          valores: serie.map((ponto) => ponto.saidas),
-        },
-      ],
+      rotulos: meses.map(formatarCompetencia),
+      completos: meses.map(formatarCompetenciaLonga),
+      series,
+      vazio: series.length === 0,
     };
-  }, [serie]);
+  }, [saidasFiltradas, motivos, ultimoMes]);
 
-  // === Gráficos 2 e 3: saídas por motivo e por unidade/UF, quebradas por coorte ===
+  /** Quantas saídas o gráfico realmente desenha — o corte em ago/2022 deixa de fora as anteriores. */
+  const noGrafico = useMemo(
+    () => saidasFiltradas.filter((registro) => registro.MES_SAIDA >= MES_INICIO_GRAFICO_SAIDAS).length,
+    [saidasFiltradas]
+  );
+  const foraDoGrafico = saidasFiltradas.length - noGrafico;
 
-  /** Monta uma série por coorte sobre um agrupamento qualquer, com nomes no tooltip. */
-  const seriesPorCoorte = (
-    grupos: { rotulo: string; itens: RegistroAuditor[] }[]
-  ): SerieGrafico[] =>
-    [ID_CONCURSO_2021, ID_CONCURSO_VETERANO]
-      .filter((id) => coorteSelecionada === TODAS || coorteSelecionada === id)
-      .map((id) => ({
-        rotulo: rotuloDoConcurso(id),
-        cor: COR_POR_CONCURSO[id],
-        valores: grupos.map((grupo) => grupo.itens.filter((registro) => registro.CONCURSO === id).length),
-        detalhes: grupos.map((grupo) =>
-          grupo.itens
-            .filter((registro) => registro.CONCURSO === id)
-            .map((registro) => `${registro.NOME} — ${formatarCompetenciaLonga(registro.MES_SAIDA)}`)
-        ),
-      }));
+  // === Gráfico por unidade / UF ===
 
-  const graficoMotivos = useMemo(() => {
-    const grupos = agregarPorMotivo(filtrados);
-    return {
-      rotulos: grupos.map((grupo) => grupo.rotulo),
-      series: seriesPorCoorte(grupos),
-      vazio: grupos.length === 0,
-    };
-    // `seriesPorCoorte` depende de `coorteSelecionada`, já na lista.
-  }, [filtrados, coorteSelecionada]);
+  const seriesPorCoorte = (grupos: { rotulo: string; itens: RegistroAuditor[] }[]): SerieGrafico[] =>
+    COORTES.filter((id) => coortes.includes(id)).map((id) => ({
+      rotulo: rotuloDoConcurso(id),
+      cor: COR_POR_CONCURSO[id],
+      valores: grupos.map((grupo) => grupo.itens.filter((registro) => registro.CONCURSO === id).length),
+      detalhes: grupos.map((grupo) =>
+        grupo.itens
+          .filter((registro) => registro.CONCURSO === id)
+          .map((registro) => `${registro.NOME} — ${formatarCompetenciaLonga(registro.MES_SAIDA)}`)
+      ),
+    }));
 
   const graficoGeografico = useMemo(() => {
-    const grupos = corteGeografico === 'unidade' ? agregarPorUnidade(filtrados) : agregarPorUf(filtrados);
+    const grupos =
+      corteGeografico === 'unidade' ? agregarPorUnidade(saidasFiltradas) : agregarPorUf(saidasFiltradas);
     return {
       rotulos: grupos.map((grupo) => grupo.rotulo),
       series: seriesPorCoorte(grupos),
       vazio: grupos.length === 0,
     };
-  }, [filtrados, corteGeografico, coorteSelecionada]);
+  }, [saidasFiltradas, corteGeografico, coortes]);
 
-  // === Gráfico 4: curva de permanência ===
+  // === Curva de permanência ===
 
   const graficoPermanencia = useMemo(() => {
     if (!ultimoMes) return { rotulos: [], series: [] as SerieGrafico[], vazio: true };
 
-    // O filtro de coorte não se aplica: o gráfico existe justamente para pôr as
-    // duas lado a lado. O de área se aplica, porque área é atributo da pessoa.
-    const porArea = areaSelecionada === TODAS
-      ? registros
-      : registros.filter((registro) => areaDe(registro) === areaSelecionada);
+    // Só o filtro de especialidade se aplica. O de coorte, não: o gráfico existe
+    // para pôr as duas lado a lado. O de tipo de saída, muito menos — excluir um
+    // tipo transformaria quem saiu por ele em alguém que ficou, e a curva
+    // mentiria para cima.
+    const porArea = registros.filter((registro) => areas.includes(areaDe(registro)));
 
-    const curvas = [ID_CONCURSO_2021, ID_CONCURSO_VETERANO].map((id) => ({
-      id,
-      pontos: curvaDePermanencia(porArea, id, ultimoMes.mes),
-    }));
-
+    const curvas = COORTES.map((id) => ({ id, pontos: curvaDePermanencia(porArea, id, ultimoMes.mes) }));
     const comprimento = Math.max(0, ...curvas.map((curva) => curva.pontos.length));
     if (comprimento === 0) return { rotulos: [], series: [] as SerieGrafico[], vazio: true };
 
@@ -262,29 +297,29 @@ const App: React.FC = () => {
         })),
       vazio: false,
     };
-  }, [registros, areaSelecionada, ultimoMes]);
+  }, [registros, areas, ultimoMes]);
 
   // === Tabela de destinos e últimas saídas ===
 
   const gruposDeDestino = useMemo(
     () =>
-      agregarPorDestino(filtrados).map((grupo) => ({
+      agregarPorDestino(saidasFiltradas).map((grupo) => ({
         rotulo: grupo.rotulo,
         total: grupo.total,
         itens: grupo.itens
           .map(detalharSaida)
           .sort((a, b) => b.mesSaida.localeCompare(a.mesSaida) || a.nome.localeCompare(b.nome, 'pt-BR')),
       })),
-    [filtrados]
+    [saidasFiltradas]
   );
 
   const ultimasSaidas = useMemo(
     () =>
-      saidas(registros)
+      saidasFiltradas
         .map(detalharSaida)
         .sort((a, b) => b.mesSaida.localeCompare(a.mesSaida) || a.nome.localeCompare(b.nome, 'pt-BR'))
         .slice(0, 6),
-    [registros]
+    [saidasFiltradas]
   );
 
   const base = baseDoSite();
@@ -293,10 +328,11 @@ const App: React.FC = () => {
     <FontAwesomeIcon icon={definicao} className="h-10 w-10 text-red-400 md:h-12 md:w-12" />
   );
 
-  const botaoFiltro = (ativo: boolean) =>
-    `px-3 py-1 rounded text-sm font-medium focus:outline-none focus:ring-2 focus:ring-red-400 ${
-      ativo ? 'bg-red-500 text-white shadow-lg' : 'bg-gray-800 text-gray-300 hover:bg-gray-700 border border-gray-700'
-    }`;
+  const semDados = (mensagem: string) => (
+    <div className="rounded border border-gray-800 bg-gray-900/50 p-8 text-center text-gray-500">
+      {carregando ? 'Carregando...' : mensagem}
+    </div>
+  );
 
   return (
     <div className="min-h-screen bg-gray-950 p-4 text-gray-200 sm:p-6 lg:p-8">
@@ -330,7 +366,7 @@ const App: React.FC = () => {
         )}
 
         <main>
-          <section className="mb-6 grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
+          <section className="mb-8 grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
             <CounterCard
               value={diasSemPerderAuditor ?? '—'}
               label={`Dia${(diasSemPerderAuditor ?? 0) === 1 ? '' : 's'} sem perder um Auditor`}
@@ -387,7 +423,7 @@ const App: React.FC = () => {
             />
 
             <CounterCard
-              value={numero(totalSaidas)}
+              value={numero(todasAsSaidas.length)}
               label="Auditores que saíram da CGU"
               icon={icone(faUserMinus)}
               footer={
@@ -448,86 +484,43 @@ const App: React.FC = () => {
             />
           </section>
 
-          <section className="mb-8">
-            <h2 className="mb-1 text-lg font-semibold text-red-300">Efetivo, entradas e saídas mês a mês</h2>
-            <p className="mb-3 text-sm text-gray-400">
-              A linha é quantos Auditores a CGU tinha em cada competência; as barras, quantos entraram e saíram no mês.
-              Este gráfico é do quadro inteiro e não responde aos filtros abaixo. A soma das barras vermelhas é maior
-              que os {numero(totalSaidas)} do card porque um punhado de pessoas some do cadastro por alguns meses e
-              volta: cada sumiço aparece aqui como movimentação do mês, mas só quem nunca voltou conta como saída.
+          <section className="mb-6 space-y-4 rounded-xl border border-gray-800 bg-gray-900/60 p-5">
+            <FiltroMultiplo titulo="Coorte" opcoes={opcoesCoorte} selecionados={coortes} aoMudar={setCoortes} />
+            <FiltroMultiplo titulo="Especialidade" opcoes={opcoesArea} selecionados={areas} aoMudar={setAreas} />
+            <FiltroMultiplo titulo="Tipo de saída" opcoes={opcoesMotivo} selecionados={motivos} aoMudar={setMotivos} />
+            <p className="text-xs text-gray-500">
+              O número ao lado de cada caixinha é o total de saídas daquela opção em toda a série, e não no recorte
+              atual — assim ele não muda a cada clique. A especialidade vem do Edital CGU nº 5, de 13/06/2022,
+              publicado no DOU; veteranos não têm edital de onde tirá-la e caem em &ldquo;{AREA_DESCONHECIDA}&rdquo;.
             </p>
-            {serie.length > 0 ? (
+          </section>
+
+          <section className="mb-8">
+            <h2 className="mb-1 text-lg font-semibold text-red-300">Saídas mês a mês</h2>
+            <p className="mb-3 text-sm text-gray-400">
+              Quantos Auditores deixaram a CGU em cada competência, no recorte escolhido acima. A série começa em
+              agosto de 2022, primeira competência em que alguém da coorte de 2022 poderia aparecer ausente.
+              {!carregando && (
+                <>
+                  {' '}
+                  <span className="text-gray-300">
+                    {numero(noGrafico)} saída{noGrafico === 1 ? '' : 's'} no gráfico
+                  </span>
+                  {foraDoGrafico > 0 && ` (${numero(foraDoGrafico)} anterior a ago/2022, fora do corte)`}.
+                </>
+              )}
+            </p>
+            {!graficoSaidas.vazio ? (
               <EvasionChart
-                rotulos={graficoEfetivo.rotulos}
-                rotulosCompletos={graficoEfetivo.completos}
-                series={graficoEfetivo.series}
-                altura={300}
-                eixoEsquerdaComZero={false}
-                tituloEixoEsquerda="Efetivo"
-                tituloEixoDireita="Movimentações"
-                maximoRotulosX={13}
+                rotulos={graficoSaidas.rotulos}
+                rotulosCompletos={graficoSaidas.completos}
+                series={graficoSaidas.series}
+                altura={340}
+                empilhar
+                maximoRotulosX={14}
               />
             ) : (
-              <div className="rounded border border-gray-800 bg-gray-900/50 p-8 text-center text-gray-500">
-                {carregando ? 'Carregando a série mensal...' : 'Série mensal indisponível.'}
-              </div>
-            )}
-          </section>
-
-          <section className="mb-6 flex flex-col items-center gap-4">
-            <div className="flex flex-col items-center">
-              <div className="mb-2 text-sm text-gray-300">Filtrar por coorte:</div>
-              <div className="flex flex-wrap justify-center gap-2">
-                {[TODAS, ID_CONCURSO_2021, ID_CONCURSO_VETERANO].map((id) => (
-                  <button
-                    key={id}
-                    type="button"
-                    onClick={() => setCoorteSelecionada(id)}
-                    aria-pressed={coorteSelecionada === id}
-                    className={botaoFiltro(coorteSelecionada === id)}
-                  >
-                    {id === TODAS ? 'Todas' : rotuloDoConcurso(id)}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {areasDisponiveis.length > 0 && (
-              <div className="flex flex-col items-center">
-                <div className="mb-2 text-sm text-gray-300">Filtrar por especialidade:</div>
-                <div className="flex flex-wrap justify-center gap-2">
-                  {[TODAS, ...areasDisponiveis].map((area) => (
-                    <button
-                      key={area}
-                      type="button"
-                      onClick={() => setAreaSelecionada(area)}
-                      aria-pressed={areaSelecionada === area}
-                      className={botaoFiltro(areaSelecionada === area)}
-                    >
-                      {area === TODAS ? 'Todas' : area}
-                    </button>
-                  ))}
-                </div>
-                <p className="mt-2 max-w-2xl text-center text-xs text-gray-500">
-                  A especialidade vem do Edital CGU nº 5, de 13/06/2022, publicado no DOU. Veteranos não têm edital de
-                  onde tirá-la, e por isso caem em &ldquo;{AREA_DESCONHECIDA}&rdquo;.
-                </p>
-              </div>
-            )}
-          </section>
-
-          <section className="mb-8">
-            <h2 className="mb-1 text-lg font-semibold text-red-300">Saídas por motivo</h2>
-            <p className="mb-3 text-sm text-gray-400">
-              O motivo vem do ato publicado no DOU, encontrado por busca de nome. &ldquo;Sem ato identificado&rdquo; é a
-              pessoa que o SIAPE mostra saindo e cujo ato a busca não achou — é informação, não erro.
-            </p>
-            {!graficoMotivos.vazio ? (
-              <EvasionChart rotulos={graficoMotivos.rotulos} series={graficoMotivos.series} altura={300} empilhar rotacionarRotulos />
-            ) : (
-              <div className="rounded border border-gray-800 bg-gray-900/50 p-8 text-center text-gray-500">
-                {carregando ? 'Carregando...' : 'Nenhuma saída neste recorte.'}
-              </div>
+              semDados('Nenhuma saída neste recorte. Marque mais alguma caixinha acima.')
             )}
           </section>
 
@@ -560,9 +553,7 @@ const App: React.FC = () => {
                 rotacionarRotulos
               />
             ) : (
-              <div className="rounded border border-gray-800 bg-gray-900/50 p-8 text-center text-gray-500">
-                {carregando ? 'Carregando...' : 'Nenhuma saída neste recorte.'}
-              </div>
+              semDados('Nenhuma saída neste recorte.')
             )}
           </section>
 
@@ -570,8 +561,9 @@ const App: React.FC = () => {
             <h2 className="mb-1 text-lg font-semibold text-red-300">Curva de permanência</h2>
             <p className="mb-3 text-sm text-gray-400">
               Que percentual de cada coorte ainda estava na CGU a cada mês desde a própria entrada. A curva para onde
-              restam menos de 50 pessoas observadas — daí para a frente ela seria ruído, não tendência. O filtro de
-              coorte não se aplica aqui: o gráfico existe para comparar as duas.
+              restam menos de 50 pessoas observadas — daí para a frente ela seria ruído, não tendência. Só o filtro de
+              especialidade vale aqui: o de coorte não, porque o gráfico existe para comparar as duas; e o de tipo de
+              saída muito menos, porque esconder um tipo transformaria quem saiu por ele em alguém que ficou.
             </p>
             {!graficoPermanencia.vazio ? (
               <EvasionChart
@@ -584,9 +576,7 @@ const App: React.FC = () => {
                 maximoRotulosX={13}
               />
             ) : (
-              <div className="rounded border border-gray-800 bg-gray-900/50 p-8 text-center text-gray-500">
-                {carregando ? 'Carregando...' : 'Sem base suficiente para traçar a curva neste recorte.'}
-              </div>
+              semDados('Sem base suficiente para traçar a curva neste recorte.')
             )}
             <p className="mt-2 text-xs text-gray-500">
               Eixo horizontal: meses desde a entrada de cada pessoa, não datas do calendário.
@@ -596,7 +586,9 @@ const App: React.FC = () => {
           <section className="mb-8 rounded-xl border border-gray-800 bg-gray-900 p-4">
             <h2 className="mb-3 text-2xl font-bold text-amber-400">Últimas saídas registradas</h2>
             {ultimasSaidas.length === 0 ? (
-              <div className="text-sm text-gray-400">{carregando ? 'Carregando...' : 'Nenhuma saída registrada.'}</div>
+              <div className="text-sm text-gray-400">
+                {carregando ? 'Carregando...' : 'Nenhuma saída neste recorte.'}
+              </div>
             ) : (
               <>
                 <ul className="space-y-2 text-sm text-gray-200">
@@ -647,9 +639,10 @@ const App: React.FC = () => {
             <h2 className="mb-4 text-2xl font-bold text-red-300">Destinos da evasão</h2>
             <p className="mb-6 text-gray-400">
               Para onde foram os Auditores que deixaram a CGU. O destino só aparece quando há ato do DOU ou registro do
-              SIAPE que o diga: cada linha traz de onde veio a informação e se alguém a conferiu. A CGU perdeu{' '}
-              <span className="font-bold text-orange-400">{numero(totalSaidas)}</span> Auditores desde{' '}
-              {primeiroMes ? formatarCompetenciaLonga(primeiroMes.mes) : 'o início da série'}.
+              SIAPE que o diga: cada linha traz de onde veio a informação e se alguém a conferiu. No recorte atual são{' '}
+              <span className="font-bold text-orange-400">{numero(saidasFiltradas.length)}</span> saída
+              {saidasFiltradas.length === 1 ? '' : 's'}, de{' '}
+              <span className="font-bold text-orange-400">{numero(todasAsSaidas.length)}</span> em toda a série.
             </p>
             <EvasionTable grupos={gruposDeDestino} />
           </section>

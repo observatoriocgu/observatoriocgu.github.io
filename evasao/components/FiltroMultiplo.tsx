@@ -1,0 +1,88 @@
+import React from 'react';
+
+export interface OpcaoFiltro {
+  valor: string;
+  rotulo: string;
+  /** Cor do marcador, quando a opção corresponde a uma série do gráfico. */
+  cor?: string;
+  /** Quantos registros a opção representa no recorte atual. */
+  total?: number;
+}
+
+interface FiltroMultiploProps {
+  titulo: string;
+  opcoes: OpcaoFiltro[];
+  selecionados: string[];
+  aoMudar: (selecionados: string[]) => void;
+}
+
+/**
+ * Um grupo de caixinhas.
+ *
+ * Seleção vazia mostra nada, e não tudo: com marcar e desmarcar, "nenhuma
+ * marcada" é uma escolha deliberada do leitor, e fazer o gráfico voltar a
+ * mostrar o conjunto inteiro nesse caso confundiria mais do que ajudaria.
+ */
+const FiltroMultiplo: React.FC<FiltroMultiploProps> = ({ titulo, opcoes, selecionados, aoMudar }) => {
+  const marcados = new Set(selecionados);
+
+  const alternar = (valor: string) => {
+    const novo = new Set(marcados);
+    if (novo.has(valor)) novo.delete(valor);
+    else novo.add(valor);
+    // Preserva a ordem em que as opções são exibidas, não a de clique.
+    aoMudar(opcoes.filter((opcao) => novo.has(opcao.valor)).map((opcao) => opcao.valor));
+  };
+
+  const todosMarcados = opcoes.length > 0 && opcoes.every((opcao) => marcados.has(opcao.valor));
+
+  return (
+    <fieldset className="min-w-0">
+      <legend className="mb-1.5 flex items-baseline gap-2 text-sm text-gray-300">
+        {titulo}
+        <button
+          type="button"
+          onClick={() => aoMudar(todosMarcados ? [] : opcoes.map((opcao) => opcao.valor))}
+          className="text-xs text-gray-500 underline decoration-dotted hover:text-amber-400"
+        >
+          {todosMarcados ? 'limpar' : 'marcar todas'}
+        </button>
+      </legend>
+      <div className="flex flex-wrap gap-2">
+        {opcoes.map((opcao) => {
+          const marcado = marcados.has(opcao.valor);
+          return (
+            <label
+              key={opcao.valor}
+              className={`inline-flex cursor-pointer select-none items-center gap-2 rounded border px-2.5 py-1 text-sm transition-colors ${
+                marcado
+                  ? 'border-red-500 bg-red-500/15 text-gray-100'
+                  : 'border-gray-700 bg-gray-800/60 text-gray-400 hover:border-gray-600 hover:text-gray-300'
+              }`}
+            >
+              <input
+                type="checkbox"
+                checked={marcado}
+                onChange={() => alternar(opcao.valor)}
+                className="h-3.5 w-3.5 accent-red-500"
+              />
+              {opcao.cor && (
+                <span
+                  aria-hidden="true"
+                  className="h-2.5 w-2.5 flex-shrink-0 rounded-sm"
+                  style={{ backgroundColor: opcao.cor, opacity: marcado ? 1 : 0.4 }}
+                />
+              )}
+              <span>{opcao.rotulo}</span>
+              {opcao.total !== undefined && (
+                <span className={marcado ? 'text-amber-400' : 'text-gray-600'}>{opcao.total}</span>
+              )}
+            </label>
+          );
+        })}
+      </div>
+    </fieldset>
+  );
+};
+
+export default FiltroMultiplo;

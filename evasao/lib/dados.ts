@@ -133,6 +133,30 @@ export const distanciaEmMeses = (de: string, ate: string): number => {
 };
 
 /**
+ * Todas as competências de `de` até `ate`, inclusive.
+ *
+ * O gráfico precisa dos meses sem nenhuma saída também: sem eles, o eixo pularia
+ * de fev para abr e o desenho sugeriria uma continuidade que não existe.
+ */
+export const listarCompetencias = (de: string, ate: string): string[] => {
+  const total = distanciaEmMeses(de, ate);
+  if (!/^\d{6}$/.test(de) || !/^\d{6}$/.test(ate) || total < 0) return [];
+
+  const competencias: string[] = [];
+  let ano = Number(de.slice(0, 4));
+  let mes = Number(de.slice(4));
+  for (let i = 0; i <= total; i += 1) {
+    competencias.push(`${String(ano).padStart(4, '0')}${String(mes).padStart(2, '0')}`);
+    mes += 1;
+    if (mes === 13) {
+      ano += 1;
+      mes = 1;
+    }
+  }
+  return competencias;
+};
+
+/**
  * Caminhos em que um arquivo de `evasao/data/` pode estar.
  *
  * A lista existe porque o mesmo bundle roda em três lugares: no `vite dev`
