@@ -11,18 +11,14 @@ import CollaborationForm from './components/CollaborationForm';
 import CounterCard from './components/CounterCard';
 import EvasionChart, { SerieGrafico } from './components/EvasionChart';
 import EvasionTable from './components/EvasionTable';
-import FiltroMultiplo, { OpcaoFiltro } from './components/FiltroMultiplo';
+import CardDeFiltros, { useFiltrosEncadeados } from './components/CardDeFiltros';
 import { SelosDaLinha } from './components/Selos';
 
 import {
-  AREAS_SEM_ESPECIALIDADE,
   COR_POR_CONCURSO,
   COR_POR_MOTIVO,
   ID_CONCURSO_2021,
-  ID_CONCURSO_VETERANO,
   MES_INICIO_GRAFICO_SAIDAS,
-  MOTIVOS_PADRAO,
-  MOTIVOS_SAIDA,
   rotuloDoConcurso,
 } from './constants';
 import { PontoSerieMensal, RegistroAuditor, SaidasDou } from './types';
@@ -39,19 +35,15 @@ import {
 import {
   agregarPorDestino,
   agregarPorMotivoResumido,
-  areaDe,
   comoRegistros,
   comoSerie,
   curvaDePermanencia,
   detalharSaida,
   evasaoDaCoorte,
   filtrarSaidas,
-  motivoDe,
   saidas,
   serieDeSaidasPorMotivo,
 } from './lib/painel';
-
-const COORTES = [ID_CONCURSO_2021, ID_CONCURSO_VETERANO];
 
 const TIPOS_SAIDA_DOU: Array<{ tipo: SaidasDou['eventos'][number]['tipo']; rotuloCurto: string }> = [
   { tipo: 'vacancia', rotuloCurto: 'Vacância' },
@@ -70,12 +62,6 @@ const App: React.FC = () => {
   const [erroDados, setErroDados] = useState<string | null>(null);
   const [erroSaidasDou, setErroSaidasDou] = useState<string | null>(null);
   const [carregando, setCarregando] = useState(true);
-
-  // Visão inicial: a coorte que entrou depois de jun/2022, todas as
-  // especialidades e só as saídas em que o Auditor foi para outro cargo.
-  const [coortes, setCoortes] = useState<string[]>([ID_CONCURSO_2021]);
-  const [areas, setAreas] = useState<string[]>([]);
-  const [motivos, setMotivos] = useState<string[]>([...MOTIVOS_PADRAO]);
 
   useEffect(() => {
     let montado = true;
@@ -125,108 +111,19 @@ const App: React.FC = () => {
     };
   }, []);
 
-  // === Opções das caixinhas ===
+  // === Recorte ===
   //
-  // Os três filtros são encadeados: a coorte manda na especialidade, e as duas
-  // juntas mandam no tipo de saída. Cada grupo só lista o que existe no recorte
-  // que vem de cima — "Veterano" não é especialidade de quem fez o concurso de
-  // 2021, e "Falecimento" não é opção se ninguém na fatia saiu por isso.
-  //
-  // Só a coorte mostra número. Abaixo dela o número mudaria a cada clique no
-  // filtro de cima, e um total que dança confunde mais do que informa: o que
-  // responde "quantos?" é o gráfico, não a caixinha.
+  // Os filtros valem para o gráfico de saídas mês a mês, e só para ele. A curva
+  // de permanência, as últimas saídas e os destinos respondem por toda a série
+  // — cada um explica isso no seu próprio texto.
 
   const todasAsSaidas = useMemo(() => saidas(registros), [registros]);
 
-  const opcoesCoorte = useMemo((): OpcaoFiltro[] => {
-    const totais = new Map<string, number>();
-    for (const registro of todasAsSaidas) {
-      totais.set(registro.CONCURSO, (totais.get(registro.CONCURSO) ?? 0) + 1);
-    }
-    return COORTES.map((id) => ({
-      valor: id,
-      rotulo: rotuloDoConcurso(id),
-      cor: COR_POR_CONCURSO[id],
-      total: totais.get(id) ?? 0,
-    }));
-  }, [todasAsSaidas]);
-
-  /** Todo mundo da(s) coorte(s) marcada(s) — a base dos dois filtros de baixo. */
-  const registrosDaCoorte = useMemo(
-    () => registros.filter((registro) => coortes.includes(registro.CONCURSO)),
-    [registros, coortes]
-  );
-
-  const opcoesArea = useMemo((): OpcaoFiltro[] => {
-    // Toda área que exista em alguém da coorte, tenha ou não saída — senão uma
-    // especialidade sem nenhuma evasão simplesmente sumiria do filtro.
-    const encontradas = new Set(registrosDaCoorte.map(areaDe));
-    const especialidades = Array.from(encontradas)
-      .filter((area) => !AREAS_SEM_ESPECIALIDADE.includes(area))
-      .sort((a, b) => a.localeCompare(b, 'pt-BR'));
-    // As duas que não são especialidade vão para o fim, na ordem da constante:
-    // primeiro o veterano, que é "não se aplica", e só depois a lacuna.
-    const ordenadas = [...especialidades, ...AREAS_SEM_ESPECIALIDADE.filter((area) => encontradas.has(area))];
-    return ordenadas.map((area) => ({ valor: area, rotulo: area }));
-  }, [registrosDaCoorte]);
-
-  const opcoesMotivo = useMemo((): OpcaoFiltro[] => {
-    const encontrados = new Set(
-      saidas(registrosDaCoorte)
-        .filter((registro) => areas.includes(areaDe(registro)))
-        .map(motivoDe)
-    );
-    // A ordem é a da constante, não a do dado: é a mesma da legenda do gráfico.
-    return MOTIVOS_SAIDA.filter((motivo) => encontrados.has(motivo)).map((motivo) => ({
-      valor: motivo,
-      rotulo: motivo,
-      cor: COR_POR_MOTIVO[motivo],
-    }));
-  }, [registrosDaCoorte, areas]);
-
-  // As especialidades só se sabem depois que o CSV chega, então a marcação
-  // inicial é aplicada aqui, uma vez, sem sobrescrever escolha do leitor.
-  //
-  // Marca TODAS as áreas da base, e não só as da coorte inicial. A seleção aqui
-  // é a intenção do leitor, não o que está à vista: guardar "Veterano" marcado
-  // desde o começo é o que faz a especialidade já vir junto quando ele abre a
-  // coorte dos veteranos, em vez de abrir uma coorte que não mostra ninguém.
-  const [areasIniciadas, setAreasIniciadas] = useState(false);
-  useEffect(() => {
-    if (areasIniciadas || registros.length === 0) return;
-    setAreas(Array.from(new Set(registros.map(areaDe))));
-    setAreasIniciadas(true);
-  }, [registros, areasIniciadas]);
-
-  // === Recorte ===
+  const filtros = useFiltrosEncadeados(registros);
+  const { coortes, areas, motivos } = filtros;
 
   const recorte = useMemo(() => ({ coortes, areas, motivos }), [coortes, areas, motivos]);
   const saidasFiltradas = useMemo(() => filtrarSaidas(registros, recorte), [registros, recorte]);
-
-  /**
-   * O que dizer ao lado de "Filtros" enquanto o card está fechado.
-   *
-   * Conta só o que está à vista em cada grupo: a seleção guarda também opções
-   * que o filtro de cima escondeu, e "5 de 4" não faria sentido nenhum.
-   */
-  const resumoDoRecorte = useMemo(() => {
-    const parte = (selecionados: string[], opcoes: OpcaoFiltro[], singular: string, plural: string) => {
-      if (opcoes.length === 0) return '';
-      const visiveis = opcoes.filter((opcao) => selecionados.includes(opcao.valor));
-      if (visiveis.length === 0) return `nenhum${singular === 'coorte' ? 'a' : ''} ${singular}`;
-      // Um só: vale mais dizer qual do que dizer quantos.
-      if (visiveis.length === 1) return visiveis[0].rotulo;
-      if (visiveis.length === opcoes.length) return `${plural}: todas`;
-      return `${plural}: ${visiveis.length} de ${opcoes.length}`;
-    };
-    return [
-      parte(coortes, opcoesCoorte, 'coorte', 'coortes'),
-      parte(areas, opcoesArea, 'especialidade', 'especialidades'),
-      parte(motivos, opcoesMotivo, 'tipo de saída', 'tipos de saída'),
-    ]
-      .filter(Boolean)
-      .join(' · ');
-  }, [coortes, areas, motivos, opcoesCoorte, opcoesArea, opcoesMotivo]);
 
   // === Cards (acima dos filtros: são sempre o quadro inteiro) ===
 
@@ -325,26 +222,33 @@ const App: React.FC = () => {
   }, [registros, ultimoMes]);
 
   // === Tabela de destinos e últimas saídas ===
+  //
+  // Os dois leem `todasAsSaidas`, não `saidasFiltradas`: são registro do que
+  // aconteceu, não recorte. "Últimas saídas" é o mural do que acabou de sair —
+  // esconder uma saída porque a especialidade dela está desmarcada faria o
+  // painel omitir a notícia mais recente sem dizer que omitiu. E os destinos
+  // são a resposta a "para onde foram os Auditores", no plural e no geral;
+  // quem quiser recortar por coorte tem o histórico de alterações.
 
   const gruposDeDestino = useMemo(
     () =>
-      agregarPorDestino(saidasFiltradas).map((grupo) => ({
+      agregarPorDestino(todasAsSaidas).map((grupo) => ({
         rotulo: grupo.rotulo,
         total: grupo.total,
         itens: grupo.itens
           .map(detalharSaida)
           .sort((a, b) => b.mesSaida.localeCompare(a.mesSaida) || a.nome.localeCompare(b.nome, 'pt-BR')),
       })),
-    [saidasFiltradas]
+    [todasAsSaidas]
   );
 
   const ultimasSaidas = useMemo(
     () =>
-      saidasFiltradas
+      todasAsSaidas
         .map(detalharSaida)
         .sort((a, b) => b.mesSaida.localeCompare(a.mesSaida) || a.nome.localeCompare(b.nome, 'pt-BR'))
         .slice(0, 6),
-    [saidasFiltradas]
+    [todasAsSaidas]
   );
 
   const base = baseDoSite();
@@ -513,46 +417,9 @@ const App: React.FC = () => {
 
           {/* Os filtros ficam DEPOIS do gráfico: quem chega vê primeiro o quadro
               inteiro, e só então o recorta. Fechados por padrão, porque o recorte
-              que abre o painel já é o que interessa à maioria — e um `details`
-              nativo dá o teclado e o leitor de tela de graça, sem estado nosso.
-              O resumo ao lado do título existe para que fechado não vire opaco:
-              dá para saber o que está aplicado sem abrir. */}
-          <details className="group mb-8 rounded-xl border border-gray-800 bg-gray-900/60">
-            <summary className="flex cursor-pointer list-none items-center gap-2 p-5 text-sm font-semibold text-gray-200 [&::-webkit-details-marker]:hidden">
-              <svg
-                aria-hidden="true"
-                viewBox="0 0 20 20"
-                fill="currentColor"
-                className="h-4 w-4 flex-shrink-0 text-gray-500 transition-transform duration-200 group-open:rotate-180"
-              >
-                <path
-                  fillRule="evenodd"
-                  d="M5.23 7.21a.75.75 0 0 1 1.06.02L10 11.17l3.71-3.94a.75.75 0 1 1 1.08 1.04l-4.25 4.5a.75.75 0 0 1-1.08 0l-4.25-4.5a.75.75 0 0 1 .02-1.06Z"
-                  clipRule="evenodd"
-                />
-              </svg>
-              Filtros
-              <span className="truncate text-xs font-normal text-gray-500 group-open:hidden">{resumoDoRecorte}</span>
-            </summary>
-            {/* Os três grupos lado a lado, com as caixinhas empilhadas dentro de cada um. */}
-            <div className="grid grid-cols-1 gap-6 px-5 pb-5 sm:grid-cols-3">
-              <FiltroMultiplo titulo="Coorte" opcoes={opcoesCoorte} selecionados={coortes} aoMudar={setCoortes} />
-              <FiltroMultiplo
-                titulo="Especialidade"
-                opcoes={opcoesArea}
-                selecionados={areas}
-                aoMudar={setAreas}
-                mensagemVazia="Marque uma coorte ao lado."
-              />
-              <FiltroMultiplo
-                titulo="Tipo de saída"
-                opcoes={opcoesMotivo}
-                selecionados={motivos}
-                aoMudar={setMotivos}
-                mensagemVazia="Nenhuma saída na coorte e na especialidade marcadas."
-              />
-            </div>
-          </details>
+              que abre o painel já é o que interessa à maioria. Eles valem para o
+              gráfico acima, e só para ele. */}
+          <CardDeFiltros filtros={filtros} />
 
           <section className="mb-8">
             <h2 className="mb-1 text-lg font-semibold text-red-300">Curva de permanência</h2>
@@ -587,10 +454,16 @@ const App: React.FC = () => {
           </section>
 
           <section className="mb-8 rounded-xl border border-gray-800 bg-gray-900 p-4">
-            <h2 className="mb-3 text-2xl font-bold text-amber-400">Últimas saídas registradas</h2>
+            <h2 className="mb-1 text-2xl font-bold text-amber-400">Últimas saídas registradas</h2>
+            <p className="mb-3 text-sm text-gray-400">
+              As seis mais recentes de toda a série, coorte de 2021 e veteranos juntos.{' '}
+              <span className="text-gray-300">Não acompanha os filtros acima</span>: é o que acabou de acontecer, e
+              esconder uma saída porque a especialidade dela está desmarcada omitiria a notícia mais recente sem dizer
+              que omitiu.
+            </p>
             {ultimasSaidas.length === 0 ? (
               <div className="text-sm text-gray-400">
-                {carregando ? 'Carregando...' : 'Nenhuma saída neste recorte.'}
+                {carregando ? 'Carregando...' : 'Nenhuma saída registrada.'}
               </div>
             ) : (
               <>
@@ -642,10 +515,15 @@ const App: React.FC = () => {
             <h2 className="mb-4 text-2xl font-bold text-red-300">Destinos da evasão</h2>
             <p className="mb-6 text-gray-400">
               Para onde foram os Auditores que deixaram a CGU. O destino só aparece quando há ato do DOU ou registro do
-              SIAPE que o diga: cada linha traz de onde veio a informação e se alguém a conferiu. No recorte atual são{' '}
-              <span className="font-bold text-orange-400">{numero(saidasFiltradas.length)}</span> saída
-              {saidasFiltradas.length === 1 ? '' : 's'}, de{' '}
-              <span className="font-bold text-orange-400">{numero(todasAsSaidas.length)}</span> em toda a série.
+              SIAPE que o diga: cada linha traz de onde veio a informação e se alguém a conferiu. São{' '}
+              <span className="font-bold text-orange-400">{numero(todasAsSaidas.length)}</span> saída
+              {todasAsSaidas.length === 1 ? '' : 's'} em toda a série, coorte de 2021 e veteranos juntos.{' '}
+              <span className="text-gray-300">Esta tabela não acompanha os filtros acima</span> — para recortar por
+              coorte ou por especialidade, use o{' '}
+              <a href="./historico_alteracoes.html" className="text-amber-400 hover:text-amber-300">
+                histórico de alterações
+              </a>
+              .
             </p>
             <EvasionTable grupos={gruposDeDestino} />
           </section>

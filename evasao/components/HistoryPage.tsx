@@ -3,10 +3,16 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { rotuloDoConcurso } from '../constants';
 import { AlteracaoRegistro, LogDeAlteracoes, MesDeAlteracoes, RegistroAuditor } from '../types';
 import { carregarCsv, carregarJsonPublico, formatarCompetenciaLonga, formatarDataIsoParaBr } from '../lib/dados';
-import { comoRegistros, motivoDe, urlDoAto } from '../lib/painel';
+import { areaDe, comoRegistros, motivoDe, urlDoAto } from '../lib/painel';
+import CardDeFiltros, { resumirGrupo, useFiltrosEncadeados } from './CardDeFiltros';
+import FiltroMultiplo, { OpcaoFiltro } from './FiltroMultiplo';
 import { SelosDaLinha } from './Selos';
 
-type Filtro = 'todas' | 'saida' | 'entrada';
+/** O quarto nível da hierarquia. As cores são as dos selos de cada linha. */
+const MOVIMENTACOES: OpcaoFiltro[] = [
+  { valor: 'entrada', rotulo: 'Entrada', cor: '#34d399' },
+  { valor: 'saida', rotulo: 'Saída', cor: '#f87171' },
+];
 
 /**
  * O histórico de alterações.
@@ -19,15 +25,20 @@ type Filtro = 'todas' | 'saida' | 'entrada';
  */
 const HistoryPage: React.FC = () => {
   const [log, setLog] = useState<LogDeAlteracoes | null>(null);
-  const [registrosPorId, setRegistrosPorId] = useState<Map<string, RegistroAuditor>>(new Map());
+  const [registros, setRegistros] = useState<RegistroAuditor[]>([]);
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState<string | null>(null);
 
   // Abre em "Saídas": é o que o observatório existe para acompanhar. As
-  // entradas continuam a um clique, no botão ao lado.
-  const [filtro, setFiltro] = useState<Filtro>('saida');
+  // entradas continuam a uma caixinha de distância.
+  const [movimentacoes, setMovimentacoes] = useState<string[]>(['saida']);
   const [busca, setBusca] = useState('');
   const [mesesVisiveis, setMesesVisiveis] = useState(12);
+
+  // Os mesmos três filtros encadeados do dashboard, com o mesmo preset. Aqui
+  // eles ganham um quarto nível embaixo: entrada ou saída.
+  const filtros = useFiltrosEncadeados(registros);
+  const { coortes, areas, motivos } = filtros;
 
   useEffect(() => {
     let montado = true;
@@ -42,12 +53,7 @@ const HistoryPage: React.FC = () => {
         ]);
         if (!montado) return;
         setLog(logCarregado);
-        // Junta pelo Id_SERVIDOR_PORTAL, e só por ele (D12): a cadeia
-        // INSCRICAO → MASP → HGV-0 → NOME que existia aqui está revogada, e
-        // casar por nome atribuiria ato de uma pessoa a seu homônimo.
-        setRegistrosPorId(
-          new Map(comoRegistros(linhas).map((registro) => [registro.ID_SERVIDOR_PORTAL, registro]))
-        );
+        setRegistros(comoRegistros(linhas));
       } catch (falha) {
         if (montado) setErro(falha instanceof Error ? falha.message : 'Erro ao carregar o histórico.');
       } finally {
@@ -63,6 +69,46 @@ const HistoryPage: React.FC = () => {
   const normalizar = (valor: string) =>
     String(valor ?? '').normalize('NFD').replace(/\p{Diacritic}/gu, '').toLocaleLowerCase('pt-BR').trim();
 
+  // Junta pelo Id_SERVIDOR_PORTAL, e só por ele (D12): a cadeia
+  // INSCRICAO → MASP → HGV-0 → NOME que existia aqui está revogada, e casar por
+  // nome atribuiria ato de uma pessoa a seu homônimo.
+  const registrosPorId = useMemo(
+    () => new Map(registros.map((registro) => [registro.ID_SERVIDOR_PORTAL, registro])),
+    [registros]
+  );
+
+  /**
+   * Os três primeiros níveis da hierarquia, sem o de movimentação.
+   *
+   * A coorte vem do próprio log. Especialidade e tipo de saída vêm do
+   * `dados.csv`, que aqui é opcional: sem ele, a movimentação que não dá para
+   * classificar PASSA, em vez de sumir. Esconder dado por não ter conseguido
+   * carregar o CSV seria pior do que mostrá-lo sem recorte.
+   *
+   * O tipo de saída não se aplica à entrada — entrada não tem motivo.
+   */
+  const passaHierarquia = useMemo(() => {
+    return (mudanca: AlteracaoRegistro): boolean => {
+      if (!coortes.includes(mudanca.concurso)) return false;
+      const registro = registrosPorId.get(mudanca.id);
+      if (registro && !areas.includes(areaDe(registro))) return false;
+      if (mudanca.tipo === 'saida' && registro && !motivos.includes(motivoDe(registro))) return false;
+      return true;
+    };
+  }, [coortes, areas, motivos, registrosPorId]);
+
+  /** Quarto nível: só as movimentações que sobram do recorte de cima. */
+  const opcoesMovimentacao = useMemo((): OpcaoFiltro[] => {
+    if (!log) return [];
+    const encontradas = new Set<string>();
+    for (const mes of log.history) {
+      for (const mudanca of mes.changes) {
+        if (passaHierarquia(mudanca)) encontradas.add(mudanca.tipo);
+      }
+    }
+    return MOVIMENTACOES.filter((opcao) => encontradas.has(opcao.valor));
+  }, [log, passaHierarquia]);
+
   const meses: MesDeAlteracoes[] = useMemo(() => {
     if (!log) return [];
     const termo = normalizar(busca);
@@ -71,14 +117,15 @@ const HistoryPage: React.FC = () => {
         ...mes,
         changes: mes.changes.filter(
           (mudanca) =>
-            (filtro === 'todas' || mudanca.tipo === filtro) &&
+            passaHierarquia(mudanca) &&
+            movimentacoes.includes(mudanca.tipo) &&
             (!termo || normalizar(mudanca.nome).includes(termo))
         ),
       }))
       .filter((mes) => mes.changes.length > 0);
-  }, [log, filtro, busca]);
+  }, [log, passaHierarquia, movimentacoes, busca]);
 
-  useEffect(() => setMesesVisiveis(12), [filtro, busca]);
+  useEffect(() => setMesesVisiveis(12), [passaHierarquia, movimentacoes, busca]);
 
   const totalFiltrado = meses.reduce((soma, mes) => soma + mes.changes.length, 0);
 
@@ -110,22 +157,6 @@ const HistoryPage: React.FC = () => {
       </>
     );
   };
-
-  const botao = (valor: Filtro, rotulo: string) => (
-    <button
-      key={valor}
-      type="button"
-      onClick={() => setFiltro(valor)}
-      aria-pressed={filtro === valor}
-      className={`rounded px-3 py-1 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-red-400 ${
-        filtro === valor
-          ? 'bg-red-500 text-white shadow-lg'
-          : 'border border-gray-700 bg-gray-800 text-gray-300 hover:bg-gray-700'
-      }`}
-    >
-      {rotulo}
-    </button>
-  );
 
   return (
     <div className="min-h-screen bg-gray-950 p-4 text-gray-200 sm:p-6 lg:p-8">
@@ -159,23 +190,38 @@ const HistoryPage: React.FC = () => {
         </div>
 
         {!carregando && !erro && (
-          <div className="mb-6 flex flex-wrap items-end gap-3">
-            <div className="flex flex-wrap gap-2">
-              {botao('todas', 'Todas')}
-              {botao('saida', 'Saídas')}
-              {botao('entrada', 'Entradas')}
+          <>
+            {/* A busca fica FORA e ACIMA do card: ela atravessa o recorte
+                inteiro, não é mais um nível da hierarquia. Quem chega
+                procurando uma pessoa não deveria ter que abrir filtro nenhum. */}
+            <div className="mb-4 flex flex-wrap items-center gap-3">
+              <input
+                type="search"
+                value={busca}
+                onChange={(evento) => setBusca(evento.target.value)}
+                placeholder="Buscar por nome..."
+                className="w-full rounded-lg border border-gray-700 bg-gray-950 px-3 py-2 text-sm text-gray-200 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-red-400 sm:w-72"
+              />
+              <span className="text-sm text-gray-500">
+                {totalFiltrado.toLocaleString('pt-BR')} no recorte
+              </span>
             </div>
-            <input
-              type="search"
-              value={busca}
-              onChange={(evento) => setBusca(evento.target.value)}
-              placeholder="Buscar por nome..."
-              className="w-full rounded-lg border border-gray-700 bg-gray-950 px-3 py-2 text-sm text-gray-200 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-red-400 sm:w-72"
-            />
-            <span className="pb-2 text-sm text-gray-500">
-              {totalFiltrado.toLocaleString('pt-BR')} no recorte
-            </span>
-          </div>
+            {/* Aberto, ao contrário do dashboard: aqui o filtro é a ferramenta
+                principal da página, não um ajuste do gráfico. */}
+            <CardDeFiltros
+              filtros={filtros}
+              aberto
+              resumoExtra={resumirGrupo(movimentacoes, opcoesMovimentacao, 'nenhuma movimentação', 'movimentações')}
+            >
+              <FiltroMultiplo
+                titulo="Movimentação"
+                opcoes={opcoesMovimentacao}
+                selecionados={movimentacoes}
+                aoMudar={setMovimentacoes}
+                mensagemVazia="Nada sobra do recorte marcado ao lado."
+              />
+            </CardDeFiltros>
+          </>
         )}
 
         {erro && (
