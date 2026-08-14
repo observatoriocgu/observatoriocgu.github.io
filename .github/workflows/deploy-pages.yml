@@ -12,9 +12,13 @@ on:
   push:
     branches:
       - main
-  # O push feito pelo workflow de histórico usa o GITHUB_TOKEN e, por regra do
-  # GitHub, não dispara outros workflows. Sem este gatilho, uma atualização do
-  # dados.csv nunca chegaria ao site publicado.
+  # O push do crawler do DOU usa o GITHUB_TOKEN e, por regra do GitHub, não
+  # dispara outros workflows. Sem este gatilho, uma atualização do
+  # dias_sem_perder_affc.json nunca chegaria ao site publicado.
+  #
+  # O gatilho do antigo "Atualizar registros de alterações" saiu junto com o
+  # workflow: o alteracoes-registros.json não é mais reconstruído do histórico
+  # do Git, e sim gerado pelo diff mensal do SIAPE, em construir_painel.py.
   workflow_run:
     workflows:
       - "Atualizar saídas do DOU (AFFC)"

@@ -1,7 +1,7 @@
 {
   "sourceFile": "data/dados.csv",
-  "generatedAt": "2026-08-09T01:32:58.683Z",
-  "commitCount": 182,
+  "generatedAt": "2026-08-14T03:41:27.121Z",
+  "commitCount": 183,
   "commits": [
     {
       "hash": "126b0aea7926e595e3e648dd581285ea7ced0d3b",
@@ -1094,6 +1094,12 @@
       "date": "2026-08-09T01:31:37Z",
       "author": "observatoriosefmg",
       "message": "alexandre raymundo e  igor ferreyra"
+    },
+    {
+      "hash": "416aae014ac2d463b627cdb2f37501704a104024",
+      "date": "2026-08-14T00:41:01-03:00",
+      "author": "observatoriocgu",
+      "message": "crawler DOU e filtrar_dados_affc do transparencia"
     }
   ]
 }

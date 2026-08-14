@@ -1,254 +1,168 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { createPortal } from 'react-dom';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faQuestion } from '@fortawesome/free-solid-svg-icons';
-import { DadosDestinoEvasao } from '../types';
+import React, { useState } from 'react';
+import { DetalheSaida } from '../types';
+import { formatarCompetenciaLonga, formatarDataIsoParaBr } from '../lib/dados';
+import { SelosDaLinha } from './Selos';
 
-interface AuditorDetail {
-  name: string;
-  data?: string | null;
-  dataPublicacao?: string | null;
-  situacao?: string | null;
-  area?: string | null;
-  unidade?: string | null;
-  observacao?: string | null;
+export interface GrupoDeDestino {
+  rotulo: string;
+  total: number;
+  itens: DetalheSaida[];
 }
 
 interface EvasionTableProps {
-  data: DadosDestinoEvasao[];
-  // detalhes por destino (apenas destinos exibidos na tabela)
-  details?: Record<string, AuditorDetail[]>;
+  grupos: GrupoDeDestino[];
 }
 
-const EvasionTable: React.FC<EvasionTableProps> = ({ data, details = {} }) => {
-  const [open, setOpen] = useState<Record<string, boolean>>({});
-  const [buscaOrgao, setBuscaOrgao] = useState('');
+const normalizarBusca = (valor: string) =>
+  valor.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLocaleLowerCase('pt-BR').trim();
 
-  const normalizarBusca = (valor: string) => valor
-    .normalize('NFD')
-    .replace(/\p{Diacritic}/gu, '')
-    .toLocaleLowerCase('pt-BR')
-    .trim();
+/**
+ * Uma pessoa dentro de um destino.
+ *
+ * Toda linha carrega os dois selos da D14 — de onde veio a informação e se foi
+ * conferida por gente — e, quando há ato, o link para o trecho do DOU que o
+ * observatório leu. Onde não há ato, a linha diz isso em vez de omitir.
+ */
+const LinhaAuditor: React.FC<{ saida: DetalheSaida }> = ({ saida }) => {
+  const localizacao = [saida.area, saida.unidade].filter(Boolean).join(' · ');
 
-  const termoBusca = normalizarBusca(buscaOrgao);
-  const dadosFiltrados = termoBusca
-    ? data.filter((item) => normalizarBusca(item.destino).includes(termoBusca))
-    : data;
+  return (
+    <li className="flex flex-col gap-2 rounded border border-gray-700/50 bg-gray-800/40 px-4 py-2 sm:flex-row sm:items-center sm:justify-between">
+      <div className="min-w-0">
+        <div className="font-medium text-gray-200">{saida.nome}</div>
+        <div className="text-xs text-gray-400">{localizacao || '—'}</div>
+      </div>
 
-  const toggle = (destino: string) => {
-    setOpen(prev => ({ ...prev, [destino]: !prev[destino] }));
-  };
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="text-sm text-gray-400">
+          {saida.motivo} em {formatarCompetenciaLonga(saida.mesSaida)}
+        </span>
 
-  // Tooltip portal component: posiciona o balão no <body> para evitar clipping por overflow
-  const TooltipPortal: React.FC<{ pos: { left: number; top: number } | null; text: string; visible: boolean }> = ({ pos, text, visible }) => {
-    if (!visible || !pos) return null;
+        {saida.provisoria && (
+          <span
+            title="Ausência observada uma única vez. Só vira saída quando o mês seguinte confirmar."
+            className="rounded border border-orange-500/50 bg-orange-500/10 px-1.5 py-0.5 text-xs text-orange-300"
+          >
+            provisória
+          </span>
+        )}
 
-    // Calcular posicionamento inteligente
-    const viewportWidth = window.innerWidth;
-    const viewportHeight = window.innerHeight;
-    const tooltipWidth = 200; // Largura estimada do tooltip
-    const tooltipHeight = 40; // Altura estimada do tooltip
+        {/* Selo do destino quando há órgão; do motivo quando não há. É sempre o
+            selo do campo que a linha está afirmando. */}
+        <SelosDaLinha
+          fonte={saida.destino ? saida.fonteDestino : saida.fonteMotivo}
+          verificado={saida.verificado}
+        />
 
-    let left = pos.left;
-    let top = pos.top;
-    let transform = 'translate(-50%, -100%)';
+        {saida.atoUrl ? (
+          <a
+            href={saida.atoUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            title={saida.atoTitulo || 'Ato publicado no DOU'}
+            className="rounded border border-amber-500/40 px-2 py-0.5 text-xs text-amber-400 transition-colors hover:border-amber-400 hover:bg-amber-500/10"
+          >
+            ato de {formatarDataIsoParaBr(saida.dataPublicacao) || 'data não informada'}
+          </a>
+        ) : (
+          <span className="text-xs text-gray-600" title="A busca por nome no DOU não encontrou ato para esta saída.">
+            sem ato no DOU
+          </span>
+        )}
+      </div>
+    </li>
+  );
+};
 
-    // Ajustar horizontalmente se sair da tela
-    if (left - tooltipWidth / 2 < 10) {
-      // Muito à esquerda - alinhar à esquerda
-      left = Math.max(10, pos.left - 20);
-      transform = 'translate(0, -100%)';
-    } else if (left + tooltipWidth / 2 > viewportWidth - 10) {
-      // Muito à direita - alinhar à direita
-      left = Math.min(viewportWidth - 10, pos.left + 20);
-      transform = 'translate(-100%, -100%)';
-    }
+const EvasionTable: React.FC<EvasionTableProps> = ({ grupos }) => {
+  const [abertos, setAbertos] = useState<Record<string, boolean>>({});
+  const [busca, setBusca] = useState('');
 
-    // Ajustar verticalmente se sair da tela
-    if (top - tooltipHeight < 10) {
-      // Muito acima - posicionar abaixo
-      top = pos.top + 25;
-      transform = transform.replace('-100%', '0');
-    }
+  const termo = normalizarBusca(busca);
+  const visiveis = termo ? grupos.filter((grupo) => normalizarBusca(grupo.rotulo).includes(termo)) : grupos;
 
-    return createPortal(
-      <div
-        role="tooltip"
-        style={{ left, top, transform }}
-        className="fixed z-[9999] pointer-events-none bg-gray-800 text-white text-xs rounded px-2 py-1 shadow-lg border border-gray-700 max-w-[200px] break-words"
-      >
-        <div className="relative">
-          {text}
-        </div>
-      </div>,
-      document.body
-    );
-  };
-
-  // Pequeno componente para cada item (usa hooks por item sem quebrar regra de hooks)
-  const AuditorRow: React.FC<{ aud: AuditorDetail; dest: string; rowIndex: number; itemIndex: number }> = ({ aud, dest, rowIndex, itemIndex }) => {
-    const btnRef = useRef<HTMLButtonElement | null>(null);
-    const [visible, setVisible] = useState(false);
-    const [pos, setPos] = useState<{ left: number; top: number } | null>(null);
-
-    const areaUnit = aud.area
-      ? (aud.unidade && String(aud.unidade).trim() ? `${aud.area} - ${aud.unidade}` : aud.area)
-      : '—';
-    const tooltip =
-      aud.situacao === 'EXONERADO' && aud.dataPublicacao && String(aud.dataPublicacao).trim() ?
-        `Exoneração publicada no DOE em ${aud.dataPublicacao}` :
-        aud.situacao === 'APOSENTADO' && aud.dataPublicacao && String(aud.dataPublicacao).trim() ?
-          `Aposentadoria publicada no DOE em ${aud.dataPublicacao}` :
-          aud.situacao === 'AFASTAMENTO PRELIMINAR À APOSENTADORIA' && aud.dataPublicacao && String(aud.dataPublicacao).trim() ?
-            `Afastamento publicado no DOE em ${aud.dataPublicacao}` :
-            aud.observacao ? String(aud.observacao).trim() : null;
-
-    const show = () => {
-      const el = btnRef.current;
-      if (el) {
-        const rect = el.getBoundingClientRect();
-        setPos({ left: rect.left + rect.width / 2, top: rect.top });
-      }
-      setVisible(true);
-    };
-    const hide = () => setVisible(false);
-
-    return (
-      <li className="flex justify-between items-center px-4 py-2 bg-gray-800/40 rounded border border-gray-700/50">
-        <div>
-          <div className="font-medium text-gray-200">{aud.name}</div>
-          <div className="text-xs text-gray-400">{areaUnit}</div>
-        </div>
-
-        <div className="flex items-center gap-3">
-          {(() => {
-            const isDesistente = aud.situacao && String(aud.situacao).toUpperCase().includes('DESISTENTE');
-            const isAposentado = aud.situacao && String(aud.situacao).toUpperCase().includes('APOSENTADO');
-            const isAfastado = aud.situacao && String(aud.situacao).toUpperCase().includes('AFASTAMENTO PRELIMINAR À APOSENTADORIA');
-
-            if (isDesistente) {
-              return <span className="text-sm text-gray-400">{aud.data ? `Nomeação sem efeito em ${aud.data}` : '—'}</span>;
-            }
-            if (isAfastado) {
-              return <span className="text-sm text-gray-400">{aud.data ? `Afastado em ${aud.data}` : '—'}</span>;
-            }
-            if (isAposentado) {
-              return <span className="text-sm text-gray-400">{aud.data ? `Aposentado em ${aud.data}` : '—'}</span>;
-            }
-            return <span className="text-sm text-gray-400">{aud.data ? `Exonerado em ${aud.data}` : '—'}</span>;
-          })()}
-
-          <div>
-            {(() => {
-
-              let showTooltip = false;
-              let tooltipText = '';
-
-              // Para desistentes: só mostra se não há data de nomeação sem efeito E há observação
-              showTooltip = tooltip ? true : false;
-              tooltipText = tooltip;
-
-
-              return showTooltip ? (
-                <>
-                  <button
-                    ref={btnRef}
-                    type="button"
-                    onMouseEnter={show}
-                    onMouseLeave={hide}
-                    onFocus={show}
-                    onBlur={hide}
-                    className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-orange-500 hover:bg-orange-400 focus:outline-none focus:ring-2 focus:ring-orange-400"
-                    aria-label={tooltipText}
-                  >
-                    <FontAwesomeIcon icon={faQuestion} className="w-2 h-2 bold-icon" aria-hidden="true" color="#1A2436" />
-                  </button>
-
-                  <TooltipPortal pos={pos} text={tooltipText} visible={visible} />
-                </>
-              ) : null;
-            })()}
-          </div>
-        </div>
-      </li>
-    );
-  };
+  const alternar = (rotulo: string) => setAbertos((anterior) => ({ ...anterior, [rotulo]: !anterior[rotulo] }));
 
   return (
     <div>
-      <label htmlFor="busca-destino-evasao" className="block text-sm font-medium text-gray-300 mb-2">
+      <label htmlFor="busca-destino-evasao" className="mb-2 block text-sm font-medium text-gray-300">
         Pesquisar por órgão
       </label>
       <input
         id="busca-destino-evasao"
         type="search"
-        value={buscaOrgao}
-        onChange={(event) => setBuscaOrgao(event.target.value)}
+        value={busca}
+        onChange={(evento) => setBusca(evento.target.value)}
         placeholder="Digite o nome do órgão..."
-        className="w-full md:max-w-md mb-4 px-3 py-2 rounded-lg border border-gray-700 bg-gray-950 text-gray-200 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-red-400"
+        className="mb-4 w-full rounded-lg border border-gray-700 bg-gray-950 px-3 py-2 text-gray-200 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-red-400 md:max-w-md"
       />
+
       <div className="overflow-x-auto">
-      <table className="w-full text-left table-auto">
-        <thead className="bg-gray-800 text-gray-300 uppercase text-sm border-b border-gray-700">
-          <tr>
-            <th className="px-6 py-3 font-semibold">Órgão de Destino</th>
-            <th className="px-6 py-3 font-semibold text-right">Quantidade</th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-gray-700">
-          {dadosFiltrados.map((item, index) => {
-            const dest = item.destino;
-            const rows = details[dest] ?? [];
-            const isOpen = !!open[dest];
-
-            return (
-              <React.Fragment key={dest + index}>
-                <tr
-                  onClick={() => toggle(dest)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' || e.key === ' ') {
-                      e.preventDefault();
-                      toggle(dest);
-                    }
-                  }}
-                  tabIndex={0}
-                  role="button"
-                  className="hover:bg-gray-800/60 transition-colors duration-200 cursor-pointer"
-                >
-                  <td className="px-6 py-4 max-w-[180px] md:max-w-none align-middle">
-                    <div className="text-left w-full flex items-center gap-2 text-gray-200">
-                      <svg xmlns="http://www.w3.org/2000/svg" className={`h-4 w-4 text-red-400 transform ${isOpen ? 'rotate-90' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                      </svg>
-                      <span className="break-words whitespace-normal block">{dest}</span>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 text-right font-bold text-red-400">{item.count}</td>
-                </tr>
-
-                {isOpen && rows.length > 0 && (
-                  <tr className="bg-gray-900/60">
-                    <td colSpan={2} className="px-6 py-3">
-                      <ul className="space-y-2">
-                        {rows.map((aud, i) => (
-                          <AuditorRow key={`${index}-${i}`} aud={aud} dest={dest} rowIndex={index} itemIndex={i} />
-                        ))}
-                      </ul>
-                    </td>
-                  </tr>
-                )}
-              </React.Fragment>
-            );
-          })}
-          {dadosFiltrados.length === 0 && (
+        <table className="w-full table-auto text-left">
+          <thead className="border-b border-gray-700 bg-gray-800 text-sm uppercase text-gray-300">
             <tr>
-              <td colSpan={2} className="px-6 py-6 text-center text-gray-400">
-                Nenhum órgão encontrado.
-              </td>
+              <th className="px-6 py-3 font-semibold">Órgão de destino</th>
+              <th className="px-6 py-3 text-right font-semibold">Auditores</th>
             </tr>
-          )}
-        </tbody>
-      </table>
+          </thead>
+          <tbody className="divide-y divide-gray-700">
+            {visiveis.map((grupo) => {
+              const aberto = !!abertos[grupo.rotulo];
+              return (
+                <React.Fragment key={grupo.rotulo}>
+                  <tr
+                    onClick={() => alternar(grupo.rotulo)}
+                    onKeyDown={(evento) => {
+                      if (evento.key === 'Enter' || evento.key === ' ') {
+                        evento.preventDefault();
+                        alternar(grupo.rotulo);
+                      }
+                    }}
+                    tabIndex={0}
+                    role="button"
+                    aria-expanded={aberto}
+                    className="cursor-pointer transition-colors duration-200 hover:bg-gray-800/60"
+                  >
+                    <td className="max-w-[180px] px-6 py-4 align-middle md:max-w-none">
+                      <div className="flex w-full items-center gap-2 text-left text-gray-200">
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          className={`h-4 w-4 transform text-red-400 ${aberto ? 'rotate-90' : ''}`}
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                        >
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                        </svg>
+                        <span className="block whitespace-normal break-words">{grupo.rotulo}</span>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 text-right font-bold text-red-400">{grupo.total}</td>
+                  </tr>
+
+                  {aberto && grupo.itens.length > 0 && (
+                    <tr className="bg-gray-900/60">
+                      <td colSpan={2} className="px-6 py-3">
+                        <ul className="space-y-2">
+                          {grupo.itens.map((saida) => (
+                            <LinhaAuditor key={saida.id} saida={saida} />
+                          ))}
+                        </ul>
+                      </td>
+                    </tr>
+                  )}
+                </React.Fragment>
+              );
+            })}
+            {visiveis.length === 0 && (
+              <tr>
+                <td colSpan={2} className="px-6 py-6 text-center text-gray-400">
+                  Nenhum órgão encontrado.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
       </div>
     </div>
   );
