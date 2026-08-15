@@ -21,8 +21,9 @@
  * - `AREA` vazia significa desconhecida, não "sem área". Vale para todo
  *   veterano e para quem do CGU-2021 não casou por nome com o edital.
  * - Quem está na CGU (`MES_SAIDA` vazio) tem todo o bloco de saída vazio.
- * - Todo campo enriquecido carrega o `FONTE_*` correspondente, e a linha
- *   carrega `VERIFICADO` (D14).
+ * - Todo campo enriquecido carrega o `FONTE_*` correspondente (D14). NÃO existe
+ *   mais coluna `VERIFICADO` (D20): a tela mostra de onde veio o dado, e não
+ *   uma avaliação do observatório sobre o próprio dado.
  */
 export interface RegistroAuditor {
   /** Chave de identidade — e a única (D12). Nome nunca é chave: homônimos existem. */
@@ -83,10 +84,6 @@ export interface RegistroAuditor {
   /** `SIAPE` | `DOU` | `BUSCA` | `MANUAL`. Selo de procedência do destino (D14). */
   FONTE_DESTINO: string;
   URL_DESTINO: string;
-
-  /** `SIM` | `NÃO` — preenchido por gente, nunca pela máquina (D14). */
-  VERIFICADO: string;
-  VERIFICADO_EM: string;
   OBSERVACAO: string;
 }
 
@@ -144,8 +141,8 @@ export interface DadosDestinoEvasao {
 
 /**
  * Uma saída, do jeito que a interface exibe: pessoa, quando, por quê e com que
- * procedência. Os dois selos da D14 (`fonte` e `verificado`) são obrigatórios —
- * nenhum destino vai à tela sem eles.
+ * procedência. Nenhuma afirmação sobre pessoa nomeada vai à tela sem os selos de
+ * fonte ao lado.
  */
 export interface DetalheSaida {
   id: string;
@@ -159,11 +156,16 @@ export interface DetalheSaida {
   motivo: string;
   /** Selo D14: de onde veio o motivo. `''` quando não há ato. */
   fonteMotivo: string;
+  /**
+   * Todas as fontes que atestam que a pessoa saiu (D20). `SIAPE` quando o
+   * cadastro mensal mostra a ausência — estava no mês n-1 e não está no mês n;
+   * `DOU` quando existe ato publicado. As duas juntas é o caso mais comum, e
+   * uma sozinha diz exatamente o que se sabe até agora.
+   */
+  fontesSaida: string[];
   destino: string;
   /** Selo D14: de onde veio o destino. */
   fonteDestino: string;
-  /** Selo D14: se gente conferiu a linha. */
-  verificado: boolean;
   /** Data de publicação do ato, `AAAA-MM-DD`. */
   dataPublicacao: string;
   atoTitulo: string;
@@ -171,6 +173,12 @@ export interface DetalheSaida {
   atoUrl: string;
   /** `SIM` quando a saída ainda pode ser um buraco na série, não uma saída (D13). */
   provisoria: boolean;
+  /**
+   * `true` quando a saída só existe no DOU: o ato está publicado e o Portal da
+   * Transparência ainda não entregou a competência que mostraria a ausência.
+   * Sem pessoa no SIAPE, não há coorte, área nem unidade para exibir.
+   */
+  soNoDou: boolean;
 }
 
 /**
@@ -193,18 +201,37 @@ export interface EventoSaidaDou {
   arquivo: string | null;
 }
 
+/**
+ * Uma saída que só o DOU conhece: o ato está publicado e o SIAPE ainda não
+ * entregou a competência que mostraria a ausência (~2 meses de atraso do
+ * Portal). O nome vem lido do texto do próprio ato.
+ *
+ * Elas entram na lista de últimas saídas para que o painel mostre o que acabou
+ * de acontecer, e NÃO entram em contagem de evasão — quem conta é o SIAPE
+ * (D11, D13). Na tela, a diferença aparece sozinha: só carregam o selo `DOU`.
+ */
+export interface SaidaRecenteDou {
+  nome: string;
+  tipo: string;
+  rotulo: string;
+  /** `AAAA-MM-DD` da publicação. */
+  dataPublicacao: string;
+  titulo: string;
+  urlDou: string;
+  arquivo: string | null;
+  /**
+   * `ID_SERVIDOR_PORTAL` de quem o ato trata, quando dá para casar com o
+   * `dados.csv`. Vazio quando não dá — nome não é chave (D12).
+   */
+  idServidor: string;
+}
+
 export interface SaidasDou {
   /** `AAAA-MM-DD` até onde a varredura do DOU já cobriu. */
   varreduraAte: string;
   /** `AAAAMM` — a competência mais nova que o SIAPE entregou. */
   ultimaCompetenciaSiape: string;
-  /**
-   * Atos que o DOU publicou depois dessa competência. Não é pendência nem erro:
-   * é a defasagem de ~2 meses do Portal da Transparência, que faz o card estar
-   * sempre à frente da lista de últimas saídas. Essas saídas ainda não contam
-   * na evasão — quem conta é o SIAPE (D11, D13).
-   */
-  atosDepoisDaUltimaCompetencia: number;
+  saidasRecentes: SaidaRecenteDou[];
   dataMaisRecente: string;
   tipoMaisRecente: string;
   eventos: EventoSaidaDou[];

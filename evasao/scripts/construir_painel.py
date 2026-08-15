@@ -59,7 +59,7 @@ COLUNAS_DADOS = (
     "DATA_SAIDA", "DATA_PUBLICACAO_SAIDA",
     "ATO_SAIDA_TITULO", "ATO_SAIDA_URL", "ATO_SAIDA_ARQUIVO",
     "ORGAO_DESTINO", "CARGO_DESTINO", "DATA_DESTINO", "FONTE_DESTINO", "URL_DESTINO",
-    "VERIFICADO", "VERIFICADO_EM", "OBSERVACAO",
+    "OBSERVACAO",
 )
 
 CAMPOS_DO_CONCURSO = ("AREA", "INSCRICAO", "POSICAO_CONCURSO", "NOTA", "MODALIDADE", "UF_VAGA")
@@ -192,7 +192,17 @@ def aplicar_saidas_dou(pessoas: list[dict], saidas: list[dict]) -> int:
 
 
 def aplicar_curadoria(pessoas: list[dict], curadoria: list[dict]) -> int:
-    """A camada humana vence todas as outras. Só toca no que estiver preenchido."""
+    """
+    A camada humana vence todas as outras. Só toca no que estiver preenchido.
+
+    A linha corrigida NÃO ganha mais marca de "conferido" (D20): o observatório
+    passou a mostrar de ONDE veio cada dado, e não uma avaliação sua sobre o
+    próprio dado. Para dizer "isto veio de correção humana" existe
+    `FONTE_* = MANUAL`, que é o que a tela mostra quando a curadoria mexe num
+    campo que tem coluna de fonte. As colunas VERIFICADO e VERIFICADO_EM do
+    `curadoria.csv`, se existirem, são simplesmente ignoradas — não há campo
+    correspondente em `pessoa`, então o laço abaixo passa por elas sem fazer nada.
+    """
     por_id = {c["ID_SERVIDOR_PORTAL"]: c for c in curadoria if c.get("ID_SERVIDOR_PORTAL")}
     aplicadas = 0
     for pessoa in pessoas:
@@ -202,7 +212,6 @@ def aplicar_curadoria(pessoas: list[dict], curadoria: list[dict]) -> int:
         for campo, valor in correcao.items():
             if campo in pessoa and campo != "ID_SERVIDOR_PORTAL" and valor:
                 pessoa[campo] = valor
-        pessoa["VERIFICADO"] = correcao.get("VERIFICADO") or "SIM"
         aplicadas += 1
     return aplicadas
 

@@ -263,8 +263,10 @@ const HistoryPage: React.FC = () => {
                       <span className="text-gray-300">{descrever(mudanca)}</span>
                       {mudanca.tipo === 'saida' && registro && (
                         <SelosDaLinha
-                          fonte={registro.ORGAO_DESTINO ? registro.FONTE_DESTINO : registro.FONTE_MOTIVO}
-                          verificado={registro.VERIFICADO === 'SIM'}
+                          fontes={[
+                            registro.MES_SAIDA ? 'SIAPE' : '',
+                            registro.FONTE_MOTIVO,
+                          ]}
                           compacto
                         />
                       )}

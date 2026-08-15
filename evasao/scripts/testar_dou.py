@@ -12,9 +12,17 @@ plausível e errado sobre pessoa real e nomeada. Antes de mexer nos padrões de
 
 from __future__ import annotations
 
+import csv
+import html
+import re
 import sys
+from pathlib import Path
 
 import dou
+
+RAIZ = Path(__file__).resolve().parent.parent
+ARQ_SAIDAS = RAIZ / "data" / "saidas_dou.csv"
+DIR_ATOS = RAIZ / "data" / "saidas_dou"
 
 CARGO = "Auditor Federal de Financas e Controle"
 
@@ -192,6 +200,63 @@ EXTRACAO = [
     ),
 ]
 
+# O nome sai do texto do ato e vai para a tela ao lado de "vacância" ou
+# "aposentadoria". Errar aqui é afirmar coisa errada sobre pessoa real e
+# nomeada, então a régua não é "acerta a maioria": é ZERO nome errado. Não achar
+# é resposta aceitável; achar o nome de outra pessoa, não.
+NOME_NO_ATO = [
+    (
+        "vacância: 'ocupado pelo servidor FULANO, matrícula SIAPE'",
+        f"Declarar vago o cargo de {CARGO} ocupado pelo servidor CIRO JONATAS DE SOUZA "
+        f"OLIVEIRA, matricula SIAPE no 2576295, Classe S",
+        "CIRO JONATAS DE SOUZA OLIVEIRA",
+    ),
+    (
+        "aposentadoria voluntária: 'ao servidor FULANO, ocupante do cargo'",
+        f"Conceder aposentadoria voluntaria ao servidor LUIZ CARLOS AKIO MATSUMOTO, "
+        f"ocupante do cargo de {CARGO}, Classe S",
+        "LUIZ CARLOS AKIO MATSUMOTO",
+    ),
+    (
+        "aposentadoria compulsória: 'o servidor FULANO', sem a preposição",
+        f"Aposentar compulsoriamente com proventos proporcionais o servidor JOAO DE DEUS "
+        f"SALOMAO BRITO, ocupante do cargo de {CARGO}",
+        "JOAO DE DEUS SALOMAO BRITO",
+    ),
+    (
+        "exoneração com preâmbulo longo entre o verbo e o nome",
+        f"EXONERAR, a pedido, por motivo de desistencia do estagio probatorio, CELSO ANTONIO "
+        f"FERNANDES DE QUEIROZ do cargo de {CARGO} da Controladoria-Geral da Uniao",
+        "CELSO ANTONIO FERNANDES DE QUEIROZ",
+    ),
+    (
+        "exoneração de ofício: nome fechado por ', SIAPE no'",
+        f"Exonerar, de oficio, por desistencia do estagio probatorio, o servidor EVANDRO "
+        f"AMORIM LELIS, SIAPE no 3302689, do cargo de {CARGO}",
+        "EVANDRO AMORIM LELIS",
+    ),
+    (
+        "nome em Title Case (29 dos 251 atos escrevem assim)",
+        f"Declarar vago o cargo de {CARGO} ocupado pelo servidor Lucas Jose Silva da "
+        f"Silveira, matricula SIAPE no 3021455",
+        "Lucas Jose Silva da Silveira",
+    ),
+    (
+        # Portaria 1.872, de 20/07/2026 — erro de digitação do próprio DOU. Com o
+        # grupo do cargo sendo opcional, a palavra errada caía DENTRO do nome e o
+        # site publicaria "servidoa Gabriel" como nome de gente.
+        "erro de digitação do DOU ('servidoa') não vira parte do nome",
+        f"Declarar vago o cargo de {CARGO} ocupado pelo servidoa GABRIEL ISMAEL "
+        f"CARRAZZONE LACATIVA, matricula SIAPE no 3145888",
+        "GABRIEL ISMAEL CARRAZZONE LACATIVA",
+    ),
+    (
+        "fórmula desconhecida devolve vazio, nunca um chute",
+        "Art. 1o Fica designado o grupo de trabalho de que trata a portaria anterior.",
+        "",
+    ),
+]
+
 MATRICULA = [
     (
         "zero à esquerda: Portal mascara '014****', DOU escreve '149262'",
@@ -212,6 +277,58 @@ MATRICULA = [
         None,
     ),
 ]
+
+
+def conferir_nomes_do_corpus() -> tuple[int, str]:
+    """
+    Refaz a leitura do nome nos atos já arquivados e compara com o SIAPE.
+
+    Não é teste sintético: usa os atos de verdade em `data/saidas_dou/` e o nome
+    que a busca por nome já casou com uma pessoa no `data/saidas_dou.csv`. É a
+    única maneira honesta de medir um extrator de nome — as fórmulas do DOU
+    variam mais do que se consegue imaginar de cabeça, e foi assim que
+    apareceram a aposentadoria compulsória, a exoneração de ofício e o
+    "servidoa".
+
+    Sem rede: só relê arquivo. Devolve (falhas, resumo). Se os dados não
+    estiverem à mão, não falha — apenas avisa que não conferiu.
+    """
+    if not ARQ_SAIDAS.is_file() or not DIR_ATOS.is_dir():
+        return 0, "sem corpus local — conferência do nome não rodou"
+
+    with open(ARQ_SAIDAS, encoding="utf-8-sig", newline="") as fh:
+        linhas = list(csv.DictReader(fh, delimiter=";"))
+
+    exato = vazio = 0
+    divergentes = []
+    for linha in linhas:
+        arquivo = (linha.get("ATO_SAIDA_ARQUIVO") or "").strip()
+        esperado = (linha.get("NOME") or "").strip()
+        if not arquivo or not esperado:
+            continue
+        caminho = DIR_ATOS / arquivo
+        if not caminho.is_file():
+            continue
+
+        achado = re.search(r'<div class="texto">(.*?)</div>', caminho.read_text(encoding="utf-8"), re.S)
+        obtido = dou.nome_do_ato(html.unescape(achado.group(1))) if achado else ""
+
+        if not obtido:
+            vazio += 1
+        elif dou.normalizar(obtido) == dou.normalizar(esperado):
+            exato += 1
+        else:
+            divergentes.append((esperado, obtido))
+
+    total = exato + vazio + len(divergentes)
+    for esperado, obtido in divergentes:
+        print(f"        DIVERGE: SIAPE diz {esperado!r}, ato leu {obtido!r}")
+    if vazio:
+        print(f"        ({vazio} ato(s) sem nome legível — aceitável, não é falha)")
+
+    # Só nome ERRADO é falha. Vazio é a resposta correta para fórmula que
+    # ninguém ensinou a ler ainda.
+    return len(divergentes), f"{exato} de {total} atos reais com o nome exato"
 
 
 def main() -> int:
@@ -253,6 +370,20 @@ def main() -> int:
         if not ok:
             print(f"        esperado {esperado!r}, obtido {obtido!r}")
 
+    print("— nome lido do próprio ato —")
+    for descricao, texto, esperado in NOME_NO_ATO:
+        obtido = dou.nome_do_ato(texto)
+        ok = obtido == esperado
+        falhas += not ok
+        print(f"  {'ok  ' if ok else 'FALHA'} {descricao}")
+        if not ok:
+            print(f"        esperado {esperado!r}, obtido {obtido!r}")
+
+    print("— nome conferido contra os atos reais já casados com pessoa —")
+    falhas_corpus, resumo = conferir_nomes_do_corpus()
+    falhas += falhas_corpus
+    print(f"  {'ok  ' if not falhas_corpus else 'FALHA'} {resumo}")
+
     print("— extração do texto do ato —")
     for descricao, pagina, esperado in EXTRACAO:
         obtido = dou.extrair_texto(pagina)
@@ -262,7 +393,10 @@ def main() -> int:
         if not ok:
             print(f"        esperado {esperado!r}, obtido {obtido[:60]!r}")
 
-    total = len(CLASSIFICACAO) + len(DESTINO) + len(MATRICULA) + len(EXTRACAO) + len(ORGAO)
+    total = (
+        len(CLASSIFICACAO) + len(DESTINO) + len(MATRICULA) + len(EXTRACAO) + len(ORGAO)
+        + len(NOME_NO_ATO) + 1  # +1: a conferência do corpus inteiro conta como uma
+    )
     print()
     print(f"{total - falhas} de {total} invariantes OK")
     return 1 if falhas else 0

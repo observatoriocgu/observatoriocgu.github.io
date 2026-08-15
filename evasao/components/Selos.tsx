@@ -2,12 +2,20 @@ import React from 'react';
 import { DESCRICAO_POR_FONTE, ROTULO_POR_FONTE } from '../constants';
 
 /**
- * Os dois selos da D14.
+ * O selo de procedência (D14, revisto pela D20).
  *
- * A máquina diz de onde tirou o dado (`SeloFonte`) e se alguém conferiu
- * (`SeloVerificado`). Não existe nota de confiança automática: o observatório
- * não se autoavalia. Nenhuma afirmação sobre pessoa nomeada — motivo de saída,
- * órgão de destino — vai à tela sem estes dois ao lado.
+ * A máquina diz de ONDE tirou o dado, e só isso. Nenhuma afirmação sobre pessoa
+ * nomeada — motivo de saída, órgão de destino — vai à tela sem um destes ao lado.
+ *
+ * O QUE SAIU, E POR QUÊ. Havia também um selo "conferido / não conferido". Ele
+ * foi removido: como quase nada passa por conferência humana individual, o que
+ * a tela mostrava, na prática, era "não conferido" ao lado de dado correto lido
+ * direto do ato oficial — o selo gerava desconfiança sobre a informação em vez
+ * de qualificá-la. No lugar entrou o que de fato responde à pergunta "posso
+ * confiar nisto?": QUANTAS fontes independentes dizem a mesma coisa. Uma saída
+ * com `SIAPE` e `DOU` lado a lado está atestada pelo cadastro de pessoal e pelo
+ * ato publicado; uma com `DOU` sozinho é ato publicado que o cadastro ainda não
+ * alcançou. O leitor tira a conclusão a partir do fato, não do nosso adjetivo.
  */
 
 /**
@@ -39,17 +47,6 @@ const SEM_FONTE: Record<TemaSelo, string> = {
   claro: 'border-gray-300 text-gray-500 bg-white',
 };
 
-const CORES_VERIFICADO: Record<TemaSelo, { sim: string; nao: string }> = {
-  escuro: {
-    sim: 'border-emerald-500/50 text-emerald-300 bg-emerald-500/10',
-    nao: 'border-gray-700 text-gray-500 bg-gray-900/40',
-  },
-  claro: {
-    sim: 'border-emerald-600 text-emerald-900 bg-emerald-100',
-    nao: 'border-gray-300 text-gray-500 bg-white',
-  },
-};
-
 export const SeloFonte: React.FC<{ fonte: string; compacto?: boolean; tema?: TemaSelo }> = ({
   fonte,
   compacto = false,
@@ -71,34 +68,25 @@ export const SeloFonte: React.FC<{ fonte: string; compacto?: boolean; tema?: Tem
   );
 };
 
-export const SeloVerificado: React.FC<{ verificado: boolean; compacto?: boolean; tema?: TemaSelo }> = ({
-  verificado,
-  compacto = false,
-  tema = 'escuro',
-}) => (
-  <span
-    title={
-      verificado
-        ? 'Conferido por uma pessoa contra o ato original.'
-        : 'Ainda não conferido por uma pessoa — o dado vem só do que a máquina leu.'
-    }
-    className={`inline-flex items-center whitespace-nowrap rounded border px-1.5 py-0.5 font-medium ${
-      compacto ? 'text-[10px]' : 'text-xs'
-    } ${verificado ? CORES_VERIFICADO[tema].sim : CORES_VERIFICADO[tema].nao}`}
-  >
-    {verificado ? 'conferido' : 'não conferido'}
-  </span>
-);
-
-/** Os dois selos juntos, que é como a interface quase sempre os mostra. */
+/**
+ * Todas as fontes que atestam o mesmo fato, lado a lado.
+ *
+ * Duas fontes não são enfeite: significam que o cadastro de pessoal e o ato
+ * publicado dizem a mesma coisa, um sem depender do outro. Uma fonte só é a
+ * resposta honesta quando é só o que existe até agora.
+ */
 export const SelosDaLinha: React.FC<{
-  fonte: string;
-  verificado: boolean;
+  fontes: string[];
   compacto?: boolean;
   tema?: TemaSelo;
-}> = ({ fonte, verificado, compacto = false, tema = 'escuro' }) => (
-  <span className="inline-flex items-center gap-1">
-    <SeloFonte fonte={fonte} compacto={compacto} tema={tema} />
-    <SeloVerificado verificado={verificado} compacto={compacto} tema={tema} />
-  </span>
-);
+}> = ({ fontes, compacto = false, tema = 'escuro' }) => {
+  const distintas = [...new Set(fontes.filter(Boolean))];
+  if (distintas.length === 0) return null;
+  return (
+    <span className="inline-flex items-center gap-1">
+      {distintas.map((fonte) => (
+        <SeloFonte key={fonte} fonte={fonte} compacto={compacto} tema={tema} />
+      ))}
+    </span>
+  );
+};

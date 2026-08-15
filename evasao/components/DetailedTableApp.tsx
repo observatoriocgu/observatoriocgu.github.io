@@ -60,7 +60,6 @@ const DetailedTableApp: React.FC = () => {
   const [unidade, setUnidade] = useState<string>(TODOS);
   const [motivo, setMotivo] = useState<string>(TODOS);
   const [situacao, setSituacao] = useState<string>(TODOS);
-  const [soVerificados, setSoVerificados] = useState(false);
   const [limite, setLimite] = useState(PAGINA);
 
   useEffect(() => {
@@ -116,7 +115,6 @@ const DetailedTableApp: React.FC = () => {
         if (unidade && registro.UNIDADE !== unidade) return false;
         if (situacao && registro.SITUACAO !== situacao) return false;
         if (motivo && (!saiuDaCgu(registro) || motivoDe(registro) !== motivo)) return false;
-        if (soVerificados && registro.VERIFICADO !== 'SIM') return false;
         if (termo && !normalizar(registro.NOME).includes(termo)) return false;
         return true;
       })
@@ -133,12 +131,18 @@ const DetailedTableApp: React.FC = () => {
         const posicaoB = Number(b.POSICAO_CONCURSO) || Number.MAX_SAFE_INTEGER;
         return posicaoA - posicaoB || a.NOME.localeCompare(b.NOME, 'pt-BR');
       });
-  }, [registros, busca, coorte, area, unidade, situacao, motivo, soVerificados]);
+  }, [registros, busca, coorte, area, unidade, situacao, motivo]);
 
-  useEffect(() => setLimite(PAGINA), [busca, coorte, area, unidade, situacao, motivo, soVerificados]);
+  useEffect(() => setLimite(PAGINA), [busca, coorte, area, unidade, situacao, motivo]);
 
   const visiveis = filtrados.slice(0, limite);
-  const totalVerificados = filtrados.filter((registro) => registro.VERIFICADO === 'SIM').length;
+  // Saída atestada pelas DUAS fontes: o cadastro mostra a ausência e existe ato
+  // publicado dizendo por quê. É o número que responde "quanto disto está
+  // documentado em dobro" — que era o que o antigo "conferido" tentava dizer, e
+  // dizia mal, porque media conferência humana, que quase nunca acontece.
+  const comDuasFontes = filtrados.filter(
+    (registro) => saiuDaCgu(registro) && registro.FONTE_MOTIVO
+  ).length;
 
   const seletor = (
     rotulo: string,
@@ -201,22 +205,13 @@ const DetailedTableApp: React.FC = () => {
           {seletor('Situação', situacao, setSituacao, situacoes, 'Todas')}
           {seletor('Motivo da saída', motivo, setMotivo, motivos, 'Todos')}
 
-          <label className="flex items-center gap-1.5 pb-1 text-[11px] font-medium text-gray-700">
-            <input
-              type="checkbox"
-              checked={soVerificados}
-              onChange={(evento) => setSoVerificados(evento.target.checked)}
-              className="h-3.5 w-3.5 accent-red-600"
-            />
-            Só conferidos por gente
-          </label>
         </div>
 
         {!carregando && !erro && (
           <div className="mb-2 text-center text-xs text-gray-600">
             {filtrados.length.toLocaleString('pt-BR')} Auditor(es) neste recorte ·{' '}
             {filtrados.filter(saiuDaCgu).length.toLocaleString('pt-BR')} já saíram ·{' '}
-            {totalVerificados.toLocaleString('pt-BR')} com linha conferida por uma pessoa
+            {comDuasFontes.toLocaleString('pt-BR')} com saída atestada pelo SIAPE e pelo DOU
             {visiveis.length < filtrados.length && ` · mostrando ${visiveis.length.toLocaleString('pt-BR')}`}
           </div>
         )}
@@ -305,8 +300,10 @@ const DetailedTableApp: React.FC = () => {
                       <Celula>
                         {saiu ? (
                           <SelosDaLinha
-                            fonte={registro.ORGAO_DESTINO ? registro.FONTE_DESTINO : registro.FONTE_MOTIVO}
-                            verificado={registro.VERIFICADO === 'SIM'}
+                            fontes={[
+                              registro.MES_SAIDA ? 'SIAPE' : '',
+                              registro.FONTE_MOTIVO,
+                            ]}
                             compacto
                             tema="claro"
                           />

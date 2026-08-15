@@ -56,6 +56,8 @@ Todas as decisões abaixo estão **fechadas**. As fases podem ser executadas sem
 | D13 | Definição de "saiu da CGU" | Fase 2 | ausência do conjunto CGU (`COD_ORG_LOTACAO = 59000`) **a partir da última presença**, nunca por diff par a par. Saída detectada no snapshot mais novo nasce **provisória** |
 | D14 | Procedência da informação | Fases 2-3 | todo campo enriquecido carrega **`FONTE_*`** (SIAPE/DOU/RANKING/BUSCA/MANUAL) e a linha carrega **`VERIFICADO`** (SIM/NÃO, preenchido por gente). **Não existe nota de confiança automática** — a máquina diz de onde tirou e se alguém conferiu; ela não se autoavalia |
 | D15 | Atualização mensal | Fase 2 | **um comando local** (`atualizar.py`), resultado commitado; o Actions só builda e publica. Assunção adotada por padrão — migrar para cron no CI é reversível e não muda a arquitetura |
+| D20 | Procedência na tela | Fase 3 | **`VERIFICADO` sai** — da UI e do `dados.csv`. Como quase nada passa por conferência humana individual, o selo aparecia como "não conferido" ao lado de dado correto lido do ato oficial, e **gerava desconfiança em vez de qualificar**. No lugar, mostram-se **as fontes que atestam o fato**, uma ao lado da outra: `SIAPE` + `DOU` é saída confirmada pelo cadastro e pelo ato; `DOU` sozinho é ato que o cadastro ainda não alcançou. O selo `SIAPE` numa saída significa "consta no mês n-1, não consta no mês n" — a própria **D13**. **Revisa a D14**, que fica só com a parte do `FONTE_*` |
+| D21 | Últimas saídas | Fase 3 | a lista **mistura as duas fontes** e mostra o mais recente que existir, mesmo sem dado de coorte/área/unidade. Saída que só o DOU conhece entra com o **nome lido do texto do ato** (`dou.nome_do_ato`) e selo `DOU` sozinho. **Não** entra em contagem, gráfico, curva nem filtro — sem SIAPE não há recorte, e um filtro por especialidade não pode esconder a notícia mais recente alegando que ela não tem especialidade marcada |
 | D19 | Entrada dos atos do DOU | Fase 2.5 + Fase 2 (v2) | **um índice único de atos**, `data/atos_dou.csv`, com chave no ato (`URL_TITLE`), alimentado pelas **duas** varreduras — a por frase (`varrer_dou.py`) e a por nome (`enriquecer_saidas.py`) — e uma pasta única de cópias, `data/saidas_dou/`. O card deixa de ter crawler próprio e passa a ser **derivado** do índice (`gerar_card_dou.py`). Some a pasta `data/dias_sem_perder_AFFC/`. **Ajusta a delimitação da D10**: a varredura por frase continua não sendo fonte de contagem, mas passa a registrar **tudo** o que encontra, em vez de parar no primeiro ato de cada tipo |
 
 **Efeito das decisões novas sobre as antigas:**
@@ -431,6 +433,44 @@ recente de cada tipo, então nunca soube quantas saídas houve no total. A **sé
 base mensal do SIAPE** (Portal da Transparência), na Fase 2 (v2). Consequência prática: não faz sentido
 auditar a cobertura do crawler nem medir recall; o que importa é a **precisão** dos 3 atos exibidos,
 que foi conferida um a um.
+
+### 2.5.2 O nome lido do próprio ato *(15/08/2026, exigido pela D21)*
+
+Para a saída recente aparecer na lista, não basta saber que houve uma vacância em 11/08 — é preciso
+saber **de quem**. O índice guarda o ato; o nome estava só no texto. `dou.nome_do_ato` lê a fórmula
+do ato e devolve o nome com acento e caixa do original (via `normalizar_com_mapa`, que casa o padrão
+na forma normalizada e recorta no texto original).
+
+**Isto publica nome de pessoa real a partir de leitura de máquina**, então a régua não é "acerta a
+maioria": é **zero nome errado**. Não achar é resposta aceitável — a lista mostra o ato sem nome —,
+achar o nome de outra pessoa não é. Por isso os padrões são ancorados na fórmula inteira, com
+terminador explícito (`, matrícula SIAPE`, `, ocupante`, ` do cargo`), e nunca em "sequência de
+maiúsculas perto de um verbo".
+
+**Medição, e é ela que sustenta a decisão:** os 251 atos que a busca por nome já casou com uma
+pessoa do SIAPE servem de gabarito. `testar_dou.py` refaz a leitura em todos, sem rede, e compara —
+**251 de 251 exatos, zero divergentes**. Divergência é falha do teste; vazio, não.
+
+Quatro fórmulas foram descobertas nessa medição, todas invisíveis a olho nu:
+
+| Fórmula | Onde aparece |
+|---|---|
+| `ocupado pelo servidor FULANO, matrícula SIAPE` | vacância, falecimento |
+| `ao servidor FULANO, ocupante do cargo` | aposentadoria voluntária |
+| `o servidor FULANO, ocupante do cargo` (sem preposição) | aposentadoria compulsória |
+| `o servidor FULANO, SIAPE nº 3302689, do cargo` | exoneração de ofício |
+
+E dois casos que exigiram guarda própria:
+
+- **29 dos 251 atos escrevem o nome em Title Case**, não em caixa alta. A ideia de exigir CAIXA ALTA
+  como prova de que a captura é um nome foi testada e **descartada por isso**.
+- **O DOU erra.** A Portaria 1.872, de 20/07/2026, publicou *"ocupado pelo **servidoa** GABRIEL..."*.
+  Com o grupo da palavra "servidor" sendo opcional, a palavra errada caía **dentro** da captura e o
+  site publicaria "servidoa Gabriel" como nome de gente. Duas correções: o padrão tolera a grafia
+  errada (`SERVIDO[AR]{0,2}`), e todo token do nome tem de começar com maiúscula — salvo partículas
+  (`de`, `da`, `dos`). Token minúsculo que não é partícula é descartado.
+
+---
 
 ### 2.5.1 Concessão de pensão não é saída *(15/08/2026, achado pela D19)*
 

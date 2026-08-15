@@ -21,7 +21,7 @@
 | `curadoria_sugestoes.csv` | `construir_painel.py` — pauta para você conferir | não (é saída) |
 
 Precedência no merge: **curadoria > DOU > concurso > SIAPE**. Qualquer campo
-preenchido no `curadoria.csv` vence, e a linha passa a valer `VERIFICADO = SIM`.
+preenchido no `curadoria.csv` vence.
 
 ## Como corrigir alguma coisa
 
@@ -69,10 +69,27 @@ Confirmando, copie para o `curadoria.csv`.
 
 **Os destinos.** `MOTIVO_SAIDA` é leitura direta do ato da CGU e é confiável.
 `ORGAO_DESTINO` é **inferência** — ver §2.3.3 do `PLANO.md` para os dez formatos
-de falso positivo já encontrados. Todo destino nasce `VERIFICADO = NÃO`; só vira
-`SIM` quando alguém abrir o `URL_DESTINO` e confirmar.
+de falso positivo já encontrados. O painel mostra o destino com o selo da fonte
+ao lado e link para o ato, para que dê para conferir; ele nunca entra em número
+agregado de card.
 
-## Por que o card de dias vai na frente da lista de saídas
+## Os selos: quem atesta cada saída
+
+Não existe selo de "conferido" (**D20**). Como quase nada passa por conferência
+humana individual, ele aparecia como "não conferido" ao lado de dado correto
+lido do ato oficial — o que gerava desconfiança em vez de qualificar. No lugar,
+a tela mostra **as fontes que atestam o fato**:
+
+| Selos | O que significa |
+|---|---|
+| `SIAPE` + `DOU` | o cadastro mostra a ausência **e** há ato publicado dizendo por quê — duas fontes independentes |
+| `SIAPE` sozinho | a pessoa sumiu do cadastro e o ato ainda não foi encontrado no DOU |
+| `DOU` sozinho | o ato está publicado e o Portal ainda não entregou a competência |
+
+`SIAPE` numa saída quer dizer exatamente isto: a pessoa consta do quadro no mês
+n-1 e não consta no mês n. É a definição da **D13**, não uma checagem à parte.
+
+## Por que a lista de saídas mistura as duas fontes
 
 Não é erro de nenhum dos dois. São dois relógios:
 
@@ -82,11 +99,15 @@ Não é erro de nenhum dos dois. São dois relógios:
   quem diz **quem** saiu, pela ausência a partir da última presença (D13). É daí
   que sai a lista de últimas saídas, o gráfico e todas as contagens.
 
-Enquanto o Portal não alcança, o ato fica no índice **sem
-`ID_SERVIDOR_PORTAL`** — sabe-se que houve uma vacância em tal dia, não de quem.
-Essas linhas não entram em contagem nenhuma, e o painel mostra quantas são.
-Quando a competência chega, `enriquecer_saidas.py` casa o ato com a pessoa e
-preenche o id.
+Enquanto o Portal não alcança, o nome de quem saiu é lido do **texto do próprio
+ato** (`dou.nome_do_ato`), e a saída aparece na lista com o selo `DOU` sozinho.
+Quando a competência chega, `enriquecer_saidas.py` casa o ato com a pessoa,
+preenche o `ID_SERVIDOR_PORTAL` e a linha ganha o selo `SIAPE` ao lado.
+
+Essas saídas **não entram em contagem nenhuma** — nem no card de total, nem no
+gráfico, nem na curva de permanência —, e não respondem a filtro: sem o SIAPE
+não há coorte, área nem unidade, e um recorte por especialidade não pode
+esconder uma saída alegando que ela não tem especialidade marcada.
 
 Contar ato como saída seria errado duas vezes: uma pessoa pode ter dois atos, e
 um ato pode ser de quem já estava fora do quadro.

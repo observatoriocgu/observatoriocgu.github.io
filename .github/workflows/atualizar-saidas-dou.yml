@@ -52,7 +52,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add evasao/public/dias_sem_perder_affc.json \
+          git add evasao/public/atos_dou.json \
                   evasao/data/atos_dou.csv \
                   evasao/data/varredura_dou.txt \
                   evasao/data/saidas_dou

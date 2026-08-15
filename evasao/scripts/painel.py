@@ -286,8 +286,6 @@ def derivar_pessoas(meses: list[str], cgu: dict, fora: dict) -> list[dict]:
                 "DATA_DESTINO": "",
                 "FONTE_DESTINO": "SIAPE" if destino_carreira else "",
                 "URL_DESTINO": "",
-                "VERIFICADO": "NÃO",
-                "VERIFICADO_EM": "",
                 "OBSERVACAO": "",
             }
         )

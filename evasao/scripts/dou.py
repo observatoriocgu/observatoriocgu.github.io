@@ -93,6 +93,42 @@ def normalizar(texto: str) -> str:
     return " ".join(sem_acento.upper().split())
 
 
+def normalizar_com_mapa(texto: str) -> tuple[str, list[int]]:
+    """
+    Como `normalizar`, mas devolve também de onde veio cada caractere.
+
+    `mapa[i]` é o índice, no texto ORIGINAL, do caractere que virou o `i`-ésimo
+    do normalizado. Serve para casar um padrão na forma normalizada — que é a
+    única em que dá para escrever regex sem sofrer com acento e caixa — e
+    recortar o trecho no original, com acento e caixa preservados.
+
+    É o que permite ler "ocupado pelo servidor CIRO JÔNATAS DE SOUZA OLIVEIRA" e
+    devolver o nome com o circunflexo no lugar, em vez de "CIRO JONATAS".
+    """
+    saida: list[str] = []
+    mapa: list[int] = []
+    espaco_pendente = False
+
+    for indice, caractere in enumerate(texto or ""):
+        if caractere.isspace():
+            # Espaço só entra se já houver conteúdo antes — é o que reproduz o
+            # `" ".join(split())` de `normalizar`, sem perder o alinhamento.
+            espaco_pendente = bool(saida)
+            continue
+        for decomposto in unicodedata.normalize("NFKD", caractere):
+            if unicodedata.combining(decomposto):
+                continue
+            if espaco_pendente:
+                saida.append(" ")
+                mapa.append(indice)
+                espaco_pendente = False
+            for maiuscula in decomposto.upper():
+                saida.append(maiuscula)
+                mapa.append(indice)
+
+    return "".join(saida), mapa
+
+
 # ------------------------------------------------------------------ rede/cache
 
 def _caminho_cache(url: str) -> Path:
@@ -633,6 +669,97 @@ def e_ato_de_nomeacao(texto: str, nome: str = "") -> bool:
     return any(re.search(p, normalizado) for p in PADROES_NOMEACAO)
 
 
+# ------------------------------------------------------------ nome no próprio ato
+#
+# De quem é o ato, lido do texto dele. Existe porque o ato do DOU sai ANTES de o
+# SIAPE mostrar a ausência (~2 meses de atraso do Portal), e sem isto a saída
+# mais recente chegava à tela como "houve uma vacância em 11/08", sem dizer de
+# quem — que é justamente a informação que interessa.
+#
+# ATENÇÃO: isto publica o nome de uma pessoa real a partir de leitura de máquina.
+# Por isso os padrões são ANCORADOS na fórmula do ato inteira, com terminador
+# explícito, e não em "uma sequência de maiúsculas perto de um verbo". Quando
+# nenhum padrão casa, a resposta é vazia — a lista mostra o ato sem nome, que é
+# menos pior que mostrar o nome errado.
+#
+# Medido sobre os 251 atos que já estavam casados com pessoa pelo SIAPE: ver
+# `testar_dou.py`, que refaz essa conferência sem rede.
+_NOME = r"([A-ZÀ-Ý][A-ZÀ-Ý'\- ]{4,70}?)"
+
+PADROES_NOME_NO_ATO = (
+    # "...o cargo de Auditor... ocupado pelo servidor FULANO, matrícula SIAPE"
+    # (vacância e falecimento)
+    #
+    # `SERVIDO[AR]{0,2}` em vez de `SERVIDOR[A]?` porque o DOU erra: a Portaria
+    # 1.872, de 20/07/2026, publicou "ocupado pelo servidoa GABRIEL...". Com o
+    # grupo exigindo a grafia certa e sendo opcional, a palavra errada caía
+    # DENTRO do nome capturado e o site publicaria "servidoa Gabriel" como se
+    # fosse o nome da pessoa.
+    r"OCUPAD[OA]\s+(?:PEL[OA]|POR)\s+(?:SERVIDO[AR]{0,2}\s+)?" + _NOME + r"\s*,",
+    # "...ao servidor FULANO, ocupante do cargo de..."   (aposentadoria voluntária)
+    # "...o servidor FULANO, ocupante do cargo de..."    (aposentadoria compulsória)
+    # "...o servidor FULANO, SIAPE nº 3302689, do cargo" (exoneração de ofício)
+    # O `(?<!EX-)` guarda contra "ex-servidor", que é como o ato de pensão fala
+    # do falecido — ato que já não chega aqui (PADROES_PENSAO), mas a fórmula é
+    # frequente demais para depender só disso.
+    r"(?<!EX-)\bSERVIDOR[A]?\s+" + _NOME + r"\s*,\s*(?:OCUPANTE|MATRICULA|SIAPE)",
+    # "EXONERAR, a pedido, FULANO do cargo de Auditor..."
+    # "EXONERAR, a pedido, por motivo de desistência do estágio probatório,
+    #  FULANO do cargo de Auditor..." — o preâmbulo varia, então quem ancora é o
+    # terminador: o nome vem logo antes de "do cargo", e não cruza vírgula
+    # porque a vírgula não está na classe de caracteres de `_NOME`.
+    r"\bEXONERAR\b[^.]{0,160}?,\s*" + _NOME + r"\s+DO\s+CARGO",
+)
+
+
+# Partículas que podem vir em minúscula no meio de um nome ("Lucas José Silva
+# da Silveira"). Fora destas, todo token de nome começa com maiúscula — seja o
+# ato escrito em CAIXA ALTA (222 dos 251 conferidos) ou em Title Case (29).
+PARTICULAS_DE_NOME = {"de", "da", "do", "das", "dos", "e", "del", "di", "van", "von"}
+
+
+def _token_de_nome(token: str, primeiro: bool) -> bool:
+    if not token:
+        return False
+    if token[0].isupper():
+        return True
+    return not primeiro and token.lower() in PARTICULAS_DE_NOME
+
+
+def nome_do_ato(texto: str) -> str:
+    """
+    O nome do Auditor de quem o ato trata, com acento e caixa do original.
+
+    String vazia quando nenhuma fórmula conhecida casa, ou quando o que casou
+    não se parece com nome de gente — e isso é resposta, não falha: melhor a
+    lista dizer que houve uma exoneração sem dizer de quem do que atribuí-la à
+    pessoa errada.
+    """
+    normalizado, mapa = normalizar_com_mapa(texto)
+    for padrao in PADROES_NOME_NO_ATO:
+        achado = re.search(padrao, normalizado)
+        if not achado:
+            continue
+        inicio, fim = achado.span(1)
+        if inicio >= len(mapa) or fim - 1 >= len(mapa):
+            continue
+
+        tokens = texto[mapa[inicio]: mapa[fim - 1] + 1].strip(" ,.").split()
+        # Palavra da fórmula que vazou para dentro da captura (o "servidoa" da
+        # Portaria 1.872) entra em minúscula e não é partícula: cai fora aqui,
+        # antes de virar nome de gente na tela.
+        while tokens and not _token_de_nome(tokens[0], primeiro=True):
+            tokens.pop(0)
+
+        # Duas palavras é o mínimo para ser nome de gente; sem isto uma fórmula
+        # truncada devolveria "SERVIDOR" ou "CARGO" como se fosse pessoa.
+        if len(tokens) >= 2 and all(
+            _token_de_nome(t, primeiro=(i == 0)) for i, t in enumerate(tokens)
+        ):
+            return " ".join(tokens)
+    return ""
+
+
 def cita_nome(texto: str, nome: str) -> bool:
     """
     True se o ato cita exatamente esta pessoa.
@@ -651,6 +778,17 @@ def cita_nome(texto: str, nome: str) -> bool:
     if not alvo:
         return False
     return alvo in normalizar(texto)
+
+
+def siape_do_ato(texto: str) -> str:
+    """A primeira matrícula SIAPE citada no ato, em 7 dígitos. Vazio se não houver.
+
+    Vai a 7 dígitos pelo mesmo motivo de `siape_compativel`: o Portal mascara em
+    7 posições preservando o zero à esquerda (`014****`) e o DOU escreve sem ele
+    (`149262`). Guardar já preenchido evita ter de lembrar disso em cada uso.
+    """
+    achados = re.findall(PADRAO_SIAPE, normalizar(texto))
+    return achados[0].zfill(7) if achados else ""
 
 
 def siape_compativel(texto: str, matricula_mascarada: str) -> bool | None:

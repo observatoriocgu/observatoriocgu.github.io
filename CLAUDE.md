@@ -58,10 +58,18 @@ Edital CGU nº 5 de 13/06/2022, publicado no DOU (D17).
 - NÃO existe dado de comissão/função: FUNCAO, SIGLA_FUNCAO e NIVEL_FUNCAO são
   "Sem informação"/"-1" nas 88.421 linhas. O análogo de desccomi/cdcomi da
   SEF-MG não tem fonte — não prometer essa análise em tela nenhuma
-- Todo campo enriquecido carrega FONTE_* (SIAPE/DOU/RANKING/BUSCA/MANUAL) e a
-  linha carrega VERIFICADO (SIM/NÃO, preenchido por gente) (D14). NÃO existe
-  nota de confiança automática: a máquina diz de onde tirou e se alguém
-  conferiu — ela não se autoavalia
+- Todo campo enriquecido carrega FONTE_* (SIAPE/DOU/RANKING/BUSCA/MANUAL) (D14).
+  NÃO existe nota de confiança automática: a máquina diz de onde tirou, e só
+- NÃO existe mais VERIFICADO (D20, 15/08/2026). O selo "conferido/não conferido"
+  saiu da UI e a coluna saiu do dados.csv. Como quase nada passa por conferência
+  humana individual, a tela mostrava "não conferido" ao lado de dado correto
+  lido do ato oficial — gerava desconfiança em vez de qualificar. No lugar,
+  mostram-se as FONTES que atestam o fato: uma saída com selo SIAPE + DOU está
+  atestada pelo cadastro e pelo ato; com DOU sozinho, é ato que o cadastro ainda
+  não alcançou. NÃO reintroduzir "conferido" — é decisão editorial, não lacuna
+- Selo SIAPE numa saída = a pessoa consta do quadro no mês n-1 e não consta no
+  mês n. Isso é a própria definição da D13, não uma checagem à parte: toda linha
+  do dados.csv com MES_SAIDA tem o selo por construção
 - Nenhum destino ("foi para o TCU") vai ao ar sem fonte registrada e link
 - DEMISSÃO NÃO É PUBLICADA (D18): é penalidade disciplinar, e o observatório
   mede evasão. O classificador reconhece o tipo, mas grava SITUACAO=DESLIGADO,
@@ -104,7 +112,16 @@ Edital CGU nº 5 de 13/06/2022, publicado no DOU (D17).
   snapshots, que estão fora do Git
 - Linha do índice sem ID_SERVIDOR_PORTAL não é falha: é saída que o DOU já
   anunciou e o SIAPE ainda não confirmou. Ela NÃO entra em contagem de evasão
-  (quem conta é o SIAPE, D11/D13) e aparece na tela como defasagem declarada
+  (quem conta é o SIAPE, D11/D13), mas ENTRA na lista "últimas saídas" do
+  painel, com nome e selo DOU sozinho (D21). Coorte, área e unidade ficam
+  vazias — só o SIAPE traz isso —, e por isso essas linhas não respondem a
+  filtro nenhum
+- O nome de quem saiu é lido do TEXTO do ato (dou.nome_do_ato), com fórmulas
+  ancoradas e terminador explícito. Isso publica nome de pessoa real a partir de
+  leitura de máquina: se nenhuma fórmula casar, a resposta é VAZIO — a lista
+  mostra o ato sem nome, nunca um nome chutado. Os padrões são conferidos contra
+  os 251 atos já casados com pessoa pelo SIAPE, em testar_dou.py, e a meta é
+  ZERO divergente (vazio é aceitável, nome errado não)
 - Cache: página de ato é imutável e vale para sempre; resposta de BUSCA, não.
   Janela que alcança o presente e busca sem data (`exactDate=all`) valem 6h.
   Sem isso a varredura devolve para sempre o resultado do dia em que rodou

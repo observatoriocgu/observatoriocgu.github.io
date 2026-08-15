@@ -39,6 +39,7 @@ import {
   comoSerie,
   curvaDePermanencia,
   detalharSaida,
+  detalharSaidaDoDou,
   evasaoDaCoorte,
   filtrarSaidas,
   saidas,
@@ -98,7 +99,7 @@ const App: React.FC = () => {
 
     (async () => {
       try {
-        const dados = await carregarJsonPublico<SaidasDou>('dias_sem_perder_affc.json');
+        const dados = await carregarJsonPublico<SaidasDou>('atos_dou.json');
         if (!montado) return;
         if (!dados?.dataMaisRecente) throw new Error('JSON sem data mais recente.');
         setSaidasDou(dados);
@@ -244,14 +245,31 @@ const App: React.FC = () => {
     [todasAsSaidas]
   );
 
-  const ultimasSaidas = useMemo(
-    () =>
-      todasAsSaidas
-        .map(detalharSaida)
-        .sort((a, b) => b.mesSaida.localeCompare(a.mesSaida) || a.nome.localeCompare(b.nome, 'pt-BR'))
-        .slice(0, 6),
-    [todasAsSaidas]
-  );
+  // "Últimas saídas" é a única lista que mistura as duas fontes, e é de propósito
+  // (D21): ela existe para mostrar o que ACABOU de acontecer, e o SIAPE chega
+  // com ~2 meses de atraso. Esperar o Portal para exibir uma saída que o DOU já
+  // publicou seria esconder a notícia mais recente por formalidade.
+  //
+  // O que vem do DOU não tem coorte, área nem unidade — o SIAPE é que traz isso.
+  // Aparece com o selo DOU sozinho, e ganha o SIAPE ao lado quando a competência
+  // chegar. Nenhuma delas entra em contagem de evasão: quem conta é o SIAPE, e
+  // contar ato dobraria quem tem dois (D11, D13).
+  const ultimasSaidas = useMemo(() => {
+    const doSiape = todasAsSaidas.map(detalharSaida);
+    const idsDoSiape = new Set(doSiape.map((saida) => saida.id));
+    const doDou = (saidasDou?.saidasRecentes ?? [])
+      .map(detalharSaidaDoDou)
+      .filter((saida) => !idsDoSiape.has(saida.id));
+
+    return [...doDou, ...doSiape]
+      .sort(
+        (a, b) =>
+          b.mesSaida.localeCompare(a.mesSaida) ||
+          b.dataPublicacao.localeCompare(a.dataPublicacao) ||
+          a.nome.localeCompare(b.nome, 'pt-BR')
+      )
+      .slice(0, 6);
+  }, [todasAsSaidas, saidasDou]);
 
   const base = baseDoSite();
 
@@ -315,17 +333,16 @@ const App: React.FC = () => {
                           <b>{formatarDataIsoParaBr(eventoMaisRecente.dataPublicacao)}</b>
                         </div>
                       )}
-                      {/* O DOU sai no dia; o SIAPE, com ~2 meses de atraso. Dizer de
-                          quanto é a distância é o que impede que a diferença entre
-                          este card e a lista de últimas saídas pareça erro. */}
-                      {saidasDou && saidasDou.atosDepoisDaUltimaCompetencia > 0 && (
+                      {/* O DOU sai no dia; o SIAPE, com ~2 meses de atraso. Estas
+                          saídas já estão na lista abaixo, com o selo DOU sozinho —
+                          o que falta é o Portal confirmar, não o ato existir. */}
+                      {saidasDou && saidasDou.saidasRecentes.length > 0 && (
                         <div className="text-gray-500">
-                          {saidasDou.atosDepoisDaUltimaCompetencia} ato
-                          {saidasDou.atosDepoisDaUltimaCompetencia === 1 ? '' : 's'} publicado
-                          {saidasDou.atosDepoisDaUltimaCompetencia === 1 ? '' : 's'} depois de{' '}
-                          {formatarCompetenciaLonga(saidasDou.ultimaCompetenciaSiape)}, que é a última
-                          competência do SIAPE. Elas só entram nas contagens quando o Portal da
-                          Transparência as confirmar.
+                          {saidasDou.saidasRecentes.length} saída
+                          {saidasDou.saidasRecentes.length === 1 ? '' : 's'} publicada
+                          {saidasDou.saidasRecentes.length === 1 ? '' : 's'} depois de{' '}
+                          {formatarCompetenciaLonga(saidasDou.ultimaCompetenciaSiape)}, última competência
+                          do SIAPE. Entram nas contagens quando o Portal da Transparência as confirmar.
                         </div>
                       )}
                       <div className="flex flex-wrap justify-center gap-2 pt-1">
@@ -476,18 +493,15 @@ const App: React.FC = () => {
               esconder uma saída porque a especialidade dela está desmarcada omitiria a notícia mais recente sem dizer
               que omitiu.
             </p>
-            {/* Esta lista é do SIAPE; o card de dias é do DOU. As duas fontes não
-                podem coincidir — o Portal publica com atraso —, e sem esta frase a
-                diferença de datas entre elas lê como erro do painel. */}
-            {saidasDou && saidasDou.atosDepoisDaUltimaCompetencia > 0 && (
-              <p className="mb-3 text-sm text-gray-500">
-                Aqui quem conta é o SIAPE, que vai até{' '}
-                {formatarCompetenciaLonga(saidasDou.ultimaCompetenciaSiape)}. O DOU já publicou mais{' '}
-                <span className="text-gray-300">{saidasDou.atosDepoisDaUltimaCompetencia}</span> ato
-                {saidasDou.atosDepoisDaUltimaCompetencia === 1 ? '' : 's'} de saída depois disso — estão no card
-                acima, e entram nesta lista quando o Portal da Transparência confirmar de quem são.
-              </p>
-            )}
+            <p className="mb-3 text-sm text-gray-500">
+              Os selos dizem quem atesta cada saída.{' '}
+              <span className="text-sky-300">SIAPE</span> é o cadastro de pessoal do Portal da Transparência, que vai
+              até {saidasDou ? formatarCompetenciaLonga(saidasDou.ultimaCompetenciaSiape) : 'a última competência'} e
+              mostra a pessoa presente num mês e ausente no seguinte.{' '}
+              <span className="text-amber-300">DOU</span> é o ato publicado no Diário Oficial, que sai no dia. Saída
+              recente costuma ter só o selo do DOU: o ato já existe e o Portal, que atrasa cerca de dois meses, ainda
+              não a registrou.
+            </p>
             {ultimasSaidas.length === 0 ? (
               <div className="text-sm text-gray-400">
                 {carregando ? 'Carregando...' : 'Nenhuma saída registrada.'}
@@ -502,7 +516,8 @@ const App: React.FC = () => {
                       </span>
                       <span className="text-amber-400">•</span>
                       <span>
-                        <strong>{saida.nome}</strong> — {saida.motivo.toLocaleLowerCase('pt-BR')}
+                        <strong>{saida.nome || 'Auditor não identificado no ato'}</strong> —{' '}
+                        {saida.motivo.toLocaleLowerCase('pt-BR')}
                         {saida.destino ? (
                           <>
                             , para <strong>{saida.destino}</strong>
@@ -510,11 +525,17 @@ const App: React.FC = () => {
                         ) : null}
                         .
                       </span>
-                      <SelosDaLinha
-                        fonte={saida.destino ? saida.fonteDestino : saida.fonteMotivo}
-                        verificado={saida.verificado}
-                        compacto
-                      />
+                      {/* As fontes da SAÍDA. O destino, quando existe, tem
+                          procedência própria e ganha o selo dele ao lado — são
+                          duas afirmações diferentes sobre a mesma pessoa, e o
+                          destino é inferência, não leitura direta do ato. */}
+                      <SelosDaLinha fontes={saida.fontesSaida} compacto />
+                      {saida.destino && saida.fonteDestino ? (
+                        <span className="inline-flex items-baseline gap-1 text-[10px] text-gray-500">
+                          destino:
+                          <SelosDaLinha fontes={[saida.fonteDestino]} compacto />
+                        </span>
+                      ) : null}
                       {saida.atoUrl && (
                         <a
                           href={saida.atoUrl}

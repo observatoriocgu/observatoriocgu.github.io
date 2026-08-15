@@ -25,6 +25,7 @@ import {
   LinhaSerieMensal,
   PontoSerieMensal,
   RegistroAuditor,
+  SaidaRecenteDou,
 } from '../types';
 import { LinhaCsv, baseDoSite } from './dados';
 
@@ -79,7 +80,22 @@ export const urlDoAto = (registro: RegistroAuditor): string => {
   return registro.ATO_SAIDA_URL;
 };
 
-/** Uma saída no formato que a interface consome, com os dois selos da D14. */
+/**
+ * As fontes que atestam que a pessoa saiu (D20).
+ *
+ * `SIAPE` sai de graça para toda linha do `dados.csv` com `MES_SAIDA`: a
+ * competência da saída é justamente o mês em que a pessoa deixou de aparecer no
+ * cadastro depois de aparecer no anterior — é a definição da D13, não uma
+ * inferência à parte. `DOU` entra quando há ato publicado.
+ */
+const fontesDaSaida = (registro: RegistroAuditor): string[] => {
+  const fontes: string[] = [];
+  if (registro.MES_SAIDA) fontes.push('SIAPE');
+  if (registro.FONTE_MOTIVO) fontes.push(registro.FONTE_MOTIVO);
+  return [...new Set(fontes)];
+};
+
+/** Uma saída no formato que a interface consome, com os selos de fonte. */
 export const detalharSaida = (registro: RegistroAuditor): DetalheSaida => ({
   id: registro.ID_SERVIDOR_PORTAL,
   nome: registro.NOME,
@@ -90,13 +106,45 @@ export const detalharSaida = (registro: RegistroAuditor): DetalheSaida => ({
   mesSaida: registro.MES_SAIDA,
   motivo: motivoDe(registro),
   fonteMotivo: registro.FONTE_MOTIVO,
+  fontesSaida: fontesDaSaida(registro),
   destino: registro.ORGAO_DESTINO,
   fonteDestino: registro.FONTE_DESTINO,
-  verificado: registro.VERIFICADO === 'SIM',
   dataPublicacao: registro.DATA_PUBLICACAO_SAIDA,
   atoTitulo: registro.ATO_SAIDA_TITULO,
   atoUrl: urlDoAto(registro),
   provisoria: registro.SAIDA_PROVISORIA === 'SIM',
+  soNoDou: false,
+});
+
+/**
+ * Uma saída que só o DOU conhece, no mesmo formato das outras.
+ *
+ * Os campos que dependem do SIAPE ficam vazios de propósito — coorte, área,
+ * unidade e UF só existem depois que o Portal entrega a competência. Vazio aqui
+ * quer dizer "ainda não se sabe", e é por isso que estas linhas não entram em
+ * filtro nenhum: um recorte por especialidade não pode esconder uma saída
+ * alegando que ela não tem a especialidade marcada.
+ */
+export const detalharSaidaDoDou = (recente: SaidaRecenteDou): DetalheSaida => ({
+  id: recente.idServidor || `dou:${recente.urlDou}`,
+  nome: recente.nome,
+  concurso: '',
+  area: '',
+  unidade: '',
+  uf: '',
+  mesSaida: recente.dataPublicacao.slice(0, 4) + recente.dataPublicacao.slice(5, 7),
+  motivo: recente.rotulo,
+  fonteMotivo: 'DOU',
+  fontesSaida: ['DOU'],
+  destino: '',
+  fonteDestino: '',
+  dataPublicacao: recente.dataPublicacao,
+  atoTitulo: recente.titulo,
+  atoUrl: recente.arquivo
+    ? `${baseDoSite()}data/saidas_dou/${recente.arquivo}`
+    : recente.urlDou,
+  provisoria: false,
+  soNoDou: true,
 });
 
 /** Ordena saídas da mais recente para a mais antiga, desempatando por nome. */

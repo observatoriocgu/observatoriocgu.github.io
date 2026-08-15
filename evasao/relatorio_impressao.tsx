@@ -140,11 +140,12 @@ const RelatorioImpressao: React.FC = () => {
                           ? `${registro.ATO_SAIDA_TITULO} (DOU de ${formatarDataIsoParaBr(registro.DATA_PUBLICACAO_SAIDA)})`
                           : 'Sem ato identificado'}
                       </td>
-                      {/* Os dois selos da D14 em texto, porque a folha impressa é
+                      {/* Os selos de fonte em texto, porque a folha impressa é
                           preto e branco e a cor do selo não sobrevive a ela. */}
                       <td className="whitespace-nowrap border border-slate-300 px-3 py-2">
-                        {(registro.ORGAO_DESTINO ? registro.FONTE_DESTINO : registro.FONTE_MOTIVO) || 'sem fonte'} ·{' '}
-                        {registro.VERIFICADO === 'SIM' ? 'conferido' : 'não conferido'}
+                        {[registro.MES_SAIDA ? 'SIAPE' : '', registro.FONTE_MOTIVO]
+                          .filter(Boolean)
+                          .join(' · ') || 'sem fonte'}
                       </td>
                     </tr>
                   ))}

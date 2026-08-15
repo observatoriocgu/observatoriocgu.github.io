@@ -45,6 +45,8 @@ do pipeline que precisa lembrar disso.
 from __future__ import annotations
 
 import csv
+import html
+import re
 from datetime import date, datetime
 from pathlib import Path
 
@@ -68,6 +70,13 @@ COLUNAS = (
     "ROTULO",
     "DATA_PUBLICACAO",
     "TITULO",
+    # De quem é o ato, LIDO DO TEXTO DELE (`dou.nome_do_ato`). É o que permite a
+    # saída recente chegar à tela com nome antes de o SIAPE confirmar — sem isto
+    # o painel só saberia dizer "houve uma vacância em 11/08". Quando a varredura
+    # por nome casa o ato com uma pessoa, este campo passa a vir do SIAPE, que é
+    # a grafia oficial.
+    "NOME",
+    "MATRICULA_SIAPE",
     "SECAO",
     "EDICAO",
     "PAGINA",
@@ -119,6 +128,7 @@ def registrar(
     texto: str,
     fonte: str,
     id_servidor: str = "",
+    nome: str = "",
     arquivar: bool = True,
 ) -> dict | None:
     """
@@ -143,6 +153,10 @@ def registrar(
         "ROTULO": dou.ROTULOS.get(tipo, tipo),
         "DATA_PUBLICACAO": dou.data_iso(resultado) or anterior.get("DATA_PUBLICACAO", ""),
         "TITULO": resultado.get("title") or anterior.get("TITULO", ""),
+        # O nome do SIAPE (passado por quem busca por nome) vence o lido do ato:
+        # é a grafia oficial, e o ato às vezes abrevia ou erra.
+        "NOME": nome or anterior.get("NOME", "") or dou.nome_do_ato(texto),
+        "MATRICULA_SIAPE": dou.siape_do_ato(texto) or anterior.get("MATRICULA_SIAPE", ""),
         "SECAO": resultado.get("pubName") or anterior.get("SECAO", ""),
         "EDICAO": str(resultado.get("editionNumber") or anterior.get("EDICAO", "")),
         "PAGINA": str(resultado.get("numberPage") or anterior.get("PAGINA", "")),
@@ -209,6 +223,9 @@ def importar_de_saidas_dou(indice: dict[str, dict]) -> int:
             "ROTULO": dou.ROTULOS[tipo],
             "DATA_PUBLICACAO": saida.get("DATA_PUBLICACAO_SAIDA", "") or anterior.get("DATA_PUBLICACAO", ""),
             "TITULO": saida.get("ATO_SAIDA_TITULO", "") or anterior.get("TITULO", ""),
+            # Aqui o nome vem do SIAPE, não do ato: é a grafia oficial.
+            "NOME": saida.get("NOME", "") or anterior.get("NOME", ""),
+            "MATRICULA_SIAPE": anterior.get("MATRICULA_SIAPE", ""),
             # Seção, edição e página não estão no saidas_dou.csv. Ficam vazias:
             # o card não as usa, e a cópia arquivada do ato traz todas.
             "SECAO": anterior.get("SECAO", ""),
@@ -223,6 +240,48 @@ def importar_de_saidas_dou(indice: dict[str, dict]) -> int:
         }
 
     return novos
+
+
+# ------------------------------------------------- releitura das cópias em disco
+
+# O texto na cópia arquivada por `dou.salvar_ato`. É `<div class="texto">…</div>`
+# com o conteúdo escapado — nada a ver com o `.texto-dou` da página do in.gov.br,
+# que é o que `dou.extrair_texto` lê.
+_PADRAO_TEXTO_ARQUIVADO = re.compile(r'<div class="texto">(.*?)</div>', re.S)
+
+
+def texto_arquivado(arquivo: str) -> str:
+    """O texto do ato a partir da cópia em `saidas_dou/`. Vazio se não der."""
+    caminho = DIR_ATOS / (arquivo or "")
+    if not arquivo or not caminho.is_file():
+        return ""
+    achado = _PADRAO_TEXTO_ARQUIVADO.search(caminho.read_text(encoding="utf-8"))
+    return html.unescape(achado.group(1)) if achado else ""
+
+
+def completar_do_arquivo(indice: dict[str, dict]) -> int:
+    """
+    Preenche NOME e MATRICULA_SIAPE que faltarem, relendo as cópias em disco.
+
+    Sem rede: o ato já está arquivado, e o que muda com o tempo é o que sabemos
+    ler dele. Serve para o dia em que um padrão novo de `dou.nome_do_ato` passa a
+    reconhecer uma fórmula que antes escapava — em vez de recrawlar 264 atos,
+    relê-se o que já está aqui. Idempotente.
+    """
+    completados = 0
+    for linha in indice.values():
+        if linha.get("NOME") and linha.get("MATRICULA_SIAPE"):
+            continue
+        texto = texto_arquivado(linha.get("ARQUIVO", ""))
+        if not texto:
+            continue
+        if not linha.get("NOME"):
+            linha["NOME"] = dou.nome_do_ato(texto)
+        if not linha.get("MATRICULA_SIAPE"):
+            linha["MATRICULA_SIAPE"] = dou.siape_do_ato(texto)
+        if linha.get("NOME") or linha.get("MATRICULA_SIAPE"):
+            completados += 1
+    return completados
 
 
 # --------------------------------------------------------------- leitura do card

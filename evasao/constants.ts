@@ -203,8 +203,10 @@ export const ROTULO_POR_FONTE: Readonly<Record<string, string>> = {
 
 /** Descrição longa de cada fonte, para o `title` do selo. */
 export const DESCRICAO_POR_FONTE: Readonly<Record<string, string>> = {
-  SIAPE: 'Portal da Transparência — Cadastro de Servidores Civis (SIAPE)',
-  DOU: 'Ato publicado no Diário Oficial da União',
+  SIAPE:
+    'Cadastro de Servidores Civis do Portal da Transparência: a pessoa consta ' +
+    'do quadro num mês e não consta no seguinte',
+  DOU: 'Ato publicado no Diário Oficial da União, com cópia arquivada aqui',
   RANKING: 'Edital CGU nº 5, de 13/06/2022, publicado no DOU',
   BUSCA: 'Busca por nome no DOU',
   MANUAL: 'Correção humana registrada em data/curadoria.csv',

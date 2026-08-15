@@ -47,12 +47,15 @@ const LinhaAuditor: React.FC<{ saida: DetalheSaida }> = ({ saida }) => {
           </span>
         )}
 
-        {/* Selo do destino quando há órgão; do motivo quando não há. É sempre o
-            selo do campo que a linha está afirmando. */}
-        <SelosDaLinha
-          fonte={saida.destino ? saida.fonteDestino : saida.fonteMotivo}
-          verificado={saida.verificado}
-        />
+        {/* As fontes que atestam a saída. O destino tem procedência própria e
+            ganha o selo dele em seguida — são duas afirmações diferentes. */}
+        <SelosDaLinha fontes={saida.fontesSaida} />
+        {saida.destino && saida.fonteDestino ? (
+          <span className="inline-flex items-baseline gap-1 text-xs text-gray-500">
+            destino:
+            <SelosDaLinha fontes={[saida.fonteDestino]} compacto />
+          </span>
+        ) : null}
 
         {saida.atoUrl ? (
           <a

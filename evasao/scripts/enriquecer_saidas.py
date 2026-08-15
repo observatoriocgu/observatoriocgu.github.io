@@ -220,6 +220,7 @@ def analisar(pessoa: dict, indice: dict, usar_cache: bool, verboso: bool = False
         linha = atos.registrar(
             indice, ato, tipo, texto, atos.FONTE_NOME,
             id_servidor=pessoa["ID_SERVIDOR_PORTAL"],
+            nome=nome,
         )
         if linha is None:
             registro["MOTIVO_SAIDA"] = dou.ROTULO_NAO_PUBLICADO
