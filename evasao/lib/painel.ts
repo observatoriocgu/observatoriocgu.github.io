@@ -19,6 +19,7 @@ import {
   MOTIVO_SEM_ATO,
   MOTIVO_VACANCIA,
   SITUACAO_EM_EXERCICIO,
+  SITUACAO_MUDOU_ORGAO,
 } from '../constants';
 import {
   DetalheSaida,
@@ -377,31 +378,92 @@ export const agregarPorMotivoResumido = (registros: RegistroAuditor[], mesMinimo
   return contarPor(noPeriodo, balde, [...MOTIVOS_DESTACADOS, MOTIVO_OUTROS]);
 };
 
-/**
- * Saídas agrupadas por órgão de destino.
- *
- * Quem não tem destino registrado cai em "Destino não identificado" — que não é
- * o mesmo que "não foi a lugar nenhum": aposentadoria e falecimento não têm
- * destino por definição, e ficam separados. Nada aqui inventa órgão (D14).
- */
 export const DESTINO_DESCONHECIDO = 'Destino não identificado';
 export const DESTINO_INATIVIDADE = 'Aposentadoria ou falecimento';
+export const SAIDA_POSSE = 'Posse em outro cargo';
 
-export const agregarPorDestino = (registros: RegistroAuditor[]) => {
-  const chave = (registro: RegistroAuditor): string => {
-    if (registro.ORGAO_DESTINO) return registro.ORGAO_DESTINO;
-    const motivo = motivoDe(registro);
-    if (motivo === 'Aposentadoria' || motivo === 'Falecimento') return DESTINO_INATIVIDADE;
-    return DESTINO_DESCONHECIDO;
-  };
+/**
+ * Rótulo de exibição de `SITUACAO_MUDOU_ORGAO` nesta tabela.
+ *
+ * O valor gravado em `MOTIVO_SAIDA` é a constante em caixa alta, e é ela que a
+ * legenda do gráfico e a caixinha de tipo de saída mostram. Aqui, ao lado de
+ * "Posse em outro cargo" e "Aposentadoria ou falecimento", a caixa alta soaria
+ * como grito — o rótulo muda, o valor por trás não.
+ */
+export const SAIDA_MUDOU_ORGAO = 'Mudou de órgão na carreira';
 
-  const grupos = contarPor(saidas(registros), chave);
-  const ordem = (rotulo: string) => {
-    if (rotulo === DESTINO_DESCONHECIDO) return 3;
-    if (rotulo === DESTINO_INATIVIDADE) return 2;
-    return 1;
-  };
-  return [...grupos].sort((a, b) => ordem(a.rotulo) - ordem(b.rotulo) || b.total - a.total);
+/**
+ * Como cada motivo do `dados.csv` cai nos baldes do primeiro nível.
+ *
+ * Aposentadoria e falecimento andam juntos porque a pergunta da tabela é "para
+ * onde foi", e nesses dois casos não há para onde: não é destino desconhecido,
+ * é destino inexistente. O resto é um balde por motivo.
+ *
+ * `Desligamento` é o rótulo neutro da D18 — o observatório mede evasão, e o
+ * motivo detalhado da penalidade disciplinar não é publicado. Ele aparece aqui
+ * porque a pessoa existe e o total da tabela tem de fechar; o que não aparece,
+ * nem aqui nem em lugar nenhum, é por que ela saiu.
+ */
+const BALDE_POR_MOTIVO: Readonly<Record<string, string>> = {
+  [MOTIVO_VACANCIA]: SAIDA_POSSE,
+  [MOTIVO_EXONERACAO]: MOTIVO_EXONERACAO,
+  [MOTIVO_APOSENTADORIA]: DESTINO_INATIVIDADE,
+  Falecimento: DESTINO_INATIVIDADE,
+  [SITUACAO_MUDOU_ORGAO]: SAIDA_MUDOU_ORGAO,
+};
+
+/** A ordem do primeiro nível. Posse vem primeiro: é o grosso da evasão. */
+const ORDEM_DOS_BALDES: readonly string[] = [
+  SAIDA_POSSE,
+  MOTIVO_EXONERACAO,
+  DESTINO_INATIVIDADE,
+  SAIDA_MUDOU_ORGAO,
+  MOTIVO_SEM_ATO,
+];
+
+/** Um órgão de chegada, dentro de um tipo de saída. */
+export interface DestinoAgregado {
+  rotulo: string;
+  total: number;
+  itens: RegistroAuditor[];
+}
+
+/** Um tipo de saída, com a quebra por órgão quando ela existe. */
+export interface SaidaAgregada extends DestinoAgregado {
+  /** Vazio quando nenhuma saída do balde tem órgão registrado. */
+  destinos: DestinoAgregado[];
+}
+
+/**
+ * Saídas em dois níveis: o tipo da saída e, dentro dele, o órgão de chegada.
+ *
+ * O nível de cima é o TIPO, e não o órgão, porque "Tribunal de Contas da União"
+ * e "Aposentadoria ou falecimento" nunca foram a mesma espécie de coisa — uma
+ * lista só misturava destino com ausência de destino e com lacuna de apuração.
+ *
+ * O nível de baixo só se abre em quem tem para onde ir: um balde sem nenhum
+ * órgão registrado vai direto para a lista de pessoas, em vez de fabricar um
+ * subnível de um item só. Quem tem destino em branco cai em "Destino não
+ * identificado", que é lacuna da busca, não afirmação sobre a pessoa (D14).
+ */
+export const agregarPorTipoDeSaida = (registros: RegistroAuditor[]): SaidaAgregada[] => {
+  const balde = (registro: RegistroAuditor): string => BALDE_POR_MOTIVO[motivoDe(registro)] ?? motivoDe(registro);
+
+  return contarPor(saidas(registros), balde, ORDEM_DOS_BALDES).map((grupo) => {
+    if (!grupo.itens.some((registro) => registro.ORGAO_DESTINO)) return { ...grupo, destinos: [] };
+
+    const destinos = contarPor(grupo.itens, (registro) => registro.ORGAO_DESTINO || DESTINO_DESCONHECIDO);
+    return {
+      ...grupo,
+      // A lacuna vai para o fim: o que se apurou vem antes do que falta apurar.
+      destinos: destinos.sort(
+        (a, b) =>
+          Number(a.rotulo === DESTINO_DESCONHECIDO) - Number(b.rotulo === DESTINO_DESCONHECIDO) ||
+          b.total - a.total ||
+          a.rotulo.localeCompare(b.rotulo, 'pt-BR')
+      ),
+    };
+  });
 };
 
 /** Um ponto da curva de permanência, numa competência do calendário. */

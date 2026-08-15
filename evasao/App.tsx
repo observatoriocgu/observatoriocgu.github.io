@@ -33,8 +33,8 @@ import {
   listarCompetencias,
 } from './lib/dados';
 import {
-  agregarPorDestino,
   agregarPorMotivoResumido,
+  agregarPorTipoDeSaida,
   comoRegistros,
   comoSerie,
   curvaDePermanencia,
@@ -42,6 +42,7 @@ import {
   evasaoDoConcurso,
   filtrarSaidas,
   mesclarSaidasDoDou,
+  porSaidaMaisRecente,
   saidas,
   serieDeSaidasPorMotivo,
 } from './lib/painel';
@@ -269,17 +270,19 @@ const App: React.FC = () => {
   // são a resposta a "para onde foram os Auditores", no plural e no geral;
   // quem quiser recortar por concurso tem o histórico de alterações.
 
-  const gruposDeDestino = useMemo(
-    () =>
-      agregarPorDestino(todasAsSaidas).map((grupo) => ({
-        rotulo: grupo.rotulo,
-        total: grupo.total,
-        itens: grupo.itens
-          .map(detalharSaida)
-          .sort((a, b) => b.mesSaida.localeCompare(a.mesSaida) || a.nome.localeCompare(b.nome, 'pt-BR')),
+  const gruposDeDestino = useMemo(() => {
+    const detalhar = (itens: RegistroAuditor[]) => itens.map(detalharSaida).sort(porSaidaMaisRecente);
+    return agregarPorTipoDeSaida(todasAsSaidas).map((grupo) => ({
+      rotulo: grupo.rotulo,
+      total: grupo.total,
+      itens: detalhar(grupo.itens),
+      destinos: grupo.destinos.map((destino) => ({
+        rotulo: destino.rotulo,
+        total: destino.total,
+        itens: detalhar(destino.itens),
       })),
-    [todasAsSaidas]
-  );
+    }));
+  }, [todasAsSaidas]);
 
   const ultimasSaidas = useMemo(
     () =>
@@ -495,7 +498,7 @@ const App: React.FC = () => {
               pelas entradas até aquele mês — as duas pontas contadas por pessoa. O denominador cresce ao longo do
               eixo, conforme novas turmas tomam posse.{' '}
               <span className="text-gray-300">Esta curva não acompanha os filtros acima</span>: é sempre o concurso de
-              2021 inteira. Recortá-la por tipo de saída transformaria quem saiu em alguém que ficou, e ela mentiria
+              2021 inteiro. Recortá-la por tipo de saída transformaria quem saiu em alguém que ficou, e ela mentiria
               para cima.
             </p>
             {!graficoPermanencia.vazio ? (
@@ -595,9 +598,10 @@ const App: React.FC = () => {
           <section className="rounded-xl border border-gray-800 bg-gray-900 p-6 shadow-2xl">
             <h2 className="mb-4 text-2xl font-bold text-red-300">Destinos da evasão</h2>
             <p className="mb-6 text-gray-400">
-              Para onde foram os Auditores que deixaram a CGU. O destino só aparece quando há ato do DOU ou registro do
-              SIAPE que o diga, e cada linha traz de onde veio a informação. Quem saiu há pouco costuma aparecer sem
-              destino: a busca do órgão de chegada parte de quem o SIAPE já mostrou saindo, então ela vem depois. São{' '}
+              Para onde foram os Auditores que deixaram a CGU, primeiro pelo tipo da saída e, dentro de quem tomou posse
+              em outro cargo, pelo órgão de chegada. O destino só aparece quando há ato do DOU ou registro do SIAPE que
+              o diga, e cada linha traz de onde veio a informação. Quem saiu há pouco costuma aparecer sem destino: a
+              busca do órgão de chegada parte de quem o SIAPE já mostrou saindo, então ela vem depois. São{' '}
               <span className="font-bold text-orange-400">{numero(todasAsSaidas.length)}</span> saída
               {todasAsSaidas.length === 1 ? '' : 's'} em toda a série, concurso de 2021 e veteranos juntos.{' '}
               <span className="text-gray-300">Esta tabela não acompanha os filtros acima</span> — para recortar por
