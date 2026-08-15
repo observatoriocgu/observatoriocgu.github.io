@@ -117,7 +117,16 @@ o critério para escolher. Nenhum desempate testado (melhor colocação, marca
 
 Há ainda `DECISAO = SEM_ANCORA_CGU`: sobrou um candidato só, mas a ficha do site
 não traz o concurso da própria CGU — ou seja, nada prova que aquela ficha é desta
-pessoa. Vai para a mesma pauta.
+pessoa. Vai para a mesma pauta. **Isso não se aplica a veterano**: ele entrou
+antes do único concurso da CGU que o site conhece e nunca terá aquela linha, então
+para ele a exigência é dispensada (era um defeito: veteranos ficavam fora sempre).
+
+A coluna `MARCADOS_NOMEADO` traz os candidatos com a **tag azul "Nomeado"** do
+site. Ela é **informativa, e não decide nada**: a tag não tem data, então marca
+quem foi nomeado naquele concurso em qualquer momento da vida — inclusive antes
+de entrar na CGU. Como desempate ela acerta **6 de 18**, e dois Auditores com a
+mesma tag `ISS Aracaju` foram, na verdade, para o TCU e para o Senado. Serve para
+quem for curar bater o olho, não para publicar.
 
 Para resolver um ambíguo: confira a fonte (a coluna `URL_DESTINO` da linha, ou o
 link no arquivo) e acrescente ao `curadoria.csv` uma linha com o

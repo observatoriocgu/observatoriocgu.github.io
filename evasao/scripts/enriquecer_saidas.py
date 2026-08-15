@@ -52,6 +52,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import json
 import sys
 from datetime import datetime
 from pathlib import Path
@@ -62,6 +63,7 @@ import dou
 RAIZ = Path(__file__).resolve().parent.parent
 ARQ_DADOS = RAIZ / "data" / "dados.csv"
 ARQ_SAIDAS = RAIZ / "data" / "saidas_dou.csv"
+ARQ_CARD = RAIZ / "public" / "atos_dou.json"
 
 COLUNAS = (
     "ID_SERVIDOR_PORTAL", "NOME", "SITUACAO",
@@ -95,6 +97,71 @@ MESES_DEPOIS_DA_SAIDA = 6
 # Quantos atos do DOU baixar por pessoa. A busca devolve no máximo 50; abrir
 # todos custaria caro e os mais relevantes vêm primeiro.
 MAX_ATOS_POR_PESSOA = 14
+
+
+# Marca as pessoas que entraram na fila pelo DOU, e não pelo SIAPE. Para elas
+# só o DESTINO é gravado — ver `somente_destino`.
+CHAVE_SO_DO_DOU = "_SO_DO_DOU"
+
+
+def saidas_so_do_dou(pessoas: list[dict]) -> list[dict]:
+    """
+    Quem o DOU já mostrou sair e o SIAPE ainda não (D22), para buscar o DESTINO.
+
+    ESTA FILA FALTAVA, e a falta era invisível. A fila principal é
+    `[p for p in pessoas if p.get("MES_SAIDA")]`, e `MES_SAIDA` vem do SIAPE —
+    logo, quem saiu depois da última competência do Portal NUNCA teve o destino
+    procurado no DOU. Não é que a busca falhava: ela não era feita.
+
+    O caso que revelou isso: três Auditores com vacância publicada em 08/2026 e
+    a PORTARIA-TCU nº 117, de 04/08/2026, nomeando os três para o TCU — ato
+    público, a uma busca de distância, que o observatório não tinha ido buscar.
+
+    O mês de referência da janela [-6, +6] é o da PUBLICAÇÃO do ato de saída, que
+    é o que `mesclarSaidasDoDou` usa como competência no navegador.
+    """
+    if not ARQ_CARD.is_file():
+        return []
+    try:
+        card = json.loads(ARQ_CARD.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return []
+
+    por_id = {p["ID_SERVIDOR_PORTAL"]: p for p in pessoas}
+    fila: dict[str, dict] = {}
+    for saida in card.get("saidasRecentes", []):
+        identificador = saida.get("idServidor")
+        publicacao = saida.get("dataPublicacao") or ""
+        if not identificador or len(publicacao) < 7:
+            continue
+        pessoa = por_id.get(identificador)
+        # Quem já tem MES_SAIDA entrou pela fila principal, com a competência do
+        # cadastro — que é a boa. Aqui só entra quem o SIAPE ainda não mostrou.
+        if not pessoa or pessoa.get("MES_SAIDA"):
+            continue
+        fila[identificador] = {
+            **pessoa,
+            "MES_SAIDA": publicacao[:4] + publicacao[5:7],
+            CHAVE_SO_DO_DOU: True,
+        }
+    return list(fila.values())
+
+
+def somente_destino(registro: dict) -> dict:
+    """
+    Apaga do registro tudo o que não for destino.
+
+    Necessário para quem entrou pela fila do DOU: essa pessoa NÃO tem `MES_SAIDA`
+    no `dados.csv`, e gravar ali motivo, situação e ato produziria uma linha que
+    afirma que alguém saiu sem dizer quando — o `SITUACAO = VACÂNCIA` de quem a
+    interface ainda conta como em exercício. Quem põe motivo e situação nessa
+    pessoa é `mesclarSaidasDoDou`, no navegador, a partir do mesmo ato. Aqui só
+    entra o que lá não existe: o órgão de chegada.
+    """
+    preservar = ("ID_SERVIDOR_PORTAL", "NOME",
+                 "ORGAO_DESTINO", "CARGO_DESTINO", "DATA_DESTINO",
+                 "FONTE_DESTINO", "URL_DESTINO")
+    return {campo: (valor if campo in preservar else "") for campo, valor in registro.items()}
 
 
 def ler_csv(caminho: Path) -> list[dict]:
@@ -266,7 +333,7 @@ def main() -> int:
     indice = atos.ler()
     atos.importar_de_saidas_dou(indice)
 
-    fila = [p for p in pessoas if p.get("MES_SAIDA")]
+    fila = [p for p in pessoas if p.get("MES_SAIDA")] + saidas_so_do_dou(pessoas)
     if args.nome:
         alvo = dou.normalizar(args.nome)
         fila = [p for p in fila if alvo in dou.normalizar(p["NOME"])]
@@ -299,6 +366,8 @@ def main() -> int:
     for numero, pessoa in enumerate(fila, start=1):
         print(f"[{numero}/{len(fila)}] {pessoa['NOME'][:44]:<44} saiu em {pessoa['MES_SAIDA']}")
         registro = analisar(pessoa, indice, usar_cache, verboso=bool(args.nome))
+        if pessoa.get(CHAVE_SO_DO_DOU):
+            registro = somente_destino(registro)
         resultados[registro["ID_SERVIDOR_PORTAL"]] = registro
 
         if registro["MOTIVO_SAIDA"]:

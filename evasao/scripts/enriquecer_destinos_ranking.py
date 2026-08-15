@@ -68,7 +68,7 @@ ARQ_CARD = RAIZ / "public" / "atos_dou.json"
 COLUNAS = (
     "ID_SERVIDOR_PORTAL", "NOME", "MES_SAIDA", "DECISAO",
     "ORGAO_DESTINO", "FONTE_DESTINO", "URL_DESTINO",
-    "CANDIDATOS", "ROTULOS_SEM_CATALOGO", "CONSULTADO_EM",
+    "CANDIDATOS", "MARCADOS_NOMEADO", "ROTULOS_SEM_CATALOGO", "CONSULTADO_EM",
 )
 
 # Só se procura destino de quem o ato diz ter tomado posse em outro cargo.
@@ -148,6 +148,9 @@ def alvos(pessoas: list[dict], recentes: list[dict]) -> list[dict]:
             "ID_SERVIDOR_PORTAL": pessoa["ID_SERVIDOR_PORTAL"],
             "NOME": pessoa["NOME"],
             "MES_SAIDA": pessoa["MES_SAIDA"],
+            # O concurso de ENTRADA decide se a âncora é exigível: veterano
+            # nunca vai ter a linha da CGU no site. Ver `ranking.exige_ancora`.
+            "CONCURSO": pessoa.get("CONCURSO", ""),
         }
 
     for saida in recentes:
@@ -169,6 +172,7 @@ def alvos(pessoas: list[dict], recentes: list[dict]) -> list[dict]:
             "ID_SERVIDOR_PORTAL": identificador,
             "NOME": pessoa["NOME"],
             "MES_SAIDA": publicacao[:4] + publicacao[5:7],
+            "CONCURSO": pessoa.get("CONCURSO", ""),
         }
 
     return sorted(fila.values(), key=lambda a: (a["MES_SAIDA"], a["NOME"]))
@@ -200,10 +204,12 @@ def consultar(alvo: dict, usar_cache: bool, verboso: bool = False) -> dict:
             "MES_SAIDA": alvo["MES_SAIDA"],
             "DECISAO": "FALHA_NA_CONSULTA",
             "ORGAO_DESTINO": "", "FONTE_DESTINO": "", "URL_DESTINO": "",
-            "CANDIDATOS": "", "ROTULOS_SEM_CATALOGO": "", "CONSULTADO_EM": "",
+            "CANDIDATOS": "", "MARCADOS_NOMEADO": "",
+            "ROTULOS_SEM_CATALOGO": "", "CONSULTADO_EM": "",
         }
 
-    achado = ranking.destino_da_pessoa(alvo["NOME"], alvo["MES_SAIDA"], linhas)
+    achado = ranking.destino_da_pessoa(
+        alvo["NOME"], alvo["MES_SAIDA"], linhas, alvo.get("CONCURSO", ""))
 
     if verboso:
         minhas = ranking.linhas_da_pessoa(alvo["NOME"], linhas)
@@ -222,6 +228,9 @@ def consultar(alvo: dict, usar_cache: bool, verboso: bool = False) -> dict:
         "FONTE_DESTINO": FONTE if achado["orgao"] else "",
         "URL_DESTINO": achado["url"] if achado["orgao"] else "",
         "CANDIDATOS": " | ".join(achado["candidatos"]),
+        # Só informativo, para a pauta de curadoria. A tag azul "Nomeado" do
+        # site acerta 6 de 18 como desempate — ver `ranking.py`.
+        "MARCADOS_NOMEADO": " | ".join(achado["marcados_nomeado"]),
         "ROTULOS_SEM_CATALOGO": " | ".join(achado["rotulos_sem_catalogo"]),
         "CONSULTADO_EM": date.today().isoformat(),
     }
@@ -252,7 +261,8 @@ def conferir(pessoas: list[dict], limite: int | None, usar_cache: bool) -> int:
         if linhas is None:
             contagem["FALHA_NA_CONSULTA"] = contagem.get("FALHA_NA_CONSULTA", 0) + 1
             continue
-        achado = ranking.destino_da_pessoa(pessoa["NOME"], pessoa["MES_SAIDA"], linhas)
+        achado = ranking.destino_da_pessoa(
+            pessoa["NOME"], pessoa["MES_SAIDA"], linhas, pessoa.get("CONCURSO", ""))
         contagem[achado["decisao"]] = contagem.get(achado["decisao"], 0) + 1
         if achado["decisao"] == "UNICO":
             if achado["orgao"] == pessoa["ORGAO_DESTINO"]:
@@ -303,7 +313,7 @@ def main() -> int:
         print(f"{alvo['NOME']}  (saída {alvo['MES_SAIDA'] or '—'})")
         linha = consultar(
             {"ID_SERVIDOR_PORTAL": alvo["ID_SERVIDOR_PORTAL"], "NOME": alvo["NOME"],
-             "MES_SAIDA": alvo["MES_SAIDA"]},
+             "MES_SAIDA": alvo["MES_SAIDA"], "CONCURSO": alvo.get("CONCURSO", "")},
             usar_cache, verboso=True,
         )
         print(f"  decisão: {linha['DECISAO']}  destino: {linha['ORGAO_DESTINO'] or '—'}")

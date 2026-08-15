@@ -437,8 +437,45 @@ def canonico(rotulo: str) -> str | None:
 # de 2022 como destino de quem saiu em 05/2026.
 ANOS_DE_FOLGA_ANTES = 3
 
+# O pseudo-concurso de quem já estava na CGU antes do primeiro concurso
+# monitorado (D9). Espelha `painel.ID_CONCURSO_VETERANO`.
+ID_CONCURSO_VETERANO = "VETERANO"
 
-def destino_da_pessoa(nome: str, mes_saida: str, linhas: list[dict]) -> dict:
+
+def exige_ancora(concurso: str) -> bool:
+    """
+    A âncora (ver `destino_da_pessoa`) só é exigível de quem PODERIA tê-la.
+
+    O ranking lista concursos, e o único concurso da CGU que ele conhece é o de
+    2022. Quem entrou antes dele — `VETERANO` — nunca prestou concurso que o
+    site cubra, então a ficha de um veterano JAMAIS terá a linha da CGU. Exigir
+    a âncora dele não filtra ficha incompleta: exclui a categoria inteira, para
+    sempre, por uma condição que ele não tem como satisfazer.
+
+    Isso não é teoria — foi o defeito que a primeira versão desta regra teve. Um
+    veterano com vacância em 08/2026 e uma única aprovação no site (TCU, 8º)
+    ficava fora do painel, e o motivo era só este.
+
+    Medido no gabarito, e é o que sustenta a distinção:
+
+        CGU-2021 COM âncora     45 publicados, 43 certos   95,6%
+        CGU-2021 SEM âncora      2 publicados,  0 certos    0,0%   <- filtra bem
+        VETERANO  (sem âncora)   2 publicados,  2 certos  100,0%   <- e os 5 do
+                                                                     gabarito são
+                                                                     todos assim
+    A ausência da âncora é informativa para quem é do concurso — ali ela indica
+    ficha incompleta, e os 2 erros que ela corta são exatamente disso. Para o
+    veterano ela não informa nada, porque é o estado esperado.
+    """
+    return (concurso or "").strip().upper() != ID_CONCURSO_VETERANO
+
+
+def destino_da_pessoa(
+    nome: str,
+    mes_saida: str,
+    linhas: list[dict],
+    concurso: str = "",
+) -> dict:
     """
     O destino que o ranking sustenta para uma saída — ou a razão de não haver um.
 
@@ -451,22 +488,28 @@ def destino_da_pessoa(nome: str, mes_saida: str, linhas: list[dict]) -> dict:
       UNICO           sobrou um órgão só  -> este é o destino, e vai à tela
       AMBIGUO         sobrou mais de um, ou há concurso unificado no meio
       SEM_CATALOGO    todo candidato tem rótulo que o catálogo não conhece
-      SEM_ANCORA_CGU  há candidato, mas a ficha não tem o concurso da CGU
+      SEM_ANCORA_CGU  há candidato, mas a ficha não tem o concurso da CGU —
+                      e esta pessoa é de um concurso que o site cobre, então a
+                      falta significa alguma coisa (ver `exige_ancora`)
 
     Só `UNICO` publica. A régua vem da medição contra os 118 destinos que o DOU
     já conhece, refeita com os dados limpos:
 
-      candidato único, sem âncora   49 publicados, 45 certos  (91,8%)
-      candidato único, COM âncora   45 publicados, 43 certos  (95,6%)
+      sem âncora nenhuma                    49 publicados, 45 certos  (91,8%)
+      âncora exigida de todos               45 publicados, 43 certos  (95,6%)
+      âncora só de quem pode tê-la (atual)  47 publicados, 45 certos  (95,7%)
 
-    A ÂNCORA é a linha do concurso da própria CGU na ficha. Ela custa 2 acertos
-    e corta 2 erros, e o motivo de valer a troca não é o placar: sem ela, o que
-    se tem é um nome batendo com um nome num site que nem sabe que essa pessoa
-    foi da CGU. Com ela, o site registra um Auditor da CGU com aquele nome
-    exato — é a prova de que a ficha é desta pessoa, e também um sinal de que a
-    lista de concursos dela ali está mais completa. Os dois erros que a âncora
-    remove são exatamente disto: fichas que não conheciam o concurso para o qual
-    a pessoa de fato foi.
+    A ÂNCORA é a linha do concurso da própria CGU na ficha. Sem ela, o que se tem
+    é um nome batendo com um nome num site que nem sabe que essa pessoa foi da
+    CGU; com ela, o site registra um Auditor da CGU com aquele nome exato — é a
+    prova de que a ficha é desta pessoa, e sinal de que a lista de concursos dela
+    ali está mais completa. Os dois erros que ela remove são exatamente disto:
+    fichas que não conheciam o concurso para o qual a pessoa de fato foi.
+
+    Mas ela SÓ É EXIGIDA DE QUEM PODERIA TÊ-LA (`exige_ancora`, e é lá que está
+    a medição): veterano entrou antes do concurso que o site cobre e nunca vai
+    ter aquela linha. A regra final publica 47 e acerta 45 — mais que os 45 e 43
+    da âncora indiscriminada, e muito mais que os 49 e 45 sem âncora nenhuma.
 
     E NÃO EXISTE DESEMPATE entre candidatos múltiplos. Todos foram medidos e
     todos reprovaram (27-39%), enquanto nos 62 casos ambíguos o destino certo
@@ -478,6 +521,10 @@ def destino_da_pessoa(nome: str, mes_saida: str, linhas: list[dict]) -> dict:
         "decisao": "SEM_FICHA",
         "orgao": "",
         "candidatos": [],
+        # Os candidatos que carregam a tag azul "Nomeado". NÃO decidem nada (ver
+        # a medição no topo do módulo): vão para a pauta, para que quem for
+        # curar veja de imediato o que o site marcou.
+        "marcados_nomeado": [],
         "rotulos_sem_catalogo": [],
         "url": url_da_consulta(nome),
     }
@@ -486,6 +533,9 @@ def destino_da_pessoa(nome: str, mes_saida: str, linhas: list[dict]) -> dict:
     if not minhas:
         return resposta
 
+    # `concurso` vazio cai no caminho ESTRITO de propósito: quem chama sem
+    # dizer de quem se trata recebe a regra mais conservadora, não a mais frouxa.
+    ancora_necessaria = exige_ancora(concurso)
     tem_ancora = any(canonico(linha["concurso"]) == ORGAO_CGU for linha in minhas)
 
     ano_saida = int(mes_saida[:4]) if len(mes_saida) >= 4 and mes_saida[:4].isdigit() else None
@@ -512,6 +562,10 @@ def destino_da_pessoa(nome: str, mes_saida: str, linhas: list[dict]) -> dict:
             candidatos.setdefault(orgao, []).append(linha)
 
     resposta["candidatos"] = sorted(candidatos)
+    resposta["marcados_nomeado"] = sorted(
+        orgao for orgao, linhas_do_orgao in candidatos.items()
+        if any(linha["nomeado"] for linha in linhas_do_orgao)
+    )
     resposta["rotulos_sem_catalogo"] = sorted(set(sem_catalogo))
 
     if not candidatos and not tem_unificado:
@@ -521,15 +575,17 @@ def destino_da_pessoa(nome: str, mes_saida: str, linhas: list[dict]) -> dict:
     # Um rótulo fora do catálogo pode ser o destino verdadeiro; um concurso
     # unificado pode esconder o órgão de chegada. Nos dois casos há candidato
     # que não sabemos nomear, então não há candidato único — só parece haver.
-    if len(candidatos) == 1 and not tem_unificado and not sem_catalogo and tem_ancora:
+    if (len(candidatos) == 1 and not tem_unificado and not sem_catalogo
+            and (tem_ancora or not ancora_necessaria)):
         resposta["decisao"] = "UNICO"
         resposta["orgao"] = resposta["candidatos"][0]
         return resposta
 
-    # Sem a ÂNCORA, o que sobrou não é candidato único — é candidato único numa
-    # ficha que talvez nem seja a desta pessoa. Marcar como ambíguo (e não como
+    # Sem a ÂNCORA — e só para quem poderia tê-la —, o que sobrou não é candidato
+    # único: é candidato único numa ficha que talvez nem seja a desta pessoa, e
+    # que comprovadamente costuma estar incompleta. Marcar assim (e não como
     # "sem candidato") é o que manda o caso para a pauta com a lista intacta.
-    if not tem_ancora and candidatos:
+    if ancora_necessaria and not tem_ancora and candidatos:
         resposta["decisao"] = "SEM_ANCORA_CGU"
         return resposta
 

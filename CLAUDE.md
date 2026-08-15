@@ -119,8 +119,14 @@ Edital CGU nº 5 de 13/06/2022, publicado no DOU (D17).
   (URL_TITLE do in.gov.br), e `data/saidas_dou/` é a pasta única das cópias.
   NÃO recriar uma segunda pasta nem um segundo JSON para o card: era assim
   antes, e o card e a lista de saídas divergiam sem que nenhum estivesse errado
-- Por NOME (`enriquecer_saidas.py`): parte do dados.csv, logo do SIAPE, logo
-  NUNCA alcança o que o DOU publicou depois da última competência do Portal
+- Por NOME (`enriquecer_saidas.py`): parte do dados.csv, logo do SIAPE. Desde
+  16/08/2026 a fila inclui TAMBÉM as saídas que só o DOU conhece (lidas do
+  `public/atos_dou.json`), e para ELAS grava só o DESTINO — motivo e situação
+  quem põe é `mesclarSaidasDoDou`, no navegador, senão o dados.csv afirmaria
+  que alguém saiu sem dizer quando. Antes disso essas pessoas NUNCA tinham o
+  destino procurado no DOU: a busca não falhava, ela não era feita. Foi assim
+  que a PORTARIA-TCU nº 117 de 04/08/2026, que nomeia três Auditores da CGU
+  para o TCU, ficou fora do observatório estando a uma busca de distância
   (~2 meses de atraso). É quem preenche o ID_SERVIDOR_PORTAL da linha
 - Por FRASE (`varrer_dou.py`): lê o DOU do dia e não sabe de quem é o ato.
   É incremental — `data/varredura_dou.txt` guarda até onde já cobriu, e a
@@ -181,9 +187,22 @@ Edital CGU nº 5 de 13/06/2022, publicado no DOU (D17).
 - A ÂNCORA: só se publica se a ficha do site tiver também a linha do concurso da
   própria CGU. É a prova de que aquela ficha é desta pessoa, e não de um
   homônimo perfeito, e sinal de que a lista de concursos dela ali está completa.
-  Custa 2 acertos e corta 2 erros — 45 publicados e 43 certos (95,6%), contra 49
-  e 45 (91,8%) sem ela. Os 2 erros que ela remove são fichas que não conheciam o
-  concurso para o qual a pessoa de fato foi
+  Os 2 erros que ela remove são fichas que não conheciam o concurso para o qual
+  a pessoa de fato foi
+- MAS A ÂNCORA SÓ VALE PARA QUEM PODE TÊ-LA (`ranking.exige_ancora`). O site só
+  conhece o concurso da CGU de 2022; quem é VETERANO entrou antes e JAMAIS terá
+  aquela linha. Exigi-la dele não filtra ficha incompleta — exclui a categoria
+  inteira, para sempre. Foi um defeito real: veterano com vacância em 08/2026 e
+  uma aprovação única no TCU ficava fora do painel só por isso. Medido:
+  CGU-2021 com âncora 43 de 45 (95,6%); CGU-2021 SEM âncora 0 de 2; VETERANO
+  (sempre sem âncora) 2 de 2. A regra final publica 47 e acerta 45 (95,7%)
+- A TAG AZUL "Nomeado" NÃO DESEMPATA, e a tentação de usá-la é forte porque
+  parece a resposta. Ela NÃO TEM DATA: marca quem foi nomeado naquele concurso
+  em algum momento da vida, inclusive ANTES de entrar na CGU. Medido: 6 de 18
+  (33,3%). Os 12 erros são quase todos tag em SEFAZ/ISS/TCE estadual de alguém
+  que foi para Câmara, Senado ou TCU. Dois casos com a MESMA tag `ISS Aracaju`
+  foram, na verdade, para TCU e para o Senado. A tag é gravada na coluna
+  MARCADOS_NOMEADO só para a pauta de curadoria
 - O quadradinho azul do site é "Nomeado" e o verde é "Dentro das Vagas". O azul
   parece a resposta e não é: quem passa em vários é nomeado em vários. São
   lidos e guardados para a curadoria, e não entram na decisão

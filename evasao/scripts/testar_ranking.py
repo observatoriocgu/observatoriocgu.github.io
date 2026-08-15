@@ -211,6 +211,55 @@ DECISAO = [
     ),
 ]
 
+# A âncora exigida de quem NÃO pode tê-la excluía uma categoria inteira. O
+# ranking só conhece o concurso da CGU de 2022; quem entrou antes (VETERANO)
+# jamais terá aquela linha na ficha. Caso real: veterano com vacância em
+# 08/2026 e uma única aprovação no site (TCU), que ficava fora do painel só
+# por isso. Medido: veterano sem âncora acerta 2 de 2; concursado sem âncora,
+# 0 de 2 — a falta só é informativa para quem poderia tê-la.
+DECISAO_VETERANO = [
+    (
+        "veterano sem a linha da CGU publica, porque nunca poderia tê-la",
+        ALVO, "202608", [_linha(ALVO, "TCU")], "VETERANO",
+        ("UNICO", "Tribunal de Contas da União"),
+    ),
+    (
+        "o mesmo caso vindo do concurso NÃO publica",
+        ALVO, "202608", [_linha(ALVO, "TCU")], "CGU-2021",
+        ("SEM_ANCORA_CGU", ""),
+    ),
+    (
+        "concurso não informado cai no caminho estrito",
+        ALVO, "202608", [_linha(ALVO, "TCU")], "",
+        ("SEM_ANCORA_CGU", ""),
+    ),
+    (
+        "veterano ambíguo continua ambíguo — a âncora não era o que faltava",
+        ALVO, "202608",
+        [_linha(ALVO, "TCU"), _linha(ALVO, "Senado")], "VETERANO",
+        ("AMBIGUO", ""),
+    ),
+]
+
+# A tag azul é registrada para a pauta e NUNCA decide. Ver a medição em
+# ranking.py: 6 de 18 como desempate, porque a tag não tem data — ela marca
+# quem foi nomeado naquele concurso em algum momento da vida, inclusive ANTES
+# de entrar na CGU.
+TAG = [
+    (
+        "a tag entra na resposta, para a pauta",
+        ALVO, "202401",
+        [_linha(ALVO, "CGU"), _linha(ALVO, "TCU", nomeado=True), _linha(ALVO, "Senado")],
+        ["Tribunal de Contas da União"],
+    ),
+    (
+        "sem tag nenhuma, lista vazia",
+        ALVO, "202401",
+        [_linha(ALVO, "CGU"), _linha(ALVO, "TCU"), _linha(ALVO, "Senado")],
+        [],
+    ),
+]
+
 # A página de bloqueio do site vem com status 200 e sem tabela. Lida como
 # resultado, ela virava "esta pessoa não está no ranking" — e gravava SEM_FICHA
 # para quem tem ficha. O eco do nome no formulário é a prova de que a busca rodou.
@@ -294,6 +343,26 @@ def main() -> int:
             print(f"        esperado {(decisao, orgao)}, "
                   f"obtido {(obtido['decisao'], obtido['orgao'])}")
 
+    print("— a âncora só é exigida de quem pode tê-la (veterano) —")
+    for descricao, nome, mes, linhas, concurso, (decisao, orgao) in DECISAO_VETERANO:
+        obtido = ranking.destino_da_pessoa(nome, mes, linhas, concurso)
+        ok = obtido["decisao"] == decisao and obtido["orgao"] == orgao
+        falhas += not ok
+        print(f"  {'ok  ' if ok else 'FALHA'} {descricao}")
+        if not ok:
+            print(f"        esperado {(decisao, orgao)}, "
+                  f"obtido {(obtido['decisao'], obtido['orgao'])}")
+
+    print("— a tag 'Nomeado' é registrada, mas não decide —")
+    for descricao, nome, mes, linhas, esperado in TAG:
+        obtido = ranking.destino_da_pessoa(nome, mes, linhas)
+        ok = obtido["marcados_nomeado"] == esperado and obtido["orgao"] == ""
+        falhas += not ok
+        print(f"  {'ok  ' if ok else 'FALHA'} {descricao}")
+        if not ok:
+            print(f"        esperado {esperado}, obtido {obtido['marcados_nomeado']} "
+                  f"orgao={obtido['orgao']!r}")
+
     print("— a resposta do site é mesmo uma resposta? —")
     for descricao, pagina, nome, esperado in RESPOSTA_VALIDA:
         obtido = ranking.pagina_respondeu_a_busca(pagina, nome)
@@ -317,7 +386,8 @@ def main() -> int:
         print(f"  {'ok  ' if ok else 'FALHA'} {descricao}")
 
     total = (len(CANONICO) + len(SEM_CATALOGO) + len(UNIFICADOS) + len(ANOS)
-             + len(DECISAO) + len(RESPOSTA_VALIDA) + len(casos))
+             + len(DECISAO) + len(DECISAO_VETERANO) + len(TAG)
+             + len(RESPOSTA_VALIDA) + len(casos))
     print()
     print(f"{total - falhas} de {total} invariantes OK")
     return 1 if falhas else 0
