@@ -93,6 +93,51 @@ Edital CGU nº 5 de 13/06/2022, publicado no DOU (D17).
   senão .upper() transforma \s em \S e o padrão nunca casa (bug real da
   Fase 2.5)
 
+## De quem é o ato, e o que o ato não é (D25, 16/08/2026)
+- IDENTIDADE É NÍVEL, NÃO PORTÃO. `dou.identidade_no_ato` devolve SIAPE (a
+  matrícula bate), NOME (a fórmula do ato nomeia exatamente esta pessoa) ou
+  CITACAO (só o nome solto no texto). Quem chama exige o cargo em tudo que não
+  for SIAPE. NÃO voltar a usar `cita_nome` como porta de entrada: ela é
+  substring, e casa "LUIZ CARLOS DE ALMEIDA" dentro de "...ALMEIDA SOUZA"
+- A MATRÍCULA DIVERGENTE REBAIXA, NÃO VETA — em ato da CGU. O DOU erra os dois
+  lados: erra o nome (Portaria 325/2023 escreve "PAGLIONE" onde o SIAPE diz
+  "PAGLIONI", com a matrícula batendo) e erra a matrícula (Portarias 1.026/2024,
+  2.529/2024 e 2.017/2025 nomeiam a pessoa por extenso e trazem SIAPE de outra;
+  a 2.017 diz 2435442 onde a própria CGU lista 3347490). Isso só é seguro porque
+  NÃO há nome repetido na base — 2.009 pessoas, zero homônimos. FORA da CGU a
+  matrícula continua VETANDO: lá o homônimo é risco real
+- "DECLARAR VAGO" É A FORMA, NÃO A CAUSA. O motivo decide o tipo: posse em outro
+  cargo → vacância; desistência do estágio probatório → EXONERAÇÃO (art. 33, I).
+  Quando o ato só cita a lei, vale o inciso (VIII → vacância, I → exoneração) —
+  a Portaria 3.089/2022 saiu TRUNCADA no DOU e o inciso é tudo o que restou.
+  Motivo desconhecido NÃO classifica, e o laço segue testando os outros tipos
+- RETIFICAÇÃO NÃO É O ATO. Ela costuma ser a única que traz o nome (foi o nome
+  que ela veio consertar), mas não tem motivo, às vezes não tem cargo, e tem a
+  data do conserto. Lê-se nela a referência e busca-se o ORIGINAL
+  (`dou.frases_do_ato_retificado`), que tem motivo, data e URL próprios
+- CESSÃO É SAÍDA DO QUADRO, NÃO EVASÃO. A pessoa continua Auditora da CGU (o ônus
+  é do órgão cedente), mas muda de lotação e some do recorte 59000. Balde próprio
+  (`MOTIVO_CESSAO`), fora de `MOTIVOS_PADRAO`. O ato NÃO cita o cargo: só a busca
+  por nome o alcança, com identidade provada pela matrícula
+- TRÊS ATOS QUE NÃO SÃO SAÍDA, e os três já foram classificados como uma:
+  ato NORMATIVO (regra geral — ancorar no INÍCIO do texto, porque metade das
+  vacâncias reais cita "Portaria Normativa" como fundamento), AJUSTAMENTO DE
+  CONDUTA (instrumento disciplinar, com nome de gente, que nem deve ir ao índice)
+  e REVERSÃO DE APOSENTADORIA. Esta última é a mais grave: "reverter a
+  aposentadoria de X para que RETORNE ao quadro" publicava como saída cinco
+  Auditores que estavam VOLTANDO
+- O `title` da busca do DOU vem com `<span class='highlight'>` nos termos
+  procurados. Passar SEMPRE por `dou.titulo_do_ato` — só apareceu quando a busca
+  passou a ser pelo título do ato (é assim que se acha o original da retificação)
+- Busca por frase exata falha mais do que parece: `"DEBORA CRISTINA PASSOS DE SA"`
+  não achava o ato que `"DEBORA CRISTINA PASSOS"` acha. Encurtar o nome afrouxa a
+  BUSCA, não a IDENTIFICAÇÃO — quem decide continua sendo `identidade_no_ato`
+- Nome que o DOU escreve diferente e não há como provar de dentro do ato é PAUTA
+  HUMANA, não automação: coluna opcional `NOME_NO_DOU` do `curadoria.csv`
+  (`construir_painel.py` a ignora). É o caso de LUIZ AUGUSTO GENTILUCCI ALVES,
+  que o Edital CGU nº 5 e a Portaria 1.968/2022 chamam de LUIZ AUGUSTO DA SILVA
+  ALVES, sem matrícula em nenhum dos dois
+
 ## Pipeline de dados (evasao/scripts/)
 - atualizar.py         comando único: filtra -> constrói -> DOU -> reconstrói
 - dou.py               biblioteca: rede, busca, cache, classificação de atos

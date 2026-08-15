@@ -129,6 +129,7 @@ export const SITUACOES: readonly string[] = [
   'APOSENTADO',
   'FALECIDO',
   'DEMITIDO',
+  'CEDIDO',
   SITUACAO_MUDOU_ORGAO,
   SITUACAO_SEM_ATO,
 ];
@@ -154,6 +155,21 @@ export const MOTIVO_APOSENTADORIA = 'Aposentadoria';
 export const MOTIVO_FALECIMENTO = 'Falecimento';
 
 /**
+ * A saída que não é evasão.
+ *
+ * Quem é cedido continua Auditor da CGU — o ônus da remuneração é do órgão
+ * cedente, e o ato manda apresentar-se de volta ao término. O que muda é o órgão
+ * de lotação, e é só por isso que a pessoa some do recorte do Portal da
+ * Transparência (COD_ORG_LOTACAO = 59000) e o SIAPE a mostra "saindo".
+ *
+ * Ela aparece na tabela porque o quadro da CGU de fato diminuiu; ela tem balde
+ * próprio porque contá-la ao lado de quem tomou posse em outro cargo diria que
+ * a CGU perdeu um Auditor que ela não perdeu. Fica FORA de `MOTIVOS_PADRAO`,
+ * como aposentadoria e falecimento, pela mesma razão: não é evasão.
+ */
+export const MOTIVO_CESSAO = 'Cessão a outro órgão';
+
+/**
  * O motivo que o dado grava e a tela não nomeia (D18).
  *
  * `MOTIVO_DEMISSAO` é o valor real, escrito no `dados.csv` por `dou.py`.
@@ -176,6 +192,7 @@ export const MOTIVOS_SAIDA: readonly string[] = [
   MOTIVO_VACANCIA,
   MOTIVO_APOSENTADORIA,
   MOTIVO_FALECIMENTO,
+  MOTIVO_CESSAO,
   MOTIVO_OUTRO,
   SITUACAO_MUDOU_ORGAO,
   MOTIVO_SEM_ATO,
@@ -208,6 +225,7 @@ export const COR_POR_MOTIVO: Readonly<Record<string, string>> = {
   [MOTIVO_VACANCIA]: '#f97316',
   [MOTIVO_APOSENTADORIA]: '#d4af37',
   [MOTIVO_FALECIMENTO]: '#94a3b8',
+  [MOTIVO_CESSAO]: '#0d9488',
   [MOTIVO_OUTRO]: '#a21caf',
   [SITUACAO_MUDOU_ORGAO]: '#2563eb',
   [MOTIVO_SEM_ATO]: '#4b5563',

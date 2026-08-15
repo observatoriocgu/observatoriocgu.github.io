@@ -256,7 +256,7 @@
           "nome": "CLEONARDO DAS CHAGAS E SILVA",
           "tipo": "saida",
           "fromSituacao": "EM EXERCÍCIO",
-          "toSituacao": "SAÍDA SEM ATO IDENTIFICADO",
+          "toSituacao": "EXONERADO",
           "orgaoDestino": "",
           "unidade": "Sede/DF",
           "concurso": "CGU-2021"
@@ -554,7 +554,7 @@
           "nome": "DEBORA CRISTINA PASSOS DE SA",
           "tipo": "saida",
           "fromSituacao": "EM EXERCÍCIO",
-          "toSituacao": "SAÍDA SEM ATO IDENTIFICADO",
+          "toSituacao": "VACÂNCIA",
           "orgaoDestino": "",
           "unidade": "CGU-Regional/AM",
           "concurso": "CGU-2021"
@@ -674,7 +674,7 @@
           "nome": "THIAGO ARNAUD ABREU DE OLIVEIRA",
           "tipo": "saida",
           "fromSituacao": "EM EXERCÍCIO",
-          "toSituacao": "SAÍDA SEM ATO IDENTIFICADO",
+          "toSituacao": "VACÂNCIA",
           "orgaoDestino": "Tribunal de Contas da União",
           "unidade": "Não informada",
           "concurso": "CGU-2021"
@@ -1224,7 +1224,7 @@
           "nome": "AMADO PEREIRA DE CERQUEIRA NETTO",
           "tipo": "saida",
           "fromSituacao": "EM EXERCÍCIO",
-          "toSituacao": "SAÍDA SEM ATO IDENTIFICADO",
+          "toSituacao": "VACÂNCIA",
           "orgaoDestino": "Tribunal de Contas da União",
           "unidade": "CGU-Regional/RR",
           "concurso": "CGU-2021"
@@ -2119,7 +2119,7 @@
           "nome": "CASSIO DA NOBREGA SANTIAGO",
           "tipo": "saida",
           "fromSituacao": "EM EXERCÍCIO",
-          "toSituacao": "SAÍDA SEM ATO IDENTIFICADO",
+          "toSituacao": "VACÂNCIA",
           "orgaoDestino": "Senado Federal",
           "unidade": "Sede/DF",
           "concurso": "CGU-2021"
@@ -3232,7 +3232,7 @@
           "nome": "HENRIQUE DA SILVA KRANZFELD",
           "tipo": "saida",
           "fromSituacao": "EM EXERCÍCIO",
-          "toSituacao": "SAÍDA SEM ATO IDENTIFICADO",
+          "toSituacao": "VACÂNCIA",
           "orgaoDestino": "Tribunal de Contas da União",
           "unidade": "Sede/DF",
           "concurso": "CGU-2021"
@@ -3830,7 +3830,7 @@
           "nome": "WILLIAM GUEDES",
           "tipo": "saida",
           "fromSituacao": "EM EXERCÍCIO",
-          "toSituacao": "SAÍDA SEM ATO IDENTIFICADO",
+          "toSituacao": "CEDIDO",
           "orgaoDestino": "",
           "unidade": "Sede/DF",
           "concurso": "VETERANO"
@@ -3937,7 +3937,7 @@
           "nome": "LUIS PAULO PAGLIONI MARCONDES",
           "tipo": "saida",
           "fromSituacao": "EM EXERCÍCIO",
-          "toSituacao": "SAÍDA SEM ATO IDENTIFICADO",
+          "toSituacao": "VACÂNCIA",
           "orgaoDestino": "",
           "unidade": "Sede/DF",
           "concurso": "CGU-2021"
@@ -4201,7 +4201,7 @@
           "nome": "ANGIVALDO ALMEIDA FERREIRA JUNIOR",
           "tipo": "saida",
           "fromSituacao": "EM EXERCÍCIO",
-          "toSituacao": "SAÍDA SEM ATO IDENTIFICADO",
+          "toSituacao": "VACÂNCIA",
           "orgaoDestino": "Tribunal de Contas da União",
           "unidade": "Sede/DF",
           "concurso": "VETERANO"

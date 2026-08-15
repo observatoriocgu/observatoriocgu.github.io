@@ -379,6 +379,25 @@ def orgao_do_ato(resultado: dict) -> str:
     return niveis[0]
 
 
+def titulo_do_ato(resultado: dict) -> str:
+    """
+    O título do ato, limpo da marcação que a busca do DOU acrescenta.
+
+    A busca DESTACA os termos procurados dentro do `title` que devolve:
+
+        <span class='highlight' style='background:#FFA;'>PORTARIA</span> Nº ...
+
+    Enquanto se buscou por nome de pessoa isso nunca apareceu — nome de gente não
+    está no título da portaria. Passou a aparecer quando a busca passou a ser
+    pelo TÍTULO do ato (é assim que se acha o original de uma retificação), e aí
+    o índice guardava o HTML e a tela mostrava a marcação crua.
+
+    Tirar a tag e desescapar a entidade é tudo o que é preciso: o texto do título
+    é o mesmo, com ou sem destaque.
+    """
+    return " ".join(html_mod.unescape(re.sub(r"<[^>]+>", "", resultado.get("title") or "")).split())
+
+
 def data_iso(resultado: dict) -> str:
     """`pubDate` (DD/MM/AAAA) em AAAA-MM-DD. String vazia se não der."""
     try:
@@ -397,7 +416,7 @@ def data_iso(resultado: dict) -> str:
 # Ordem de teste. Importa: os atos se sobrepõem no vocabulário, e o mais
 # específico tem de ser testado primeiro. Um ato de aposentadoria termina com
 # "declarar vago o referido cargo"; um de falecimento também.
-TIPOS_SAIDA = ("falecimento", "demissao", "vacancia", "aposentadoria", "exoneracao")
+TIPOS_SAIDA = ("falecimento", "demissao", "vacancia", "aposentadoria", "exoneracao", "cessao")
 
 ROTULOS = {
     "falecimento": "Falecimento",
@@ -405,6 +424,7 @@ ROTULOS = {
     "vacancia": "Vacância (posse em outro cargo)",
     "aposentadoria": "Aposentadoria",
     "exoneracao": "Exoneração",
+    "cessao": "Cessão a outro órgão",
 }
 
 # Situação correspondente na coluna SITUACAO do dados.csv.
@@ -414,6 +434,7 @@ SITUACAO_POR_TIPO = {
     "vacancia": "VACÂNCIA",
     "aposentadoria": "APOSENTADO",
     "exoneracao": "EXONERADO",
+    "cessao": "CEDIDO",
 }
 
 # DECISÃO EDITORIAL (usuário, 14/08/2026, alcance revisto em 16/08/2026): o ATO
@@ -478,23 +499,115 @@ PADROES = {
     # identidade já foi provada pela matrícula. Padrão exige a forma de
     # penalidade para não casar com menção solta à palavra.
     "demissao": (r"PENALIDADE\s+DE\s+DEMISSAO", r"\bDEMITIR\b", r"APLICAR[^.]{0,80}DEMISSAO"),
+    # `DECLARAR?` e não `DECLARAR`: a retificação fala do ato no presente — "na
+    # Portaria nº 2.025 [...], QUE DECLARA VAGO o cargo de Auditor Federal [...]
+    # ocupado pelo servidor HENRIQUE DA SILVA KRANZFELD". Exigindo o infinitivo,
+    # nenhuma retificação de vacância casava, e o Auditor ficava sem ato.
     "vacancia": (
-        r"DECLARAR\s+VAG[OA]",
+        r"DECLARAR?\s+VAG[OA]",
         r"DECLARAR\s+A\s+VACANCIA",
         r"VACANCIA\s+DO\s+CARGO",
     ),
     "aposentadoria": (r"APOSENTADORIA", r"\bAPOSENTAR\b"),
     "exoneracao": (r"EXONERACAO", r"\bEXONERAR\b"),
+    # Cessão: a pessoa continua Auditora da CGU, mas passa a servir em outro
+    # órgão, e por isso some do quadro que o Portal da Transparência filtra por
+    # COD_ORG_LOTACAO. Para o SIAPE ela "saiu"; o ato é o que explica que não foi
+    # evasão. Sem este tipo, o caso caía em "saída sem ato identificado" tendo o
+    # ato publicado — foi o que aconteceu com a Portaria nº 604, de 23/02/2023.
+    #
+    # O ato NÃO cita o cargo de AFFC ("CEDER O SERVIDOR FULANO, matrícula SIAPE
+    # nº ..., pertencente ao quadro de pessoal da Controladoria-Geral da União,
+    # para exercer a Função Comissionada Executiva de ... do Ministério ..."),
+    # então só a busca por NOME o alcança, com a identidade provada pela
+    # matrícula. A varredura por frase nunca o vê, e o card não conta cessão.
+    "cessao": (r"\bCEDER\b[^.]{0,140}?\bSERVIDOR[A]?\b",),
 }
 
-# A vacância só conta como saída quando o motivo é posse em outro cargo — que é
-# o recorte pedido. O art. 33 lista outros motivos (promoção, readaptação) que
-# são movimentação interna, não saída da CGU.
+# O que parece cessão e não é: o ato que a desfaz ou a encerra. Nos dois casos a
+# pessoa VOLTA para a CGU, e publicá-los como saída inverteria o fato.
+PADROES_NAO_E_CESSAO = (
+    r"TORNAR\s+SEM\s+EFEITO",
+    r"(?:ENCERRAR|DAR\s+POR\s+ENCERRADA)\s+A\s+CESSAO",
+)
+
+# O MOTIVO DA VACÂNCIA DECIDE QUE SAÍDA ELA É — e não são todas a mesma.
 #
-# Este é também o desempate contra a exoneração a pedido, cuja redação traz
-# "ficando vago o cargo que atualmente ocupa" — texto que casaria com um padrão
-# frouxo tipo "VAGO O CARGO", mas não com "DECLARAR VAGO".
+# "Declarar vago" é a forma do ato, não a causa: o art. 33 da Lei 8.112/90 lista
+# nove causas e o ato cita o inciso. Duas interessam, e cada uma é um tipo:
+#
+#   inciso VIII  posse em outro cargo inacumulável  -> vacância
+#   inciso I     exoneração (aqui, por desistência
+#                do estágio probatório)             -> exoneração
+#
+# O inciso I faltava, e a falta era silenciosa. A Portaria nº 3.232, de
+# 29/09/2025 — "declarar vago, a contar do dia 8 de outubro de 2025, POR
+# DESISTÊNCIA DO ESTÁGIO PROBATÓRIO, o cargo de Auditor Federal [...] de acordo
+# com art. 33, inciso I" — casava o gatilho da vacância, não casava o motivo, e
+# caía fora de todos os tipos. O Auditor aparecia como "saída sem ato
+# identificado" com o ato publicado no DOU.
+#
+# É exoneração e não vacância porque é isso que o ato diz: o inciso I do art. 33
+# é a exoneração, e a desistência do estágio probatório é o pedido de saída de
+# quem ainda não estabilizou. Chamá-la de "vacância (posse em outro cargo)"
+# afirmaria uma posse que o ato não menciona.
+#
+# Motivo DESCONHECIDO continua não classificando, de propósito: "declarar vago"
+# sozinho não distingue quem foi embora de quem se aposentou ou foi promovido, e
+# o laço de `classificar` ainda testará os outros tipos — é assim que a
+# aposentadoria que termina em "declarar vago o referido cargo" segue sendo
+# aposentadoria.
+#
+# O gatilho da vacância é também o desempate contra a exoneração a pedido, cuja
+# redação traz "ficando vago o cargo que atualmente ocupa" — texto que casaria
+# com um padrão frouxo tipo "VAGO O CARGO", mas não com "DECLARAR VAGO".
 PADRAO_VACANCIA_MOTIVO = r"POSSE\s+EM\s+OUTRO\s+CARGO"
+PADRAO_VACANCIA_DESISTENCIA = r"DESISTENCIA\s+DO\s+ESTAGIO\s+PROBATORIO"
+
+
+def _art_33(inciso: str) -> str:
+    """
+    Regex da citação de um inciso do art. 33 da Lei 8.112/90, nas duas ordens.
+
+    Às vezes o INCISO é tudo o que o ato diz sobre o motivo — e num caso ele é
+    tudo o que o ato diz, ponto. A Portaria nº 3.089, de 09/11/2022, saiu
+    TRUNCADA no próprio DOU: "declarar vago, a contar de 27 de outubro de 2022,
+    o cargo efetivo de Auditor Federal [...], classe C, padrão II, O." — o texto
+    acaba no meio da palavra, sem nome e sem motivo. Foi para consertar isso que
+    a retificação de 10/05/2023 existiu. O que restou de motivo no ato original é
+    "conforme inciso VIII do art. 33", e é o bastante: o inciso VIII É a posse em
+    outro cargo inacumulável.
+
+    O `\\b` no fim do inciso não é decoração: sem ele, `INCISO I` casaria dentro
+    de `INCISO VIII` e toda vacância por posse viraria exoneração.
+    """
+    return (
+        rf"ART(?:IGO)?\.?\s*33\s*,?\s*INCISO\s+{inciso}\b"
+        rf"|INCISO\s+{inciso}\s+DO\s+ART(?:IGO)?\.?\s*33"
+    )
+
+
+PADRAO_VACANCIA_ART33_VIII = _art_33("VIII")
+PADRAO_VACANCIA_ART33_I = _art_33("I")
+
+# Motivo declarado no ato -> tipo de saída. Ordem: o que o ato diz por extenso
+# vem antes do que ele diz por citação legal. Inciso não mapeado aqui (III,
+# promoção; IV, readaptação) não classifica de propósito: são movimentação
+# interna, não saída da CGU.
+TIPO_POR_MOTIVO_DA_VACANCIA = (
+    (PADRAO_VACANCIA_MOTIVO, "vacancia"),
+    (PADRAO_VACANCIA_DESISTENCIA, "exoneracao"),
+    (PADRAO_VACANCIA_ART33_VIII, "vacancia"),
+    (PADRAO_VACANCIA_ART33_I, "exoneracao"),
+)
+
+
+def tipo_da_vacancia(texto_normalizado: str) -> str | None:
+    """Que saída é esta vacância, pelo motivo que o ato declara. `None` se não diz."""
+    for padrao, tipo in TIPO_POR_MOTIVO_DA_VACANCIA:
+        if re.search(padrao, texto_normalizado):
+            return tipo
+    return None
 
 # Só conta se o ato realmente falar do cargo efetivo de AFFC.
 PADRAO_CARGO = r"AUDITOR[A]?\s+FEDERAL\s+DE\s+FINANCAS\s+E\s+CONTROLE"
@@ -526,6 +639,52 @@ PADROES_PENSAO = (
     r"INSTITUIDOR\s+DA\s+PENSAO",
 )
 
+# ATOS QUE NÃO MOVEM NINGUÉM — descobertos em 16/08/2026, ao varrer o DOU por
+# frase desde 2022 pela primeira vez. Nenhum dos dois é saída, e os dois eram
+# classificados como aposentadoria por uma palavra solta no texto:
+#
+#   PORTARIA NORMATIVA SE/CGU nº 224, de 03/09/2025 — "aprova os modelos e
+#     estabelece os procedimentos para emissão [...] das cédulas de identificação
+#     destinadas às pessoas APOSENTADAS nos cargos da carreira". É uma regra
+#     sobre carteirinha de aposentado; não aposenta ninguém.
+#
+#   EXTRATO DE AJUSTAMENTO DE CONDUTA de 25/08/2023 — instrumento DISCIPLINAR,
+#     que nomeia um Auditor e descreve a conduta imputada a ele. A palavra
+#     "aposentadoria" aparece só dentro da descrição do fato. Publicá-lo seria
+#     duas coisas erradas de uma vez: afirmar uma aposentadoria que não houve, e
+#     pôr no ar, com link, um documento disciplinar sobre pessoa nomeada — o
+#     mesmo dano que a D18 evita no ato de demissão. Aqui nem chega a ser
+#     decisão editorial: o servidor não saiu, e o ato não é sobre saída.
+#
+# A âncora do primeiro é o INÍCIO do texto, e tem de ser: "Portaria Normativa" é
+# citada como fundamento legal por metade dos atos de vacância reais ("no uso da
+# competência que lhe foi subdelegada pelo art. 2º da Portaria Normativa CGU
+# nº 33"). Procurar a expressão solta excluiria as saídas de verdade.
+#   PORTARIA nº 2.909, de 01/09/2025 — instaura Processo Administrativo de
+#     Responsabilização contra uma EMPRESA e designa um Auditor para a comissão.
+#     A palavra "aposentadoria" está dentro do nome do ente investigado ("CABPREV
+#     Casa de Apoio ao Beneficiário Previdenciário de APOSENTADORIA e Pensão do
+#     INSS"). Ninguém se aposentou; o ato abre processo contra terceiro.
+PADROES_NAO_E_ATO_DE_PESSOAL = (
+    r"^PORTARIA\s+NORMATIVA\b",
+    r"\bESTA\s+PORTARIA\s+NORMATIVA\b",
+    r"\bAJUSTAMENTO\s+DE\s+CONDUTA\b",
+    r"\bINSTAURAR\s+PROCESSO\s+ADMINISTRATIVO\b",
+)
+
+# ATO QUE TRAZ A PESSOA DE VOLTA É O CONTRÁRIO DE UMA SAÍDA.
+#
+# A Portaria nº 3.331, de 09/10/2025, "reverte a aposentadoria da servidora
+# QUELI RODRIGUES DOS SANTOS [...] para que RETORNE ao quadro de pessoal desta
+# Controladoria-Geral da União". Ela casa `APOSENTADORIA`, casa o cargo, é da
+# CGU — e diz exatamente o oposto do que seria publicado. É o mesmo erro de sinal
+# que `PADROES_NAO_E_DESTINO` evita do outro lado: ler o ato que desfaz como se
+# fosse o ato que faz.
+PADROES_DE_RETORNO = (
+    r"REVERTER\s+A\s+APOSENTADORIA",
+    r"REVERSAO\s+D[AE]\s+APOSENTADORIA",
+)
+
 # Nomeação/posse — usado para achar o DESTINO de quem saiu.
 PADROES_NOMEACAO = (
     r"\bNOMEAR\b",
@@ -540,7 +699,7 @@ PADROES_NOMEACAO = (
 # 2025" para alguém cujo único ato do TRE em 2025 é a baixa do cargo que ele
 # deixou lá em 2022, antes de entrar na CGU — afirmação falsa sobre pessoa real.
 PADROES_NAO_E_DESTINO = (
-    r"DECLARAR\s+VAG[OA]",
+    r"DECLARAR?\s+VAG[OA]",
     r"VACANCIA",
     r"\bDISPENSAR\b",
     r"\bEXONERAR\b",
@@ -569,6 +728,15 @@ def classificar(texto: str, exigir_cargo: bool = True) -> str | None:
     if any(re.search(p, normalizado) for p in PADROES_PENSAO):
         return None
 
+    # Ato que não move ninguém — norma geral, instrumento disciplinar, abertura
+    # de processo contra terceiro. Ver PADROES_NAO_E_ATO_DE_PESSOAL.
+    if any(re.search(p, normalizado) for p in PADROES_NAO_E_ATO_DE_PESSOAL):
+        return None
+
+    # Ato que traz a pessoa de volta. Ver PADROES_DE_RETORNO.
+    if any(re.search(p, normalizado) for p in PADROES_DE_RETORNO):
+        return None
+
     # IMPORTANTE: quando um tipo é descartado, o certo é `continue` — testar os
     # demais —, nunca `return None`. Os atos se sobrepõem no vocabulário: um ato
     # de aposentadoria termina com "declarar vago o referido cargo", e um
@@ -577,8 +745,17 @@ def classificar(texto: str, exigir_cargo: bool = True) -> str | None:
         if not any(re.search(p, normalizado) for p in PADROES[tipo]):
             continue
 
-        if tipo == "vacancia" and not re.search(PADRAO_VACANCIA_MOTIVO, normalizado):
-            continue  # "declarar vago" sem posse em outro cargo: ver se é outro tipo
+        if tipo == "vacancia":
+            # O motivo declarado decide QUE saída é: posse em outro cargo é
+            # vacância, desistência do estágio probatório é exoneração. Sem
+            # motivo reconhecido, `continue` — ainda pode ser outro tipo.
+            pelo_motivo = tipo_da_vacancia(normalizado)
+            if pelo_motivo is None:
+                continue
+            return pelo_motivo
+
+        if tipo == "cessao" and any(re.search(p, normalizado) for p in PADROES_NAO_E_CESSAO):
+            continue  # ato que desfaz ou encerra a cessão: a pessoa volta
 
         if tipo == "exoneracao":
             # Exoneração exige as duas provas: nenhum marcador de chefia no ato,
@@ -648,7 +825,7 @@ def e_lista_de_classificacao(texto_normalizado: str, nome: str) -> bool:
 PADROES_SAIDA_DA_PESSOA = (
     r"POSSE\s+DE\s+{nome}",
     r"OCUPAD[OA]\s+PEL[OA]\s+SERVIDOR[A]?\s+{nome}",
-    r"DECLARAR\s+VAG[OA][^.]{{0,120}}{nome}",
+    r"DECLARAR?\s+VAG[OA][^.]{{0,120}}{nome}",
     r"\bEXONERAR\b[^.]{{0,120}}{nome}",
     r"\bDISPENSAR\b[^.]{{0,120}}{nome}",
     # "...em vaga originária da vacância do cargo ANTERIORMENTE OCUPADO POR
@@ -745,6 +922,16 @@ PADROES_NOME_NO_ATO = (
     # terminador: o nome vem logo antes de "do cargo", e não cruza vírgula
     # porque a vírgula não está na classe de caracteres de `_NOME`.
     r"\bEXONERAR\b[^.]{0,160}?,\s*" + _NOME + r"\s+DO\s+CARGO",
+    # "EXONERAR, A PEDIDO LUIZ AUGUSTO DA SILVA ALVES, DO CARGO DE AUDITOR..."
+    # — sem a vírgula depois de "a pedido" (Portaria 1.968, de 17/08/2022). O
+    # padrão acima depende dessa vírgula como âncora e não casa nada aqui.
+    #
+    # A âncora, então, passa a ser o próprio preâmbulo, CONSUMIDO explicitamente.
+    # Não basta tornar a vírgula opcional no padrão de cima: `_NOME` aceita
+    # espaços, então ele engoliria "A PEDIDO LUIZ AUGUSTO DA SILVA ALVES" inteiro
+    # e o site publicaria "A Pedido Luiz Augusto" como nome de gente. Este vem
+    # DEPOIS na lista, então só roda quando o de cima não casou.
+    r"\bEXONERAR\b\s*,?\s*(?:A\s+PEDIDO|DE\s+OFICIO)\s*,?\s*" + _NOME + r"\s*,?\s+DO\s+CARGO",
 )
 
 
@@ -854,6 +1041,128 @@ def siape_compativel(texto: str, matricula_mascarada: str) -> bool | None:
     return any(s.zfill(7).startswith(prefixo) for s in achados)
 
 
+# ------------------------------------------------------- de quem o ato é, afinal
+#
+# TRÊS PROVAS, EM ORDEM DE FORÇA, e a distinção não é acadêmica: até 16/08/2026 o
+# crawler usava uma prova só — `cita_nome`, que é substring — como PORTA de
+# entrada, e a matrícula como VETO. As duas falhavam ao contrário uma da outra, e
+# quatro Auditores ficaram sem ato tendo o ato publicado:
+#
+#   - o DOU erra o nome. A Portaria nº 325, de 02/02/2023 escreve "LUIS PAULO
+#     PAGLIONE MARCONDES" onde o SIAPE diz "PAGLIONI". `cita_nome` dava falso, e
+#     o ato era descartado ANTES de a matrícula (que batia) poder salvá-lo;
+#   - o DOU erra a matrícula. Três vacâncias — Portarias 1.026/2024, 2.529/2024 e
+#     2.017/2025 — nomeiam a pessoa por extenso, citam o cargo de AFFC e são da
+#     própria CGU, mas trazem um SIAPE que não é o dela (a 2.017 diz 2435442
+#     quando a própria CGU, na Portaria 2.605, lista o Auditor como 3347490). O
+#     veto de homônimo derrubava os três.
+#
+# Medido sobre os 251 atos que já estavam casados com pessoa: 236 se provam pela
+# matrícula, 15 pela fórmula do ato, ZERO só por citação. O nível `CITACAO` fica
+# como estava — não porque alguma coisa depende dele hoje, mas para não perder
+# recall no dia em que o DOU inventar uma fórmula que `nome_do_ato` não lê.
+IDENTIDADE_SIAPE = "SIAPE"
+IDENTIDADE_NOME = "NOME"
+IDENTIDADE_CITACAO = "CITACAO"
+
+
+def nome_do_ato_bate(texto: str, nome: str) -> bool:
+    """
+    True quando a FÓRMULA do ato nomeia exatamente esta pessoa.
+
+    Diferente de `cita_nome`, que é substring e por isso casa "LUIZ CARLOS DE
+    ALMEIDA" dentro de "LUIZ CARLOS DE ALMEIDA SOUZA". Aqui o nome vem de
+    `nome_do_ato`, que o recorta com terminador explícito, e a comparação é de
+    igualdade — o prefixo de outra pessoa não passa.
+    """
+    lido = nome_do_ato(texto)
+    return bool(lido) and normalizar(lido) == normalizar(nome)
+
+
+def identidade_no_ato(texto: str, nome: str, matricula_mascarada: str) -> str:
+    """
+    Como este ato prova ser DESTA pessoa. `""` quando não prova.
+
+    Devolve o nível mais forte que se sustenta:
+
+      `IDENTIDADE_SIAPE`   a matrícula do ato bate com a do Portal. Identidade
+                           provada: quem chama pode dispensar a prova do cargo
+                           (é o que torna legível a demissão, cujo ato fala do
+                           servidor e da penalidade, mas não do cargo).
+      `IDENTIDADE_NOME`    a matrícula não decide, ou o ato a escreveu errado,
+                           mas a fórmula do ato nomeia exatamente esta pessoa.
+      `IDENTIDADE_CITACAO` o nome só aparece solto no meio do texto, e a
+                           matrícula não CONFLITA. É o nível fraco: quem chama
+                           tem de exigir também o cargo.
+
+    O conflito de matrícula deixou de VETAR e passou a apenas REBAIXAR: com o
+    nome exato lido da fórmula, num ato da CGU que cita o cargo de AFFC, a
+    identidade se sustenta sem ele. Isso é seguro aqui porque não há nome
+    repetido na base — 2.009 pessoas, zero homônimos — e deixa de ser seguro no
+    dia em que houver; ver a limitação documentada em `cita_nome`.
+    """
+    if siape_compativel(texto, matricula_mascarada) is True:
+        return IDENTIDADE_SIAPE
+    if nome_do_ato_bate(texto, nome):
+        return IDENTIDADE_NOME
+    if siape_compativel(texto, matricula_mascarada) is False:
+        return ""
+    return IDENTIDADE_CITACAO if cita_nome(texto, nome) else ""
+
+
+# --------------------------------------------------- retificação -> ato original
+#
+# A retificação é um ato sobre outro ato, e às vezes é o ÚNICO que traz o nome da
+# pessoa — porque foi o nome que ela veio consertar. Dois casos reais:
+#
+#   Portaria 3.089, de 09/11/2022, saiu sem dizer de quem era o cargo; a
+#   retificação de 10/05/2023 acrescenta "ocupado pelo servidor ANGIVALDO
+#   ALMEIDA FERREIRA JUNIOR [...] em virtude de posse em outro cargo".
+#
+#   Portaria 2.025, de 30/05/2023, declarou vago o cargo de "HENRIQUE DA SILVA
+#   KRANZFIELD"; a retificação de 01/06/2023 corrige para "KRANZFELD".
+#
+# Nos dois, a busca por nome só alcança a retificação — e a retificação, sozinha,
+# é um documento pobre: a de Kranzfeld não diz o motivo da vacância, e a de
+# Angivaldo não cita o cargo. Classificá-la seria afirmar mais do que ela diz, e
+# datar a saída no dia em que o erro foi corrigido.
+#
+# Por isso o caminho é o outro: ler nela a REFERÊNCIA ao ato original e ir buscar
+# o original, que tem o motivo, a data certa e a URL própria. O que a retificação
+# fornece é o vínculo com a pessoa.
+PADRAO_ATO_RETIFICADO = (
+    r"RETIFICA(?:CAO|R|-SE)?\b[^.]{0,80}?"
+    r"\bPORTARIA\s+N?[O°º.\s]{0,4}\s*([\d.]+)\s*,\s*"
+    r"DE\s+(\d{1,2}O?\s+DE\s+[A-Z]+\s+DE\s+\d{4})"
+)
+
+
+def _numero_com_ponto(numero: str) -> str:
+    """`3089` -> `3.089`. O DOU titula com o ponto de milhar; o corpo do ato, nem sempre."""
+    digitos = numero.replace(".", "")
+    return f"{int(digitos):,}".replace(",", ".") if digitos.isdigit() else numero
+
+
+def frases_do_ato_retificado(texto: str) -> list[str]:
+    """
+    Frases de busca que acham o ato que esta retificação corrige. `[]` se não é uma.
+
+    Devolve VARIANTES porque a grafia do número e do dia varia entre o corpo da
+    retificação e o título do ato original, e a busca do DOU é por frase exata:
+    `3089` no corpo é `3.089` no título, e `1O` (o `1º` já normalizado) é `1º`.
+    Quem chama tenta uma por uma e para na primeira que responder.
+    """
+    achado = re.search(PADRAO_ATO_RETIFICADO, normalizar(texto))
+    if not achado:
+        return []
+
+    numero, data = achado.group(1).strip(". "), achado.group(2)
+    datas = [data] + ([re.sub(r"^(\d{1,2})O\b", r"\1º", data)] if re.match(r"\d{1,2}O\b", data) else [])
+    numeros = list(dict.fromkeys([_numero_com_ponto(numero), numero]))
+
+    return [f"PORTARIA Nº {n}, DE {d}" for n in numeros for d in datas]
+
+
 # ------------------------------------------------------------ arquivamento HTML
 
 def nome_arquivo(resultado: dict, prefixo: str) -> str:
@@ -874,7 +1183,7 @@ def salvar_ato(resultado: dict, tipo: str, texto: str, destino: Path) -> str:
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>{html_mod.escape(resultado.get('title', ''))} — DOU</title>
+<title>{html_mod.escape(titulo_do_ato(resultado))} — DOU</title>
 <style>
  body {{ font-family: Georgia, serif; max-width: 46rem; margin: 2rem auto; padding: 0 1rem;
         line-height: 1.6; color: #111; background: #fff; }}
@@ -890,7 +1199,7 @@ def salvar_ato(resultado: dict, tipo: str, texto: str, destino: Path) -> str:
 </head>
 <body>
 <header>
-<h1>{html_mod.escape(resultado.get('title', ''))}</h1>
+<h1>{html_mod.escape(titulo_do_ato(resultado))}</h1>
 <dl>
 <dt>Tipo</dt><dd>{html_mod.escape(rotulo)}</dd>
 <dt>Publicado em</dt><dd>{html_mod.escape(str(resultado.get('pubDate', '')))}</dd>

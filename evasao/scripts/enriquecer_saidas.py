@@ -31,8 +31,22 @@ DUAS DEFESAS CONTRA AFIRMAR COISA ERRADA SOBRE PESSOA REAL:
 
   Homônimo. A busca do DOU ignora acento e gênero, então nome casa demais. O
   Portal mascara a matrícula como "166****", deixando os 3 primeiros dígitos do
-  SIAPE visíveis, e os atos escrevem o SIAPE por extenso. Quando o ato traz
-  matrícula e ela CONFLITA com a do Portal, o ato é descartado.
+  SIAPE visíveis, e os atos escrevem o SIAPE por extenso.
+
+  ONDE ELA VALE MUDOU EM 16/08/2026 (D25). Em ato de OUTRO órgão, a matrícula que
+  conflita continua descartando o ato — lá o homônimo é risco real, e foi assim
+  que uma lista do Judiciário virou "destino" de um Auditor. Em ato da PRÓPRIA
+  CGU, ela rebaixa em vez de vetar: `dou.identidade_no_ato` aceita a identidade
+  provada pela FÓRMULA do ato (nome exato, com terminador), e a exigência do
+  cargo fica de pé. Sem isso, quatro saídas ficavam sem ato tendo o ato
+  publicado — o DOU erra o nome (Portaria 325/2023: "PAGLIONE" por "PAGLIONI") e
+  erra a matrícula (Portarias 1.026/2024, 2.529/2024 e 2.017/2025).
+
+  BUSCAS DE RESERVA. Frase exata falha mais do que parece: o nome inteiro de uma
+  Auditora não achava a portaria que declarou vago o cargo dela, e os três
+  primeiros nomes acharam. Quando o nome do SIAPE não acha ato de saída, tenta-se
+  o nome que a curadoria diz que o DOU usa (`COLUNA_NOME_NO_DOU`) e depois o nome
+  encurtado. Isso afrouxa a BUSCA, nunca a IDENTIFICAÇÃO.
 
   Destino. Um ato posterior à saída que cita a pessoa não é, por si, prova de
   destino. Caso real: alguém saiu da CGU em 2022, e o único ato posterior que o
@@ -63,7 +77,28 @@ import dou
 RAIZ = Path(__file__).resolve().parent.parent
 ARQ_DADOS = RAIZ / "data" / "dados.csv"
 ARQ_SAIDAS = RAIZ / "data" / "saidas_dou.csv"
+ARQ_CURADORIA = RAIZ / "data" / "curadoria.csv"
 ARQ_CARD = RAIZ / "public" / "atos_dou.json"
+
+# Coluna OPCIONAL do `curadoria.csv`: o nome com que o DOU se refere a esta
+# pessoa, quando não é o do SIAPE.
+#
+# O DOU e o Portal da Transparência discordam sobre o nome de gente com mais
+# frequência do que se imagina, e nem sempre há como provar de dentro do ato.
+# Quando o ato traz a matrícula, `identidade_no_ato` resolve sozinha. Quando não
+# traz, não há o que fazer pela máquina — e o silêncio é a resposta certa.
+#
+# O caso que abriu esta porta: o Portal chama alguém de "LUIZ AUGUSTO GENTILUCCI
+# ALVES"; o Edital CGU nº 5/2022 e a Portaria nº 1.968, de 17/08/2022 (exoneração
+# a pedido, a partir de 12/08/2022 — o mês exato em que ele some do SIAPE) o
+# chamam de "LUIZ AUGUSTO DA SILVA ALVES". Nenhum dos dois atos traz matrícula.
+# Dois documentos independentes contra um cadastro não é prova, é indício forte —
+# e indício forte sobre pessoa real e nomeada é pauta humana, não automação.
+#
+# `construir_painel.py` IGNORA esta coluna sem reclamar: `aplicar_curadoria` só
+# copia campo que já exista em `pessoa`, e não existe `NOME_NO_DOU` lá. É o mesmo
+# caminho por onde passaram VERIFICADO e VERIFICADO_EM.
+COLUNA_NOME_NO_DOU = "NOME_NO_DOU"
 
 COLUNAS = (
     "ID_SERVIDOR_PORTAL", "NOME", "SITUACAO",
@@ -97,6 +132,26 @@ MESES_DEPOIS_DA_SAIDA = 6
 # Quantos atos do DOU baixar por pessoa. A busca devolve no máximo 50; abrir
 # todos custaria caro e os mais relevantes vêm primeiro.
 MAX_ATOS_POR_PESSOA = 14
+
+# BUSCA DE RESERVA: quantos primeiros nomes usar quando o nome inteiro não acha
+# o ato de saída.
+#
+# A busca do DOU é por frase exata, e a frase inteira falha mais do que parece.
+# Caso real: `"DEBORA CRISTINA PASSOS DE SA"` devolve 4 atos e NENHUM da CGU;
+# `"DEBORA CRISTINA PASSOS"` devolve 19, entre eles a Portaria nº 2.708, de
+# 12/08/2025, que declara vago o cargo dela — ato público, com a matrícula
+# batendo, que o observatório simplesmente não tinha ido buscar.
+#
+# Encurtar afrouxa a busca, não a identificação: quem decide se o ato é da
+# pessoa continua sendo `dou.identidade_no_ato`, que exige matrícula compatível
+# ou o nome exato lido da fórmula do ato. Trazer mais candidatos só aumenta o
+# que se pode CONFERIR.
+TOKENS_DA_BUSCA_DE_RESERVA = 3
+
+# Partículas que não podem FECHAR a frase encurtada. `dou.PARTICULAS_DE_NOME` é
+# a mesma lista, em minúscula, usada para outra coisa (decidir se um token faz
+# parte de um nome); aqui interessa comparar com o nome já normalizado.
+PARTICULAS = {p.upper() for p in dou.PARTICULAS_DE_NOME}
 
 
 # Marca as pessoas que entraram na fila pelo DOU, e não pelo SIAPE. Para elas
@@ -211,7 +266,112 @@ def buscar_atos(nome: str, usar_cache: bool) -> list[dict]:
     return resultados
 
 
-def analisar(pessoa: dict, indice: dict, usar_cache: bool, verboso: bool = False) -> dict:
+def nome_encurtado(nome: str) -> str:
+    """
+    Os primeiros nomes, para a busca de reserva. Vazio se não encurta nada.
+
+    A frase não pode terminar em partícula: `"RAFAEL ROCHA DOS"` é uma busca
+    pior que `"RAFAEL ROCHA"` — pede um pedaço de sobrenome que o corte partiu
+    ao meio, e a busca do DOU é por frase exata.
+    """
+    tokens = nome.split()
+    if len(tokens) <= TOKENS_DA_BUSCA_DE_RESERVA:
+        return ""
+    curto = tokens[:TOKENS_DA_BUSCA_DE_RESERVA]
+    while len(curto) > 2 and dou.normalizar(curto[-1]) in PARTICULAS:
+        curto.pop()
+    return " ".join(curto)
+
+
+def seguir_retificacao(
+    texto: str, matricula: str, usar_cache: bool, verboso: bool = False
+) -> tuple[str, dict, str] | None:
+    """
+    O ato ORIGINAL que esta retificação corrige, já classificado. `None` se não há.
+
+    Por que não classificar a própria retificação: ela é um documento pobre e de
+    data errada. A de Kranzfeld (01/06/2023) só conserta a grafia do sobrenome e
+    não diz o motivo da vacância; a de Angivaldo (10/05/2023) traz o motivo mas
+    não o cargo, e sai SEIS MESES depois da saída que descreve. Publicar
+    qualquer uma das duas como o ato da saída dataria a saída no dia em que o
+    erro foi corrigido.
+
+    O original tem tudo isso certo. O que só a retificação tem é o vínculo com a
+    pessoa — e é justamente por isso que ela foi publicada.
+
+    A identidade já foi provada pelo chamador, na retificação. Aqui a única
+    guarda é a matrícula do original: se ela CONFLITAR, o ato é de outra pessoa e
+    não se aproveita. Não se exige que o original nomeie a pessoa, porque em
+    metade dos casos ele não a nomeia — foi essa a falha que a retificação veio
+    corrigir.
+    """
+    for frase in dou.frases_do_ato_retificado(texto):
+        for ato in dou.buscar(f'"{frase}"', usar_cache=usar_cache):
+            if not dou.e_da_cgu(ato) or not ato.get("urlTitle"):
+                continue
+            _, original = dou.baixar_ato(ato["urlTitle"], usar_cache=usar_cache)
+            if not original or dou.siape_compativel(original, matricula) is False:
+                continue
+            tipo = dou.classificar(original)
+            if tipo:
+                if verboso:
+                    print(f"      + retificação leva a {frase}: {tipo}")
+                return tipo, ato, original
+    return None
+
+
+def procurar_ato_de_saida(
+    nomes: list[str], matricula: str, atos_ordenados: list[dict],
+    usar_cache: bool, verboso: bool = False
+) -> tuple[str, dict, str, str] | None:
+    """
+    O ato da CGU que diz por que a pessoa saiu. `(tipo, ato, texto, identidade)`.
+
+    `nomes` é o nome do SIAPE e, quando a curadoria souber de outro, o nome com
+    que o DOU chama a mesma pessoa (ver `COLUNA_NOME_NO_DOU`). Basta um deles
+    provar a identidade.
+
+    A identidade vai junto no resultado porque é o que se registra na observação:
+    um ato aceito pelo nome exato, com a matrícula divergindo, é dado bom e
+    merece uma segunda leitura humana.
+    """
+    for ato in atos_ordenados:
+        chave = ato.get("urlTitle")
+        if not chave or not dou.e_da_cgu(ato):
+            continue
+        _, texto = dou.baixar_ato(chave, usar_cache=usar_cache)
+        if not texto:
+            continue
+
+        identidade = next(
+            (nivel for nivel in (dou.identidade_no_ato(texto, n, matricula) for n in nomes) if nivel),
+            "",
+        )
+        if not identidade:
+            if verboso:
+                print(f"      - descartado (não prova ser dela): {ato.get('title', '')[:55]}")
+            continue
+
+        # Identidade provada pela matrícula dispensa a prova do cargo: é o que
+        # permite ler a demissão disciplinar, cujo texto fala do servidor e da
+        # penalidade mas não do cargo de AFFC, e a cessão, que também não o cita.
+        # Nos níveis mais fracos a exigência fica de pé.
+        tipo = dou.classificar(texto, exigir_cargo=identidade != dou.IDENTIDADE_SIAPE)
+        if tipo:
+            if verboso:
+                print(f"      + motivo {tipo} (por {identidade}): {ato.get('title', '')[:50]}")
+            return tipo, ato, texto, identidade
+
+        seguido = seguir_retificacao(texto, matricula, usar_cache, verboso)
+        if seguido:
+            return (*seguido, identidade)
+
+    return None
+
+
+def analisar(
+    pessoa: dict, indice: dict, usar_cache: bool, verboso: bool = False, nome_no_dou: str = ""
+) -> dict:
     """Motivo e destino de uma saída, a partir dos atos do DOU que citam a pessoa."""
     nome, mes_saida = pessoa["NOME"], pessoa["MES_SAIDA"]
     matricula = pessoa.get("MATRICULA", "")
@@ -219,64 +379,76 @@ def analisar(pessoa: dict, indice: dict, usar_cache: bool, verboso: bool = False
     registro["ID_SERVIDOR_PORTAL"] = pessoa["ID_SERVIDOR_PORTAL"]
     registro["NOME"] = nome
 
+    # O nome do SIAPE é sempre o primeiro: é a grafia oficial, e é por ela que a
+    # busca deve começar. O da curadoria entra em seguida, quando existir.
+    nomes = [nome] + ([nome_no_dou] if nome_no_dou and nome_no_dou != nome else [])
+
     citam_a_pessoa = buscar_atos(nome, usar_cache)
-    if not citam_a_pessoa:
-        return registro
 
     # Do mais próximo da saída para o mais distante: o ato que interessa é o que
     # está perto do mês em que a pessoa sumiu do SIAPE.
-    ordenados = sorted(
-        citam_a_pessoa, key=lambda a: abs(distancia_meses(dou.data_iso(a), mes_saida))
-    )
+    def por_proximidade(lista: list[dict]) -> list[dict]:
+        return sorted(lista, key=lambda a: abs(distancia_meses(dou.data_iso(a), mes_saida)))
 
-    melhor_saida = None
+    ordenados = por_proximidade(citam_a_pessoa)[:MAX_ATOS_POR_PESSOA]
+    melhor_saida = procurar_ato_de_saida(nomes, matricula, ordenados, usar_cache, verboso)
+
+    # Buscas de reserva, em ordem de força da evidência, e só para o ato de
+    # SAÍDA: o destino depende de `e_ato_de_nomeacao`, que casa pelo nome inteiro
+    # do SIAPE e não teria como aproveitar candidatos a mais.
+    #
+    #   1. o nome que a curadoria diz que o DOU usa — afirmação humana;
+    #   2. os primeiros nomes — afrouxa a busca, não a identificação.
+    for alternativo in ([nome_no_dou] if nome_no_dou and nome_no_dou != nome else []) + [
+        nome_encurtado(nome)
+    ]:
+        if melhor_saida is not None:
+            break
+        if not alternativo:
+            continue
+        if verboso:
+            print(f"      (nada com o nome inteiro — tentando {alternativo!r})")
+        reserva = por_proximidade(dou.buscar(f'"{alternativo}"', usar_cache=usar_cache))
+        melhor_saida = procurar_ato_de_saida(
+            nomes, matricula, reserva[:MAX_ATOS_POR_PESSOA], usar_cache, verboso
+        )
+
     candidatos_destino = []
-
-    for ato in ordenados[:MAX_ATOS_POR_PESSOA]:
+    for ato in ordenados:
         chave = ato.get("urlTitle")
-        if not chave:
+        if not chave or dou.e_da_cgu(ato):
+            continue
+        distancia = distancia_meses(dou.data_iso(ato), mes_saida)
+        if not MESES_ANTES_DA_SAIDA <= distancia <= MESES_DEPOIS_DA_SAIDA:
             continue
         _, texto = dou.baixar_ato(chave, usar_cache=usar_cache)
         if not texto or not dou.cita_nome(texto, nome):
             continue
-
-        # Matrícula que conflita = outra pessoa com o mesmo nome. `None` (ato sem
-        # matrícula) não elimina: seria jogar fora a maioria dos atos.
-        matricula_confere = dou.siape_compativel(texto, matricula)
-        if matricula_confere is False:
+        # Fora da CGU o homônimo é risco real (ver o caso do TRE no cabeçalho), e
+        # aqui a matrícula que conflita continua VETANDO. É o oposto do que vale
+        # para o ato da própria CGU, e de propósito: lá o nome vem da fórmula do
+        # ato sobre o cargo de AFFC, aqui vem de uma citação solta num ato de
+        # outro órgão, que não sabe nada sobre a carreira desta pessoa.
+        if dou.siape_compativel(texto, matricula) is False:
             if verboso:
-                print(f"      - descartado (SIAPE não bate): {ato.get('title', '')[:60]}")
+                print(f"      - descartado (SIAPE não bate): {ato.get('title', '')[:55]}")
             continue
-
-        distancia = distancia_meses(dou.data_iso(ato), mes_saida)
-
-        if dou.e_da_cgu(ato) and melhor_saida is None:
-            # Quando a matrícula bate, a identidade já está provada e não é
-            # preciso o ato citar o cargo. Isso é o que permite reconhecer a
-            # demissão disciplinar, cujo texto fala do servidor e da penalidade
-            # mas não do cargo de AFFC. Sem prova de matrícula, mantém-se a
-            # exigência do cargo — nome sozinho casa homônimo.
-            tipo = dou.classificar(texto, exigir_cargo=not matricula_confere)
-            if tipo:
-                melhor_saida = (tipo, ato, texto)
-                if verboso:
-                    print(f"      + motivo {tipo}: {ato.get('title', '')[:60]}")
-                continue
-
-        if not dou.e_da_cgu(ato) and MESES_ANTES_DA_SAIDA <= distancia <= MESES_DEPOIS_DA_SAIDA:
-            if dou.e_ato_de_nomeacao(texto, nome):
-                candidatos_destino.append((distancia, ato, texto))
-                if verboso:
-                    print(f"      + destino?  {ato.get('hierarchyStr', '')[:50]}")
-
-        # Achou os dois: pode parar. Como `ordenados` vem por proximidade da
-        # saída, o primeiro destino encontrado já é o mais próximo — continuar
-        # só gastaria requisição sem poder melhorar a resposta.
-        if melhor_saida and candidatos_destino:
+        if dou.e_ato_de_nomeacao(texto, nome):
+            candidatos_destino.append((distancia, ato, texto))
+            if verboso:
+                print(f"      + destino?  {ato.get('hierarchyStr', '')[:50]}")
+            # Como `ordenados` vem por proximidade da saída, o primeiro destino
+            # já é o mais próximo — continuar só gastaria requisição.
             break
 
     if melhor_saida:
-        tipo, ato, texto = melhor_saida
+        tipo, ato, texto, identidade = melhor_saida
+        if identidade != dou.IDENTIDADE_SIAPE:
+            registro["OBSERVACAO"] = (
+                f"identidade do ato provada por {identidade}, não pela matrícula "
+                f"(ato: SIAPE {dou.siape_do_ato(texto) or 'ausente'}; "
+                f"Portal: {matricula or 'ausente'}) — confira à mão"
+            )
         registro["FONTE_MOTIVO"] = "DOU"
         registro["DATA_PUBLICACAO_SAIDA"] = dou.data_iso(ato)
 
@@ -327,6 +499,14 @@ def main() -> int:
 
     ja_feitas = {r["ID_SERVIDOR_PORTAL"]: r for r in ler_csv(ARQ_SAIDAS)}
 
+    # Nomes alternativos afirmados à mão. Coluna opcional: se ninguém a criou, o
+    # dicionário fica vazio e nada muda.
+    nomes_no_dou = {
+        c["ID_SERVIDOR_PORTAL"]: c[COLUNA_NOME_NO_DOU]
+        for c in ler_csv(ARQ_CURADORIA)
+        if c.get("ID_SERVIDOR_PORTAL") and c.get(COLUNA_NOME_NO_DOU)
+    }
+
     # O índice de atos é compartilhado com a varredura por frase. Ler antes e
     # reconciliar com o que já está no saidas_dou.csv mantém as duas metades
     # coerentes mesmo quando só um dos crawlers roda.
@@ -365,7 +545,10 @@ def main() -> int:
 
     for numero, pessoa in enumerate(fila, start=1):
         print(f"[{numero}/{len(fila)}] {pessoa['NOME'][:44]:<44} saiu em {pessoa['MES_SAIDA']}")
-        registro = analisar(pessoa, indice, usar_cache, verboso=bool(args.nome))
+        registro = analisar(
+            pessoa, indice, usar_cache, verboso=bool(args.nome),
+            nome_no_dou=nomes_no_dou.get(pessoa["ID_SERVIDOR_PORTAL"], ""),
+        )
         if pessoa.get(CHAVE_SO_DO_DOU):
             registro = somente_destino(registro)
         resultados[registro["ID_SERVIDOR_PORTAL"]] = registro

@@ -152,7 +152,7 @@ def registrar(
         "TIPO": tipo,
         "ROTULO": dou.ROTULOS.get(tipo, tipo),
         "DATA_PUBLICACAO": dou.data_iso(resultado) or anterior.get("DATA_PUBLICACAO", ""),
-        "TITULO": resultado.get("title") or anterior.get("TITULO", ""),
+        "TITULO": dou.titulo_do_ato(resultado) or anterior.get("TITULO", ""),
         # O nome do SIAPE (passado por quem busca por nome) vence o lido do ato:
         # é a grafia oficial, e o ato às vezes abrevia ou erra.
         "NOME": nome or anterior.get("NOME", "") or dou.nome_do_ato(texto),
