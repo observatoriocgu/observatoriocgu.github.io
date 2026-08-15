@@ -175,9 +175,13 @@ export interface DetalheSaida {
 
 /**
  * Saídas de AFFC da CGU publicadas no DOU, geradas por
- * `evasao/scripts/dou_saidas_affc.py` (Fase 2.5, D10). O JSON guarda datas,
- * nunca a contagem de dias — quem conta é o navegador, para o card não congelar
- * no dia em que o crawler rodou.
+ * `evasao/scripts/gerar_card_dou.py` a partir do índice único de atos
+ * (`data/atos_dou.csv`), que as duas varreduras do DOU alimentam — a por frase
+ * e a por nome. Até 15/08/2026 este JSON vinha de um crawler só dele, e por
+ * isso podia discordar do resto do painel.
+ *
+ * O JSON guarda datas, nunca a contagem de dias — quem conta é o navegador,
+ * para o card não congelar no dia em que o crawler rodou.
  */
 export interface EventoSaidaDou {
   tipo: 'vacancia' | 'aposentadoria' | 'exoneracao';
@@ -190,7 +194,17 @@ export interface EventoSaidaDou {
 }
 
 export interface SaidasDou {
-  geradoEm: string;
+  /** `AAAA-MM-DD` até onde a varredura do DOU já cobriu. */
+  varreduraAte: string;
+  /** `AAAAMM` — a competência mais nova que o SIAPE entregou. */
+  ultimaCompetenciaSiape: string;
+  /**
+   * Atos que o DOU publicou depois dessa competência. Não é pendência nem erro:
+   * é a defasagem de ~2 meses do Portal da Transparência, que faz o card estar
+   * sempre à frente da lista de últimas saídas. Essas saídas ainda não contam
+   * na evasão — quem conta é o SIAPE (D11, D13).
+   */
+  atosDepoisDaUltimaCompetencia: number;
   dataMaisRecente: string;
   tipoMaisRecente: string;
   eventos: EventoSaidaDou[];

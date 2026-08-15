@@ -89,8 +89,10 @@ const App: React.FC = () => {
   }, []);
 
   // Saídas de AFFC no DOU — alimenta o card "dias sem perder um Auditor" (D10).
-  // Vem de um crawler próprio, por frase, e não do dados.csv: é o único número
-  // da tela que precisa estar certo no dia, não no mês.
+  // Vem do índice de atos do DOU, não do dados.csv: é o único número da tela que
+  // precisa estar certo no dia, e não no mês. Por isso ele fica à frente da
+  // lista de últimas saídas, que espera o SIAPE — `atosDepoisDaUltimaCompetencia`
+  // diz de quanto é essa distância, e o card mostra.
   useEffect(() => {
     let montado = true;
 
@@ -313,6 +315,19 @@ const App: React.FC = () => {
                           <b>{formatarDataIsoParaBr(eventoMaisRecente.dataPublicacao)}</b>
                         </div>
                       )}
+                      {/* O DOU sai no dia; o SIAPE, com ~2 meses de atraso. Dizer de
+                          quanto é a distância é o que impede que a diferença entre
+                          este card e a lista de últimas saídas pareça erro. */}
+                      {saidasDou && saidasDou.atosDepoisDaUltimaCompetencia > 0 && (
+                        <div className="text-gray-500">
+                          {saidasDou.atosDepoisDaUltimaCompetencia} ato
+                          {saidasDou.atosDepoisDaUltimaCompetencia === 1 ? '' : 's'} publicado
+                          {saidasDou.atosDepoisDaUltimaCompetencia === 1 ? '' : 's'} depois de{' '}
+                          {formatarCompetenciaLonga(saidasDou.ultimaCompetenciaSiape)}, que é a última
+                          competência do SIAPE. Elas só entram nas contagens quando o Portal da
+                          Transparência as confirmar.
+                        </div>
+                      )}
                       <div className="flex flex-wrap justify-center gap-2 pt-1">
                         {TIPOS_SAIDA_DOU.map(({ tipo, rotuloCurto }) => {
                           const evento = eventosDouPorTipo.get(tipo);
@@ -328,7 +343,7 @@ const App: React.FC = () => {
                             );
                           }
                           const href = evento.arquivo
-                            ? `${base}data/dias_sem_perder_AFFC/${evento.arquivo}`
+                            ? `${base}data/saidas_dou/${evento.arquivo}`
                             : evento.urlDou;
                           return (
                             <a
@@ -461,6 +476,18 @@ const App: React.FC = () => {
               esconder uma saída porque a especialidade dela está desmarcada omitiria a notícia mais recente sem dizer
               que omitiu.
             </p>
+            {/* Esta lista é do SIAPE; o card de dias é do DOU. As duas fontes não
+                podem coincidir — o Portal publica com atraso —, e sem esta frase a
+                diferença de datas entre elas lê como erro do painel. */}
+            {saidasDou && saidasDou.atosDepoisDaUltimaCompetencia > 0 && (
+              <p className="mb-3 text-sm text-gray-500">
+                Aqui quem conta é o SIAPE, que vai até{' '}
+                {formatarCompetenciaLonga(saidasDou.ultimaCompetenciaSiape)}. O DOU já publicou mais{' '}
+                <span className="text-gray-300">{saidasDou.atosDepoisDaUltimaCompetencia}</span> ato
+                {saidasDou.atosDepoisDaUltimaCompetencia === 1 ? '' : 's'} de saída depois disso — estão no card
+                acima, e entram nesta lista quando o Portal da Transparência confirmar de quem são.
+              </p>
+            )}
             {ultimasSaidas.length === 0 ? (
               <div className="text-sm text-gray-400">
                 {carregando ? 'Carregando...' : 'Nenhuma saída registrada.'}

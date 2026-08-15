@@ -1,7 +1,13 @@
 name: Atualizar saídas do DOU (AFFC)
 
-# Roda o crawler do Diário Oficial da União e atualiza o card
-# "dias sem perder um Auditor".
+# Varre o Diário Oficial da União, registra as saídas de AFFC no índice de atos
+# e regera o card "dias sem perder um Auditor" a partir dele.
+#
+# São dois passos porque um tem rede e o outro não: `varrer_dou.py` busca no
+# in.gov.br, `gerar_card_dou.py` só relê arquivo. O segundo NÃO depende dos
+# snapshots do Portal da Transparência, que não estão no Git — é por isso que o
+# card pode ser regerado aqui, enquanto o `construir_painel.py` só roda na
+# máquina de quem tem os snapshots.
 #
 # O JSON gerado guarda DATAS, não a contagem de dias — o navegador calcula
 # "faz N dias" ao renderizar. Por isso o card continua correto mesmo se este
@@ -34,15 +40,22 @@ jobs:
         with:
           python-version: '3.12'
 
-      - name: Buscar saídas no DOU
-        run: python scripts/dou_saidas_affc.py --meses 12
+      - name: Varrer o DOU e registrar os atos
+        run: python scripts/varrer_dou.py
+        working-directory: evasao
+
+      - name: Regerar o card a partir do índice
+        run: python scripts/gerar_card_dou.py
         working-directory: evasao
 
       - name: Commit e push do que mudou
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add evasao/public/dias_sem_perder_affc.json evasao/data/dias_sem_perder_AFFC
+          git add evasao/public/dias_sem_perder_affc.json \
+                  evasao/data/atos_dou.csv \
+                  evasao/data/varredura_dou.txt \
+                  evasao/data/saidas_dou
           if ! git diff --cached --quiet; then
             git commit -m "Atualiza saídas de AFFC publicadas no DOU"
             git push

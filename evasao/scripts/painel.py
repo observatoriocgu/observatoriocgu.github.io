@@ -356,11 +356,24 @@ def gerar_alteracoes(meses: list[str], cgu: dict, pessoas: list[dict]) -> dict:
     por_id = {p["ID_SERVIDOR_PORTAL"]: p for p in pessoas}
     historico = []
 
+    def por_nome(identificador: str) -> tuple[str, str]:
+        """Ordem estável para a diferença entre dois conjuntos.
+
+        `set - set` sai em ordem de hash, e o Python randomiza o hash de string a
+        cada processo: sem esta chave o arquivo nascia diferente a cada execução,
+        com os mesmos registros embaralhados. Não quebrava nada e não aparecia em
+        tela — só produzia ~1.850 linhas de diff falso em todo commit, escondendo
+        a alteração de verdade no meio. O id entra como desempate porque nome não
+        é chave (D12).
+        """
+        pessoa = por_id.get(identificador)
+        return ((pessoa or {}).get("NOME", ""), identificador)
+
     for indice in range(1, len(meses)):
         mes, anterior = meses[indice], meses[indice - 1]
         mudancas = []
 
-        for identificador in set(cgu[anterior]) - set(cgu[mes]):
+        for identificador in sorted(set(cgu[anterior]) - set(cgu[mes]), key=por_nome):
             pessoa = por_id[identificador]
             # Só é saída se a pessoa não voltou depois (D13). Quem voltou teve
             # um buraco na série, não uma saída.
@@ -379,7 +392,7 @@ def gerar_alteracoes(meses: list[str], cgu: dict, pessoas: list[dict]) -> dict:
                 }
             )
 
-        for identificador in set(cgu[mes]) - set(cgu[anterior]):
+        for identificador in sorted(set(cgu[mes]) - set(cgu[anterior]), key=por_nome):
             pessoa = por_id.get(identificador)
             if not pessoa or pessoa["MES_ENTRADA"] != mes:
                 continue  # retorno de quem tinha sumido, não entrada nova

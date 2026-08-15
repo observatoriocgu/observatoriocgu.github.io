@@ -4,12 +4,20 @@ Para cada saída da CGU detectada no SIAPE, busca no DOU o ato que diz POR QUE a
 pessoa saiu e, quando dá, PARA ONDE foi.
 
 Entrada : data/dados.csv (as linhas com MES_SAIDA preenchido)
-Saída   : data/saidas_dou.csv        — acumulativo, uma linha por pessoa
+Saída   : data/saidas_dou.csv        — acumulativo, uma linha por PESSOA
+          data/atos_dou.csv          — o índice único, uma linha por ATO
           data/saidas_dou/*.html     — cópia arquivada do ato
 
 O arquivo de saída é uma camada separada de propósito: `construir_painel.py`
 regenera o dados.csv do zero a cada execução, e se este script escrevesse lá
 direto, reconstruir o painel apagaria ~50 minutos de crawl.
+
+DUAS SAÍDAS, DUAS CHAVES, E ISSO NÃO É DUPLICAÇÃO. O `saidas_dou.csv` é indexado
+por PESSOA e é o que o painel mescla no `dados.csv`. O `atos_dou.csv` é indexado
+por ATO e é o que o card lê — e é o mesmo índice que a varredura por frase
+(`varrer_dou.py`) alimenta, que é como o card enxerga o que o SIAPE ainda não
+mostrou. Este script preenche o `ID_SERVIDOR_PORTAL` da linha do índice: é o
+momento em que "houve uma vacância em 11/08" vira "foi fulano quem saiu".
 
 ESTRATÉGIA DE BUSCA — uma requisição por pessoa, sem janelamento. Um nome não
 chega perto do teto de 50 resultados por resposta (o caso testado devolveu 20
@@ -48,12 +56,12 @@ import sys
 from datetime import datetime
 from pathlib import Path
 
+import atos
 import dou
 
 RAIZ = Path(__file__).resolve().parent.parent
 ARQ_DADOS = RAIZ / "data" / "dados.csv"
 ARQ_SAIDAS = RAIZ / "data" / "saidas_dou.csv"
-DIR_ATOS = RAIZ / "data" / "saidas_dou"
 
 COLUNAS = (
     "ID_SERVIDOR_PORTAL", "NOME", "SITUACAO",
@@ -136,7 +144,7 @@ def buscar_atos(nome: str, usar_cache: bool) -> list[dict]:
     return resultados
 
 
-def analisar(pessoa: dict, usar_cache: bool, verboso: bool = False) -> dict:
+def analisar(pessoa: dict, indice: dict, usar_cache: bool, verboso: bool = False) -> dict:
     """Motivo e destino de uma saída, a partir dos atos do DOU que citam a pessoa."""
     nome, mes_saida = pessoa["NOME"], pessoa["MES_SAIDA"]
     matricula = pessoa.get("MATRICULA", "")
@@ -144,13 +152,15 @@ def analisar(pessoa: dict, usar_cache: bool, verboso: bool = False) -> dict:
     registro["ID_SERVIDOR_PORTAL"] = pessoa["ID_SERVIDOR_PORTAL"]
     registro["NOME"] = nome
 
-    atos = buscar_atos(nome, usar_cache)
-    if not atos:
+    citam_a_pessoa = buscar_atos(nome, usar_cache)
+    if not citam_a_pessoa:
         return registro
 
     # Do mais próximo da saída para o mais distante: o ato que interessa é o que
     # está perto do mês em que a pessoa sumiu do SIAPE.
-    ordenados = sorted(atos, key=lambda a: abs(distancia_meses(dou.data_iso(a), mes_saida)))
+    ordenados = sorted(
+        citam_a_pessoa, key=lambda a: abs(distancia_meses(dou.data_iso(a), mes_saida))
+    )
 
     melhor_saida = None
     candidatos_destino = []
@@ -200,23 +210,26 @@ def analisar(pessoa: dict, usar_cache: bool, verboso: bool = False) -> dict:
 
     if melhor_saida:
         tipo, ato, texto = melhor_saida
-        if tipo in dou.MOTIVOS_NAO_PUBLICADOS:
-            # Sabemos o motivo e não o publicamos — ver MOTIVOS_NAO_PUBLICADOS
-            # em dou.py. Nada de título, URL ou cópia arquivada do ato: o
-            # arquivo é commitado num repositório público e a pasta
-            # `saidas_dou/` vai inteira para o site.
+        registro["FONTE_MOTIVO"] = "DOU"
+        registro["DATA_PUBLICACAO_SAIDA"] = dou.data_iso(ato)
+
+        # `atos.registrar` devolve None para motivo não publicado (D18) e é o
+        # único ponto que precisa decidir isso. Aqui basta respeitar: sem linha
+        # no índice, sem título, sem URL e sem cópia arquivada — o índice e a
+        # pasta `saidas_dou/` vão inteiros para repositório público e para o site.
+        linha = atos.registrar(
+            indice, ato, tipo, texto, atos.FONTE_NOME,
+            id_servidor=pessoa["ID_SERVIDOR_PORTAL"],
+        )
+        if linha is None:
             registro["MOTIVO_SAIDA"] = dou.ROTULO_NAO_PUBLICADO
             registro["SITUACAO"] = dou.SITUACAO_NAO_PUBLICADA
-            registro["FONTE_MOTIVO"] = "DOU"
-            registro["DATA_PUBLICACAO_SAIDA"] = dou.data_iso(ato)
         else:
             registro["MOTIVO_SAIDA"] = dou.ROTULOS[tipo]
             registro["SITUACAO"] = dou.SITUACAO_POR_TIPO[tipo]
-            registro["FONTE_MOTIVO"] = "DOU"
-            registro["DATA_PUBLICACAO_SAIDA"] = dou.data_iso(ato)
-            registro["ATO_SAIDA_TITULO"] = ato.get("title", "")
-            registro["ATO_SAIDA_URL"] = dou.BASE_ATO + ato["urlTitle"]
-            registro["ATO_SAIDA_ARQUIVO"] = dou.salvar_ato(ato, tipo, texto, DIR_ATOS)
+            registro["ATO_SAIDA_TITULO"] = linha["TITULO"]
+            registro["ATO_SAIDA_URL"] = linha["URL"]
+            registro["ATO_SAIDA_ARQUIVO"] = linha["ARQUIVO"]
 
     if candidatos_destino:
         # O mais próximo da saída, em qualquer direção. Se a pessoa tomou posse
@@ -246,6 +259,12 @@ def main() -> int:
 
     ja_feitas = {r["ID_SERVIDOR_PORTAL"]: r for r in ler_csv(ARQ_SAIDAS)}
 
+    # O índice de atos é compartilhado com a varredura por frase. Ler antes e
+    # reconciliar com o que já está no saidas_dou.csv mantém as duas metades
+    # coerentes mesmo quando só um dos crawlers roda.
+    indice = atos.ler()
+    atos.importar_de_saidas_dou(indice)
+
     fila = [p for p in pessoas if p.get("MES_SAIDA")]
     if args.nome:
         alvo = dou.normalizar(args.nome)
@@ -264,6 +283,9 @@ def main() -> int:
     print(f"Saídas a processar: {len(fila)}  (já feitas: {len(ja_feitas)}"
           f"{f', {len(provisorias)} provisória(s) adiada(s)' if provisorias else ''})")
     if not fila:
+        # Nada a buscar não quer dizer nada a gravar: a reconciliação acima pode
+        # ter trazido atos que faltavam ao índice.
+        atos.gravar(indice)
         print("Nada a fazer.")
         return 0
     print(f"Pausa entre requisições: {dou.PAUSA_SEGUNDOS}s | cache: "
@@ -273,9 +295,9 @@ def main() -> int:
     resultados = dict(ja_feitas)
     achou_motivo = achou_destino = 0
 
-    for indice, pessoa in enumerate(fila, start=1):
-        print(f"[{indice}/{len(fila)}] {pessoa['NOME'][:44]:<44} saiu em {pessoa['MES_SAIDA']}")
-        registro = analisar(pessoa, usar_cache, verboso=bool(args.nome))
+    for numero, pessoa in enumerate(fila, start=1):
+        print(f"[{numero}/{len(fila)}] {pessoa['NOME'][:44]:<44} saiu em {pessoa['MES_SAIDA']}")
+        registro = analisar(pessoa, indice, usar_cache, verboso=bool(args.nome))
         resultados[registro["ID_SERVIDOR_PORTAL"]] = registro
 
         if registro["MOTIVO_SAIDA"]:
@@ -290,18 +312,21 @@ def main() -> int:
                   f"({registro['DATA_DESTINO']})")
 
         # Grava a cada pessoa: uma interrupção no meio de 268 nomes não pode
-        # jogar fora o que já foi baixado.
+        # jogar fora o que já foi baixado. O índice de atos vai junto, pelo
+        # mesmo motivo — e para os dois arquivos nunca discordarem.
         ARQ_SAIDAS.parent.mkdir(parents=True, exist_ok=True)
         with open(ARQ_SAIDAS, "w", encoding="utf-8", newline="") as fh:
             escritor = csv.DictWriter(fh, fieldnames=list(COLUNAS), delimiter=";",
                                       extrasaction="ignore")
             escritor.writeheader()
             escritor.writerows(resultados[k] for k in sorted(resultados))
+        atos.gravar(indice)
 
     print()
     print(f"Motivo identificado : {achou_motivo} de {len(fila)}")
     print(f"Destino identificado: {achou_destino} de {len(fila)}")
     print(f"Gravado: {ARQ_SAIDAS.relative_to(RAIZ)} ({len(resultados)} linhas)")
+    print(f"Gravado: {atos.ARQ_INDICE.relative_to(RAIZ)} ({len(indice)} atos)")
     print()
     print("CONFIRA À MÃO uma amostra dos atos antes de publicar: abra o ATO_SAIDA_URL,")
     print("veja se cita a pessoa e se o motivo classificado é o que o texto diz.")

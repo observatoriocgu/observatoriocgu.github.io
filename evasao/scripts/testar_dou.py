@@ -54,6 +54,20 @@ CLASSIFICACAO = [
         f"Declarar vago, por motivo de falecimento, o cargo de {CARGO} ocupado por JOAO DA SILVA",
         "falecimento",
     ),
+    (
+        "concessão de pensão NÃO é saída: o ato é sobre o pensionista, sai muito "
+        "depois do óbito, e o instituidor pode ser aposentado ou de outro cargo",
+        f"Art. 1o Conceder pensao vitalicia a MARIA DE SOUZA, na qualidade de conjuge "
+        f"do ex-servidor JOAO DA SILVA, ocupante do cargo de {CARGO}, Classe S, Padrao V, "
+        f"matricula SIAPE no 1538014, falecido em atividade, em 16/02/2025",
+        None,
+    ),
+    (
+        "pensão temporária, mesma coisa",
+        f"Art. 1o Conceder pensao temporaria, pelo periodo de quatro meses, a LUISA DE SOUZA, "
+        f"na qualidade de filha do ex-servidor JOAO DA SILVA, ocupante do cargo de {CARGO}",
+        None,
+    ),
 ]
 
 DESTINO = [

@@ -63,6 +63,24 @@ DELTA_MAXIMO = 50
 # Segundos entre duas requisições de rede. Acerto de cache não conta.
 PAUSA_SEGUNDOS = 1.0
 
+# VALIDADE DO CACHE — a distinção que faltava, e que fazia o observatório não
+# enxergar movimentação nova.
+#
+# Página de ATO publicado é imutável: uma vez baixada, vale para sempre, e é daí
+# que vem a economia dos ~50 minutos de backfill.
+#
+# Resposta de BUSCA não é imutável. Uma janela que alcança o presente ganha atos
+# a cada dia que passa, e uma busca sem janela (`exactDate=all`, que é como se
+# busca por nome) nunca fecha. Cacheá-las para sempre congela a varredura no dia
+# em que ela rodou pela primeira vez: o crawler segue respondendo, sem erro
+# nenhum, com o resultado da semana passada.
+#
+# A janela só é considerada FECHADA — e o cache dela, eterno — quando termina há
+# mais de 30 dias. O DOU republica e reindexa ato com atraso de alguns dias; a
+# folga de 30 é a margem para isso.
+DIAS_PARA_JANELA_FECHADA = 30
+VALIDADE_BUSCA_ABERTA_HORAS = 6.0
+
 _ultima_requisicao = 0.0
 
 
@@ -89,17 +107,32 @@ def _respeitar_pausa() -> None:
     _ultima_requisicao = time.monotonic()
 
 
-def baixar(url: str, timeout: int = 90, usar_cache: bool = True) -> str:
+def baixar(
+    url: str,
+    timeout: int = 90,
+    usar_cache: bool = True,
+    validade_horas: float | None = None,
+) -> str:
     """
     Baixa uma URL como texto, com cache em disco e pausa entre requisições.
+
+    `validade_horas=None` é cache eterno — o certo para página de ato, que não
+    muda depois de publicada. Com um valor, a cópia em disco mais velha que isso
+    é ignorada e a URL vai à rede de novo (ver VALIDADE_BUSCA_ABERTA_HORAS).
 
     Tenta urllib e cai para o curl se levar 403 — alguns proxies bloqueiam o
     User-Agent do urllib mas deixam o curl passar. Este fallback não é
     decorativo: sem ele a busca do DOU responde 403 nesta máquina.
     """
     cache = _caminho_cache(url)
+    vencido = False
     if usar_cache and cache.is_file():
-        return cache.read_text(encoding="utf-8")
+        if validade_horas is None:
+            return cache.read_text(encoding="utf-8")
+        idade_horas = (time.time() - cache.stat().st_mtime) / 3600
+        if idade_horas <= validade_horas:
+            return cache.read_text(encoding="utf-8")
+        vencido = True
 
     cabecalhos = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
@@ -123,6 +156,13 @@ def baixar(url: str, timeout: int = 90, usar_cache: bool = True) -> str:
             conteudo = proc.stdout.decode("utf-8", errors="replace")
         except Exception as erro:
             print(f"    ! falha ao baixar {url[:80]}: {erro}", file=sys.stderr)
+            # Rede fora com cópia vencida em disco: a cópia velha é melhor que
+            # nada. Sem esta volta, uma queda de rede transformaria o cache
+            # vencido em ausência de resultado — e a varredura do dia
+            # "descobriria" que a CGU não tem mais saída nenhuma.
+            if vencido:
+                print("      (usando a cópia vencida do cache)", file=sys.stderr)
+                return cache.read_text(encoding="utf-8")
             return ""
 
     # Só grava resposta não-vazia: cachear "" transformaria uma falha de rede
@@ -131,6 +171,13 @@ def baixar(url: str, timeout: int = 90, usar_cache: bool = True) -> str:
         DIR_CACHE.mkdir(parents=True, exist_ok=True)
         cache.write_text(conteudo, encoding="utf-8")
     return conteudo
+
+
+def janela_fechada(fim: date | None) -> bool:
+    """True quando o fim da janela já passou tempo bastante para não mudar mais."""
+    if fim is None:
+        return False
+    return (date.today() - fim).days > DIAS_PARA_JANELA_FECHADA
 
 
 def buscar(
@@ -149,6 +196,11 @@ def buscar(
     `secao='todos'` é o padrão de propósito: atos de pessoal (nomeação,
     exoneração, vacância, aposentadoria) saem na Seção 2, e buscar só na Seção 1
     não devolve nenhum deles.
+
+    O cache só é eterno para janela FECHADA (ver DIAS_PARA_JANELA_FECHADA). Busca
+    que alcança o presente — e busca sem janela, que é como se busca por nome —
+    tem validade curta: senão a varredura de hoje devolveria o resultado do dia
+    em que rodou pela primeira vez.
     """
     parametros = {
         "q": q,
@@ -163,7 +215,12 @@ def buscar(
     else:
         parametros["exactDate"] = "all"
 
-    pagina = baixar(BASE_BUSCA + "?" + urllib.parse.urlencode(parametros), usar_cache=usar_cache)
+    validade = None if janela_fechada(fim) else VALIDADE_BUSCA_ABERTA_HORAS
+    pagina = baixar(
+        BASE_BUSCA + "?" + urllib.parse.urlencode(parametros),
+        usar_cache=usar_cache,
+        validade_horas=validade,
+    )
     if not pagina:
         return []
 
@@ -370,6 +427,33 @@ PADRAO_VACANCIA_MOTIVO = r"POSSE\s+EM\s+OUTRO\s+CARGO"
 # Só conta se o ato realmente falar do cargo efetivo de AFFC.
 PADRAO_CARGO = r"AUDITOR[A]?\s+FEDERAL\s+DE\s+FINANCAS\s+E\s+CONTROLE"
 
+# CONCESSÃO DE PENSÃO NÃO É SAÍDA — descoberto em 15/08/2026, quando a varredura
+# por frase deixou de parar no primeiro ato de cada tipo e passou a ver tudo.
+#
+# O ato diz: "Conceder pensão vitalícia a FULANA, na qualidade de cônjuge do
+# ex-servidor BELTRANO, ocupante do cargo de Auditor Federal de Finanças e
+# Controle [...] falecido em atividade". Ele casa `PADRAO_CARGO` e casa
+# `FALECID[OA]`, e por isso era classificado como falecimento — mas o ato é
+# sobre a PENSÃO DE OUTRA PESSOA, e sai meses ou anos depois do óbito. Três
+# problemas de uma vez:
+#
+#   - quem o ato nomeia primeiro é o pensionista, que não é Auditor;
+#   - a data do ato não é a data da saída;
+#   - o instituidor pode ser aposentado, ou de outro cargo. Um dos atos
+#     encontrados trata de um TÉCNICO Federal de Finanças e Controle, cargo que
+#     está fora do observatório por decisão (D7) — e o nome dele é prefixo do
+#     nome de um Auditor real da base, que é o caso de homônimo já documentado
+#     em `cita_nome`.
+#
+# A saída por morte tem ato próprio, com outra redação: "Declarar vago, em
+# virtude de falecimento, o cargo efetivo de Auditor Federal...". É esse que
+# conta, e ele não fala em conceder pensão.
+PADROES_PENSAO = (
+    r"CONCEDER\s+PENSAO",
+    r"PENSAO\s+(?:VITALICIA|TEMPORARIA)",
+    r"INSTITUIDOR\s+DA\s+PENSAO",
+)
+
 # Nomeação/posse — usado para achar o DESTINO de quem saiu.
 PADROES_NOMEACAO = (
     r"\bNOMEAR\b",
@@ -406,6 +490,11 @@ def classificar(texto: str, exigir_cargo: bool = True) -> str | None:
     normalizado = normalizar(texto)
 
     if exigir_cargo and not re.search(PADRAO_CARGO, normalizado):
+        return None
+
+    # Antes de qualquer tipo: ato de pensão fala do falecimento de um servidor
+    # sem ser o ato de saída dele. Ver PADROES_PENSAO.
+    if any(re.search(p, normalizado) for p in PADROES_PENSAO):
         return None
 
     # IMPORTANTE: quando um tipo é descartado, o certo é `continue` — testar os

@@ -56,6 +56,7 @@ Todas as decisões abaixo estão **fechadas**. As fases podem ser executadas sem
 | D13 | Definição de "saiu da CGU" | Fase 2 | ausência do conjunto CGU (`COD_ORG_LOTACAO = 59000`) **a partir da última presença**, nunca por diff par a par. Saída detectada no snapshot mais novo nasce **provisória** |
 | D14 | Procedência da informação | Fases 2-3 | todo campo enriquecido carrega **`FONTE_*`** (SIAPE/DOU/RANKING/BUSCA/MANUAL) e a linha carrega **`VERIFICADO`** (SIM/NÃO, preenchido por gente). **Não existe nota de confiança automática** — a máquina diz de onde tirou e se alguém conferiu; ela não se autoavalia |
 | D15 | Atualização mensal | Fase 2 | **um comando local** (`atualizar.py`), resultado commitado; o Actions só builda e publica. Assunção adotada por padrão — migrar para cron no CI é reversível e não muda a arquitetura |
+| D19 | Entrada dos atos do DOU | Fase 2.5 + Fase 2 (v2) | **um índice único de atos**, `data/atos_dou.csv`, com chave no ato (`URL_TITLE`), alimentado pelas **duas** varreduras — a por frase (`varrer_dou.py`) e a por nome (`enriquecer_saidas.py`) — e uma pasta única de cópias, `data/saidas_dou/`. O card deixa de ter crawler próprio e passa a ser **derivado** do índice (`gerar_card_dou.py`). Some a pasta `data/dias_sem_perder_AFFC/`. **Ajusta a delimitação da D10**: a varredura por frase continua não sendo fonte de contagem, mas passa a registrar **tudo** o que encontra, em vez de parar no primeiro ato de cada tipo |
 
 **Efeito das decisões novas sobre as antigas:**
 
@@ -408,12 +409,61 @@ resolvendo para arquivo existente**.
   havendo mais de um na mesma data (em 11/08/2026 houve as Portarias 2.099 e 2.100), fica com o
   primeiro que a busca devolver. O ato serve de exemplo e comprovação da data, não de censo.
 
+> **REVISADA EM 15/08/2026 PELA D19.** O `dou_saidas_affc.py` não existe mais. A varredura por frase
+> virou `varrer_dou.py`, deixou de parar no primeiro ato de cada tipo e passou a registrar tudo no
+> índice `data/atos_dou.csv`; o card virou `gerar_card_dou.py`, derivado do índice, sem rede. A pasta
+> `data/dias_sem_perder_AFFC/` foi removida — as cópias dos atos moram todas em `data/saidas_dou/`.
+>
+> **O que motivou:** as duas estruturas guardavam o mesmo ato em pastas diferentes e discordavam
+> sobre qual era a última saída, sem que nenhuma estivesse errada — o card lia o DOU do dia
+> (11/08/2026) e a lista lia o SIAPE, que ia até 202606. A divergência agora é medida e mostrada,
+> não deduzida pelo leitor.
+>
+> **O que a parada precoce escondia:** ao varrer a mesma janela sem parar, apareceram na primeira
+> execução 2 atos de 11/08 (Portarias 2.099 **e** 2.100) e um de 07/08 que o crawler antigo
+> descartava por já ter "achado a vacância". Apareceram também 5 atos de **concessão de pensão**
+> classificados como falecimento — corrigido em `dou.PADROES_PENSAO`, com 2 casos novos no
+> `testar_dou.py` e 3 pessoas reprocessadas (ver §2.5.1).
+
 **Delimitação de escopo (D10):** este crawler existe **só para o número de dias e os 3 links**. Ele
 não é — e não precisa virar — fonte de contagem de evasões: para de varrer assim que acha o ato mais
 recente de cada tipo, então nunca soube quantas saídas houve no total. A **série completa vem da
 base mensal do SIAPE** (Portal da Transparência), na Fase 2 (v2). Consequência prática: não faz sentido
 auditar a cobertura do crawler nem medir recall; o que importa é a **precisão** dos 3 atos exibidos,
 que foi conferida um a um.
+
+### 2.5.1 Concessão de pensão não é saída *(15/08/2026, achado pela D19)*
+
+Enquanto a varredura por frase parava no primeiro ato de cada tipo, este ato nunca aparecia. Assim
+que ela passou a ver tudo, apareceram cinco de uma vez:
+
+> *"Art. 1º Conceder pensão vitalícia a **MARIA DE LOURDES SILVA**, na qualidade de companheira do
+> ex-servidor **LUIZ CARLOS DE ALMEIDA**, ocupante do cargo de **Técnico** Federal de Finanças e
+> Controle, matrícula SIAPE nº 1538217, [...] **falecido em atividade**, em 16/02/2025"*
+
+O ato cita o cargo e cita falecimento, então casava `PADRAO_CARGO` e `PADROES["falecimento"]`. Mas
+ele é sobre **outra pessoa** — a pensionista —, sai meses ou anos depois do óbito, e o instituidor
+pode ser aposentado ou, como aqui, **TFFC**, que está fora do observatório (**D7**). Pior: o nome
+dele é o mesmo de um Auditor real da base — o caso de homônimo por prefixo já documentado em
+`dou.cita_nome`.
+
+**Correção:** `dou.PADROES_PENSAO`, testado antes de qualquer tipo, com dois casos novos no
+`testar_dou.py` (pensão vitalícia e temporária).
+
+**Efeito nos dados já publicados.** Três pessoas tinham o motivo apoiado num ato de pensão. Todas as
+três foram reprocessadas, e as três acharam o ato **certo**, que existia desde sempre e só perdia a
+vez por estar mais longe do mês da saída:
+
+| Pessoa | Ato antes (pensão) | Ato depois (vacância por falecimento) |
+|---|---|---|
+| WLADIMIR BRAIDOTTI | 12/03/2024 | **01/03/2024** |
+| FABIO CARVALHO HANSEM | 13/06/2024 | **11/06/2024** |
+| LUIZ CARLOS DE ALMEIDA | 14/03/2025 | **10/03/2025** |
+
+O motivo publicado (`Falecimento`) continua o mesmo nos três casos — o que muda é o ato citado, que
+agora é o da pessoa certa. O de LUIZ CARLOS foi conferido à mão: o ato novo declara vago o cargo de
+**Auditor** Federal de Finanças e Controle, SIAPE `1538…`, compatível com a máscara `153****` do
+Portal; o ato de pensão era de um **Técnico**, SIAPE 1538217.
 
 ---
 

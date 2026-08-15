@@ -75,15 +75,44 @@ Edital CGU nº 5 de 13/06/2022, publicado no DOU (D17).
 ## Pipeline de dados (evasao/scripts/)
 - atualizar.py         comando único: filtra -> constrói -> DOU -> reconstrói
 - dou.py               biblioteca: rede, busca, cache, classificação de atos
+- atos.py              biblioteca: o índice único dos atos (data/atos_dou.csv)
 - painel.py            biblioteca: derivação dos snapshots (sem rede)
 - construir_painel.py  gera historico_mensal / dados / serie / alteracoes
 - concurso.py          resultado final do concurso, a partir de 1 ato do DOU
-- enriquecer_saidas.py motivo e destino de cada saída, buscando por nome no DOU
+- enriquecer_saidas.py motivo e destino de cada saída, buscando por NOME no DOU
+- varrer_dou.py        varre o DOU por FRASE e registra toda saída de AFFC
+- gerar_card_dou.py    card "dias sem perder um Auditor", derivado do índice
 - filtrar_affc.py      reduz o CSV bruto do Portal aos AFFC
-- dou_saidas_affc.py   card "dias sem perder um Auditor" (Fase 2.5)
 - testar_dou.py        regressão da classificação, sem rede. RODAR SEMPRE que
                        mexer nos padrões de dou.py: cada caso ali é um erro que
                        já foi ao ar ou quase foi
+
+## As duas varreduras do DOU escrevem no mesmo índice (D19, 15/08/2026)
+- `data/atos_dou.csv` é o índice ÚNICO dos atos de saída, com chave no ato
+  (URL_TITLE do in.gov.br), e `data/saidas_dou/` é a pasta única das cópias.
+  NÃO recriar uma segunda pasta nem um segundo JSON para o card: era assim
+  antes, e o card e a lista de saídas divergiam sem que nenhum estivesse errado
+- Por NOME (`enriquecer_saidas.py`): parte do dados.csv, logo do SIAPE, logo
+  NUNCA alcança o que o DOU publicou depois da última competência do Portal
+  (~2 meses de atraso). É quem preenche o ID_SERVIDOR_PORTAL da linha
+- Por FRASE (`varrer_dou.py`): lê o DOU do dia e não sabe de quem é o ato.
+  É incremental — `data/varredura_dou.txt` guarda até onde já cobriu, e a
+  execução seguinte volta 21 dias, porque o DOU reindexa com atraso
+- O card sai de `gerar_card_dou.py`, que só relê arquivo: sem rede, sem
+  snapshot do Portal, determinístico. É por isso que o workflow diário
+  consegue rodá-lo — `construir_painel.py` não roda no CI, depende dos
+  snapshots, que estão fora do Git
+- Linha do índice sem ID_SERVIDOR_PORTAL não é falha: é saída que o DOU já
+  anunciou e o SIAPE ainda não confirmou. Ela NÃO entra em contagem de evasão
+  (quem conta é o SIAPE, D11/D13) e aparece na tela como defasagem declarada
+- Cache: página de ato é imutável e vale para sempre; resposta de BUSCA, não.
+  Janela que alcança o presente e busca sem data (`exactDate=all`) valem 6h.
+  Sem isso a varredura devolve para sempre o resultado do dia em que rodou
+- CONCESSÃO DE PENSÃO NÃO É SAÍDA. "Conceder pensão vitalícia a X, na qualidade
+  de cônjuge do ex-servidor Y, [...] falecido em atividade" cita o cargo e cita
+  falecimento, e era classificado como falecimento — mas o ato é sobre o
+  pensionista, sai muito depois do óbito e o instituidor pode ser aposentado ou
+  TFFC (fora do escopo, D7). Ver dou.PADROES_PENSAO
 
 ## Ferramentas
 - Scripts Python são STDLIB ONLY: o CI não roda pip install, e requests/bs4/

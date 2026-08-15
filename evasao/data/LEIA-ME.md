@@ -13,8 +13,10 @@
 | `serie_mensal.csv` | `construir_painel.py` — uma linha por competência | **não** |
 | `concurso_2021.csv` | `concurso.py` — resultado final do DOU (D17) + os sub judice | **não** |
 | **`concurso_2021_subjudice.csv`** | **você** — aprovados por decisão judicial | **sim** |
-| `saidas_dou.csv` | `enriquecer_saidas.py` — motivo e destino, do DOU | **não** |
-| `saidas_dou/*.html` | `enriquecer_saidas.py` — cópia do ato de cada saída | **não** |
+| `saidas_dou.csv` | `enriquecer_saidas.py` — motivo e destino, uma linha por **pessoa** | **não** |
+| `atos_dou.csv` | as duas varreduras do DOU — o índice único, uma linha por **ato** | **não** |
+| `saidas_dou/*.html` | as duas varreduras do DOU — cópia do ato | **não** |
+| `varredura_dou.txt` | `varrer_dou.py` — até que dia o DOU já foi varrido | **não** |
 | **`curadoria.csv`** | **você** | **sim** |
 | `curadoria_sugestoes.csv` | `construir_painel.py` — pauta para você conferir | não (é saída) |
 
@@ -69,6 +71,25 @@ Confirmando, copie para o `curadoria.csv`.
 `ORGAO_DESTINO` é **inferência** — ver §2.3.3 do `PLANO.md` para os dez formatos
 de falso positivo já encontrados. Todo destino nasce `VERIFICADO = NÃO`; só vira
 `SIM` quando alguém abrir o `URL_DESTINO` e confirmar.
+
+## Por que o card de dias vai na frente da lista de saídas
+
+Não é erro de nenhum dos dois. São dois relógios:
+
+- o **DOU** publica o ato no dia. `varrer_dou.py` varre por frase e registra
+  tudo em `atos_dou.csv`. É daí que sai o card "dias sem perder um Auditor";
+- o **SIAPE** chega ao Portal da Transparência com ~2 meses de atraso, e é ele
+  quem diz **quem** saiu, pela ausência a partir da última presença (D13). É daí
+  que sai a lista de últimas saídas, o gráfico e todas as contagens.
+
+Enquanto o Portal não alcança, o ato fica no índice **sem
+`ID_SERVIDOR_PORTAL`** — sabe-se que houve uma vacância em tal dia, não de quem.
+Essas linhas não entram em contagem nenhuma, e o painel mostra quantas são.
+Quando a competência chega, `enriquecer_saidas.py` casa o ato com a pessoa e
+preenche o id.
+
+Contar ato como saída seria errado duas vezes: uma pessoa pode ter dois atos, e
+um ato pode ser de quem já estava fora do quadro.
 
 ## Saídas provisórias
 
