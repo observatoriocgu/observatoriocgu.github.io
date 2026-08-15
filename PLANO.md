@@ -6,7 +6,7 @@ Regra do CLAUDE.md: **uma fase por vez**.
 ## Escopo (revisado em 14/08/2026)
 
 O observatório acompanha **apenas Auditores Federais de Finanças e Controle (AFFC)** da CGU, em duas
-coortes: `CGU-2021` (concurso FGV) e `VETERANO` (quem já estava na CGU em jun/2022). **Técnicos
+concursos: `CGU-2021` (concurso FGV) e `VETERANO` (quem já estava na CGU em jun/2022). **Técnicos
 Federais de Finanças e Controle (TFFC) ficam fora** — não entram nos dados, nos filtros, nos textos
 nem nas contagens.
 
@@ -58,12 +58,12 @@ Todas as decisões abaixo estão **fechadas**. As fases podem ser executadas sem
 | D15 | Atualização mensal | Fase 2 | **um comando local** (`atualizar.py`), resultado commitado; o Actions só builda e publica. Assunção adotada por padrão — migrar para cron no CI é reversível e não muda a arquitetura |
 | D20 | Procedência na tela | Fase 3 | **`VERIFICADO` sai** — da UI e do `dados.csv`. Como quase nada passa por conferência humana individual, o selo aparecia como "não conferido" ao lado de dado correto lido do ato oficial, e **gerava desconfiança em vez de qualificar**. No lugar, mostram-se **as fontes que atestam o fato**, uma ao lado da outra: `SIAPE` + `DOU` é saída confirmada pelo cadastro e pelo ato; `DOU` sozinho é ato que o cadastro ainda não alcançou. O selo `SIAPE` numa saída significa "consta no mês n-1, não consta no mês n" — a própria **D13**. **Revisa a D14**, que fica só com a parte do `FONTE_*` |
 | D21 | Últimas saídas | Fase 3 | a lista **mistura as duas fontes** e mostra o mais recente que existir. Saída que só o DOU conhece entra com o **nome lido do texto do ato** (`dou.nome_do_ato`) e selo `DOU` sozinho. *(A parte que a mantinha fora de contagens, gráficos e filtros foi **revogada pela D22** — ver abaixo.)* |
-| D22 | Alcance das saídas do DOU | Fase 3 | **revoga o recorte da D21.** A saída que só o DOU conhece passa a contar **em tudo** — cards, gráficos, curva, destinos, tabela detalhada, histórico e relatório impresso. Ela não vira linha nova: é **sobreposta** ao registro da pessoa, que já está no `dados.csv` como ativa, e por isso chega à tela com coorte, área e unidade e responde aos filtros. A sobreposição acontece **no navegador** (`mesclarSaidasDoDou`), porque o `construir_painel.py` depende dos snapshots, que não existem no CI, e quem roda todo dia é a varredura do DOU |
+| D22 | Alcance das saídas do DOU | Fase 3 | **revoga o recorte da D21.** A saída que só o DOU conhece passa a contar **em tudo** — cards, gráficos, curva, destinos, tabela detalhada, histórico e relatório impresso. Ela não vira linha nova: é **sobreposta** ao registro da pessoa, que já está no `dados.csv` como ativa, e por isso chega à tela com concurso, área e unidade e responde aos filtros. A sobreposição acontece **no navegador** (`mesclarSaidasDoDou`), porque o `construir_painel.py` depende dos snapshots, que não existem no CI, e quem roda todo dia é a varredura do DOU |
 | D19 | Entrada dos atos do DOU | Fase 2.5 + Fase 2 (v2) | **um índice único de atos**, `data/atos_dou.csv`, com chave no ato (`URL_TITLE`), alimentado pelas **duas** varreduras — a por frase (`varrer_dou.py`) e a por nome (`enriquecer_saidas.py`) — e uma pasta única de cópias, `data/saidas_dou/`. O card deixa de ter crawler próprio e passa a ser **derivado** do índice (`gerar_card_dou.py`). Some a pasta `data/dias_sem_perder_AFFC/`. **Ajusta a delimitação da D10**: a varredura por frase continua não sendo fonte de contagem, mas passa a registrar **tudo** o que encontra, em vez de parar no primeiro ato de cada tipo |
 
 **Efeito das decisões novas sobre as antigas:**
 
-- **D9 sobrevive parcialmente.** `CONCURSO` continua coluna própria, separada de `AREA`, com `VETERANO` como valor. Muda a **origem**: a coorte passa a ser derivada da primeira aparição na série mensal, não da lista da FGV. A parte da D9 sobre chave de identidade é revogada pela **D12**.
+- **D9 sobrevive parcialmente.** `CONCURSO` continua coluna própria, separada de `AREA`, com `VETERANO` como valor. Muda a **origem**: o concurso passa a ser derivado da primeira aparição na série mensal, não da lista da FGV. A parte da D9 sobre chave de identidade é revogada pela **D12**.
 - **D10 sobrevive inteira.** O card "dias sem perder um Auditor" continua vindo do crawler de frase da Fase 2.5, e seus padrões de classificação — validados ato a ato — são **reaproveitados sem reescrita** pelo crawler por nome da Fase 2.
 - **D5 fica em suspenso.** Sem `CADASTRO DE RESERVA`/`DESISTENTE` no universo (**D11**), o card de custo perde parte do sentido original; decidir na Fase 3 se volta e sobre qual base.
 
@@ -219,7 +219,7 @@ Dois defeitos, que a CGU herda se copiarmos o modelo:
    do `DetailedTableApp.tsx` (`:481, 666, 714, 723, 738`) e do `DetailedTable.tsx` (`:253, 288, 297, 310`),
    com tabelas de 7/8 colunas em vez de 11/12.
 2. **Não existe coluna de concurso.** O concurso é implícito ("o último"). Com o concurso CGU de 2026
-   à vista, isso colapsa: as coortes não se separam e `POSICAO_CONCURSO` fica ambíguo.
+   à vista, isso colapsa: os concursos não se separam e `POSICAO_CONCURSO` fica ambíguo.
 
 **D9 — decisão:** separar as duas dimensões. `CONCURSO` passa a ser coluna própria; `AREA` fica só
 com a especialidade e vale **também para veteranos**.
@@ -297,11 +297,11 @@ com a especialidade e vale **também para veteranos**.
   `AUDITOR EXEMPLO 01/02/07/09` do `dados.csv`, para o card "aguardando nomeação" ter o que mostrar —
   inclusive um veterano e uma pessoa aprovada em dois concursos.
   - ⚠️ Não confundir: esses dois arquivos são sobre concursos **de outros órgãos** em que auditores da
-    CGU foram aprovados. Nada a ver com a coluna `CONCURSO` nova, que é a coorte de entrada **na CGU**.
+    CGU foram aprovados. Nada a ver com a coluna `CONCURSO` nova, que é o concurso de entrada **na CGU**.
 
 **Concluída quando:** ~~`npm run build` OK, o site carrega o CSV de exemplo sem erro no console.~~
 ✅ build OK (`vite 6.4.3`, 60 módulos). Validação executada nos 3 CSVs: contagem de campos por linha
-bate com o cabeçalho em **todas** as linhas (18/9/10 colunas), as 3 coortes aparecem (8/4/2), nenhuma
+bate com o cabeçalho em **todas** as linhas (18/9/10 colunas), os 3 concursos aparecem (8/4/2), nenhuma
 linha `VETERANO` tem `INSCRICAO` ou `POSICAO_CONCURSO` preenchidos, e nenhuma linha ficou sem a marca
 `EXEMPLO`.
 
@@ -520,7 +520,7 @@ a ser gerados por um comando, a partir de fonte pública, e cada saída carrega 
 | `serie_mensal.csv` | 49 linhas |
 | Saídas **com motivo** | **255 (95%)** |
 | Saídas **com destino** | 126 (47%) — camada frágil, ver §2.3.3 |
-| `AREA` preenchida | **422 de 450** da coorte CGU-2021 (93,8%) — 410 automáticas + 12 por curadoria |
+| `AREA` preenchida | **422 de 450** do concurso CGU-2021 (93,8%) — 410 automáticas + 12 por curadoria |
 | Atos arquivados | 251 HTML, 1,2 MB |
 | Teste de regressão | **30 invariantes**, todos passando |
 | `npm run build` | verde · `tsc --noEmit`: os 6 pré-existentes, **nenhum novo** |
@@ -756,7 +756,7 @@ Regras de preenchimento:
 Uma linha por pessoa que esteve na CGU no período (~2.009). **Derivado do
 `historico_mensal.csv`**, não dos snapshots.
 
-- **Identidade e coorte** — `ID_SERVIDOR_PORTAL` (chave, **D12**) · `NOME` · `CONCURSO`
+- **Identidade e concurso** — `ID_SERVIDOR_PORTAL` (chave, **D12**) · `NOME` · `CONCURSO`
   (`VETERANO` | `CGU-2021`) · `AREA` (**D17**) · `MES_ENTRADA` (AAAAMM) · `DATA_POSSE`
 - **Concurso de entrada (D17, vazios para `VETERANO`)** — `INSCRICAO` · `POSICAO_CONCURSO` ·
   `NOTA` · `MODALIDADE` (AC / PcD / negros) · `UF_VAGA`
@@ -799,7 +799,7 @@ máquina. Os dois crawlers atuais já são stdlib pura (urllib + fallback `curl`
   - **subcaso resolvido sem crawler:** some do conjunto CGU mas continua no arquivo AFFC com outro
     `COD_ORG_LOTACAO` (3 casos) → `MOTIVO_SAIDA = MUDOU DE ÓRGÃO NA CARREIRA`, `ORGAO_DESTINO` = o
     órgão novo, `FONTE_DESTINO = SIAPE`
-  - coorte: `MES_ENTRADA == 202206` → `VETERANO`; senão `CGU-2021`
+  - concurso: `MES_ENTRADA == 202206` → `VETERANO`; senão `CGU-2021`
   - **empilha** os snapshots em `historico_mensal.csv` (**D16**), com `MES`, `CONCURSO` e `AREA`
   - normalizar `UORG_LOTACAO` (38 grafias para 34 códigos) com tabela de-para explícita:
     `CONTROLADORIA-GERAL DA UNIAO` e `CGU` → mesma unidade sede; `CONTR REGIONAL DO ESTADO - RJ` →
@@ -1086,7 +1086,7 @@ apresentacional.
       (`EvasionTable.tsx:99,101,103`).
 - [ ] **Por unidade / UF** — `agregarPorUnidade` (`App.tsx:849-920`) aproveitável quase como está;
       hoje só considera `EXONERADO` (`App.tsx:1228`) e passa a considerar toda saída.
-- [ ] **Curva de permanência da coorte 2022** (novo) — % remanescente por mês desde a posse. É a
+- [ ] **Curva de permanência do concurso 2022** (novo) — % remanescente por mês desde a posse. É a
       visualização que um observatório de evasão existe para mostrar, e a base agora dá.
 
 ### 3.4 Tabela detalhada e histórico
@@ -1095,7 +1095,7 @@ apresentacional.
       O **filtro de área continua existindo** (**D17** dá a fonte), mas com as áreas reais do
       CGU-2021 — `Auditoria e Fiscalização` · `Correição e Combate à Corrupção` · `TI` ·
       `Contabilidade Pública e Finanças` — e mais a opção "sem área" para veteranos e não-casados.
-      Entram também **coorte**, **unidade**, **motivo de saída** e **verificado**. Cai o layout
+      Entram também **concurso**, **unidade**, **motivo de saída** e **verificado**. Cai o layout
       duplo `VETERANO` (9 colunas) × padrão (11) de `:669-707` — vira uma tabela só — e o default
       `'FISCALIZAÇÃO'` (`:6`, `:415`, `:420`) some.
 - [ ] `HistoryPage.tsx` — `alteracoes-registros.json` passa a ser gerado pelo diff mensal; o bloco
@@ -1140,7 +1140,7 @@ esteira **é** o assunto da Fase 2 (v2) e foi especificada lá em detalhe. O que
 - Regenerar `alteracoes-registros.json` → passa a ser produto do `construir_painel.py`, a partir do
   diff mensal, com data real em vez de arqueologia de commits git.
 - **Carregar a lista da FGV** e **derivar os veteranos por cruzamento de nome** → **cancelado**.
-  A coorte passa a ser derivada da primeira aparição na série mensal (**D11**/**D13**), que é dado
+  O concurso passa a ser derivado da primeira aparição na série mensal (**D11**/**D13**), que é dado
   direto e não depende de casar nome normalizado entre duas pontas — cruzamento que a própria fase
   já reconhecia como arriscado por homônimos, e que a **D12** agora proíbe.
 - A lista de aprovados volta na **Fase 7**, e por um caminho melhor: ela está publicada no próprio

@@ -68,7 +68,7 @@ const DetailedTableApp: React.FC = () => {
   const [erro, setErro] = useState<string | null>(null);
 
   const [busca, setBusca] = useState('');
-  const [coorte, setCoorte] = useState<string>(TODOS);
+  const [concurso, setConcurso] = useState<string>(TODOS);
   const [area, setArea] = useState<string>(TODOS);
   const [unidade, setUnidade] = useState<string>(TODOS);
   const [motivo, setMotivo] = useState<string>(TODOS);
@@ -132,7 +132,7 @@ const DetailedTableApp: React.FC = () => {
     const termo = normalizar(busca);
     return registros
       .filter((registro) => {
-        if (coorte && registro.CONCURSO !== coorte) return false;
+        if (concurso && registro.CONCURSO !== concurso) return false;
         if (area && areaDe(registro) !== area) return false;
         if (unidade && registro.UNIDADE !== unidade) return false;
         if (situacao && registro.SITUACAO !== situacao) return false;
@@ -153,9 +153,9 @@ const DetailedTableApp: React.FC = () => {
         const posicaoB = Number(b.POSICAO_CONCURSO) || Number.MAX_SAFE_INTEGER;
         return posicaoA - posicaoB || a.NOME.localeCompare(b.NOME, 'pt-BR');
       });
-  }, [registros, busca, coorte, area, unidade, situacao, motivo]);
+  }, [registros, busca, concurso, area, unidade, situacao, motivo]);
 
-  useEffect(() => setLimite(PAGINA), [busca, coorte, area, unidade, situacao, motivo]);
+  useEffect(() => setLimite(PAGINA), [busca, concurso, area, unidade, situacao, motivo]);
 
   const visiveis = filtrados.slice(0, limite);
   // Saída atestada pelas DUAS fontes: o cadastro mostra a ausência e existe ato
@@ -221,7 +221,7 @@ const DetailedTableApp: React.FC = () => {
             />
           </label>
 
-          {seletor('Coorte', coorte, setCoorte, [ID_CONCURSO_2021, ID_CONCURSO_VETERANO], 'Todas', rotuloDoConcurso)}
+          {seletor('Concurso', concurso, setConcurso, [ID_CONCURSO_2021, ID_CONCURSO_VETERANO], 'Todos', rotuloDoConcurso)}
           {seletor('Especialidade', area, setArea, areas, 'Todas')}
           {seletor('Unidade', unidade, setUnidade, unidades, 'Todas')}
           {seletor('Situação', situacao, setSituacao, situacoes, 'Todas')}
@@ -245,7 +245,7 @@ const DetailedTableApp: React.FC = () => {
                 <tr>
                   {[
                     'Nome',
-                    'Coorte',
+                    'Concurso',
                     'Especialidade',
                     'Class.',
                     'Modalidade',

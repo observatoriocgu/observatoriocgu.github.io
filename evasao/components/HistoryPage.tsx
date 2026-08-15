@@ -52,7 +52,7 @@ const HistoryPage: React.FC = () => {
   // Os mesmos três filtros encadeados do dashboard, com o mesmo preset. Aqui
   // eles ganham um quarto nível embaixo: entrada ou saída.
   const filtros = useFiltrosEncadeados(registros);
-  const { coortes, areas, motivos } = filtros;
+  const { concursos, areas, motivos } = filtros;
 
   useEffect(() => {
     let montado = true;
@@ -99,7 +99,7 @@ const HistoryPage: React.FC = () => {
   /**
    * Os três primeiros níveis da hierarquia, sem o de movimentação.
    *
-   * A coorte vem do próprio log. Especialidade e tipo de saída vêm do
+   * O concurso vem do próprio log. Especialidade e tipo de saída vêm do
    * `dados.csv`, que aqui é opcional: sem ele, a movimentação que não dá para
    * classificar PASSA, em vez de sumir. Esconder dado por não ter conseguido
    * carregar o CSV seria pior do que mostrá-lo sem recorte.
@@ -108,13 +108,13 @@ const HistoryPage: React.FC = () => {
    */
   const passaHierarquia = useMemo(() => {
     return (mudanca: AlteracaoRegistro): boolean => {
-      if (!coortes.includes(mudanca.concurso)) return false;
+      if (!concursos.includes(mudanca.concurso)) return false;
       const registro = registrosPorId.get(mudanca.id);
       if (registro && !areas.includes(areaDe(registro))) return false;
       if (mudanca.tipo === 'saida' && registro && !motivos.includes(motivoDe(registro))) return false;
       return true;
     };
-  }, [coortes, areas, motivos, registrosPorId]);
+  }, [concursos, areas, motivos, registrosPorId]);
 
   /** Quarto nível: só as movimentações que sobram do recorte de cima. */
   const opcoesMovimentacao = useMemo((): OpcaoFiltro[] => {
@@ -155,7 +155,7 @@ const HistoryPage: React.FC = () => {
     if (mudanca.tipo === 'entrada') {
       return (
         <>
-          {pessoa} entrou em exercício na CGU ({mudanca.unidade || 'unidade não informada'}), coorte{' '}
+          {pessoa} entrou em exercício na CGU ({mudanca.unidade || 'unidade não informada'}), concurso{' '}
           {rotuloDoConcurso(mudanca.concurso)}.
         </>
       );

@@ -17,9 +17,9 @@ export const MES_INICIO_OBSERVACAO = '202206';
 /**
  * Onde o gráfico de saídas mês a mês começa.
  *
- * A coorte CGU-2021 tomou posse em jul/2022, então ago/2022 é a primeira
+ * O concurso CGU-2021 tomou posse em jul/2022, então ago/2022 é a primeira
  * competência em que alguém dela poderia aparecer ausente. Antes disso o
- * gráfico só teria os veteranos, e a comparação entre as duas coortes — que é
+ * gráfico só teria os veteranos, e a comparação entre os dois concursos — que é
  * o ponto — nasceria torta. Custa exatamente uma saída, a de jul/2022.
  */
 export const MES_INICIO_GRAFICO_SAIDAS = '202208';
@@ -72,7 +72,7 @@ export const CONCURSO_POR_ID: ReadonlyMap<string, Concurso> = new Map(
   CONCURSOS.map((concurso) => [concurso.id, concurso])
 );
 
-/** Rótulo de exibição de uma coorte; devolve o próprio id se for desconhecida. */
+/** Rótulo de exibição de um concurso; devolve o próprio id se for desconhecido. */
 export const rotuloDoConcurso = (id: string): string => CONCURSO_POR_ID.get(id)?.rotulo ?? id;
 
 /** Concursos de verdade, sem o pseudo-concurso `VETERANO`. */
@@ -97,7 +97,7 @@ export const areasDoConcurso = (idConcurso?: string): readonly string[] => {
  * concurso de 2021, e a especialidade só existe no edital dele. Não há dado a
  * buscar, e não haverá.
  *
- * `AREA_DESCONHECIDA` é lacuna de verdade: é gente da coorte de 2021 cujo nome
+ * `AREA_DESCONHECIDA` é lacuna de verdade: é gente do concurso de 2021 cujo nome
  * não casou com nenhum documento do concurso. Aí ainda há o que procurar.
  *
  * Juntar os dois num rótulo só faria 104 saídas de veterano parecerem buraco de
@@ -183,7 +183,7 @@ export const COR_POR_MOTIVO: Readonly<Record<string, string>> = {
   [MOTIVO_SEM_ATO]: '#4b5563',
 };
 
-/** Cor de cada coorte, usada nos gráficos que separam CGU-2021 de veteranos. */
+/** Cor de cada concurso, usada nos gráficos que separam CGU-2021 de veteranos. */
 export const COR_POR_CONCURSO: Readonly<Record<string, string>> = {
   [ID_CONCURSO_2021]: '#dc2626',
   [ID_CONCURSO_VETERANO]: '#d4af37',

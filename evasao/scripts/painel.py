@@ -296,7 +296,7 @@ def derivar_pessoas(meses: list[str], cgu: dict, fora: dict) -> list[dict]:
 
 def gerar_historico(meses: list[str], cgu: dict, pessoas: list[dict]) -> list[dict]:
     """
-    A base consolidada (D16): os snapshots empilhados, com competência e coorte.
+    A base consolidada (D16): os snapshots empilhados, com competência e concurso.
 
     `CONCURSO` e `AREA` são atributos da pessoa e ficam repetidos em todas as
     linhas dela. A desnormalização é de propósito: é o que deixa a base usável

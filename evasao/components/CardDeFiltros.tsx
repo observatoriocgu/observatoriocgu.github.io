@@ -14,51 +14,51 @@ import { RegistroAuditor } from '../types';
 import { areaDe, motivoDe, saidas } from '../lib/painel';
 import FiltroMultiplo, { OpcaoFiltro } from './FiltroMultiplo';
 
-export const COORTES = [ID_CONCURSO_2021, ID_CONCURSO_VETERANO];
+export const CONCURSOS = [ID_CONCURSO_2021, ID_CONCURSO_VETERANO];
 
 export interface FiltrosEncadeados {
-  coortes: string[];
+  concursos: string[];
   areas: string[];
   motivos: string[];
-  definirCoortes: (valores: string[]) => void;
+  definirConcursos: (valores: string[]) => void;
   definirAreas: (valores: string[]) => void;
   definirMotivos: (valores: string[]) => void;
-  opcoesCoorte: OpcaoFiltro[];
+  opcoesConcurso: OpcaoFiltro[];
   opcoesArea: OpcaoFiltro[];
   opcoesMotivo: OpcaoFiltro[];
-  /** Todo mundo da(s) coorte(s) marcada(s) — o nível de cima da cascata. */
-  registrosDaCoorte: RegistroAuditor[];
+  /** Todo mundo do(s) concurso(s) marcado(s) — o nível de cima da cascata. */
+  registrosDoConcurso: RegistroAuditor[];
   /** Resumo curto do recorte, para o card fechado. */
   resumo: string;
 }
 
 /**
- * Os três filtros encadeados do painel: a coorte manda na especialidade, e as
- * duas juntas mandam no tipo de saída. Cada grupo só lista o que existe no
+ * Os três filtros encadeados do painel: o concurso manda na especialidade, e os
+ * dois juntos mandam no tipo de saída. Cada grupo só lista o que existe no
  * recorte que vem de cima.
  *
- * Só a coorte mostra número. Abaixo dela o total mudaria a cada clique no
+ * Só o concurso mostra número. Abaixo dele o total mudaria a cada clique no
  * filtro de cima, e um total que dança confunde mais do que informa: o que
  * responde "quantos?" é o gráfico, não a caixinha.
  *
  * A seleção guarda a INTENÇÃO do leitor, não o que está à vista: `areas` nasce
  * com todas as áreas da base, inclusive "Veterano", que fica invisível enquanto
- * a coorte dele estiver fechada. É o que faz a especialidade já vir junto
- * quando ele abre a coorte, em vez de abrir uma coorte que não mostra ninguém.
+ * o concurso dele estiver fechado. É o que faz a especialidade já vir junto
+ * quando ele abre o concurso, em vez de abrir um concurso que não mostra ninguém.
  */
 export const useFiltrosEncadeados = (registros: RegistroAuditor[]): FiltrosEncadeados => {
-  const [coortes, definirCoortes] = useState<string[]>([ID_CONCURSO_2021]);
+  const [concursos, definirConcursos] = useState<string[]>([ID_CONCURSO_2021]);
   const [areas, definirAreas] = useState<string[]>([]);
   const [motivos, definirMotivos] = useState<string[]>([...MOTIVOS_PADRAO]);
 
   const todasAsSaidas = useMemo(() => saidas(registros), [registros]);
 
-  const opcoesCoorte = useMemo((): OpcaoFiltro[] => {
+  const opcoesConcurso = useMemo((): OpcaoFiltro[] => {
     const totais = new Map<string, number>();
     for (const registro of todasAsSaidas) {
       totais.set(registro.CONCURSO, (totais.get(registro.CONCURSO) ?? 0) + 1);
     }
-    return COORTES.map((id) => ({
+    return CONCURSOS.map((id) => ({
       valor: id,
       rotulo: rotuloDoConcurso(id),
       cor: COR_POR_CONCURSO[id],
@@ -66,15 +66,15 @@ export const useFiltrosEncadeados = (registros: RegistroAuditor[]): FiltrosEncad
     }));
   }, [todasAsSaidas]);
 
-  const registrosDaCoorte = useMemo(
-    () => registros.filter((registro) => coortes.includes(registro.CONCURSO)),
-    [registros, coortes]
+  const registrosDoConcurso = useMemo(
+    () => registros.filter((registro) => concursos.includes(registro.CONCURSO)),
+    [registros, concursos]
   );
 
   const opcoesArea = useMemo((): OpcaoFiltro[] => {
-    // Toda área que exista em alguém da coorte, tenha ou não saída — senão uma
+    // Toda área que exista em alguém do concurso, tenha ou não saída — senão uma
     // especialidade sem nenhuma evasão simplesmente sumiria do filtro.
-    const encontradas = new Set(registrosDaCoorte.map(areaDe));
+    const encontradas = new Set(registrosDoConcurso.map(areaDe));
     const especialidades = Array.from(encontradas)
       .filter((area) => !AREAS_SEM_ESPECIALIDADE.includes(area))
       .sort((a, b) => a.localeCompare(b, 'pt-BR'));
@@ -82,11 +82,11 @@ export const useFiltrosEncadeados = (registros: RegistroAuditor[]): FiltrosEncad
     // primeiro o veterano, que é "não se aplica", e só depois a lacuna.
     const ordenadas = [...especialidades, ...AREAS_SEM_ESPECIALIDADE.filter((area) => encontradas.has(area))];
     return ordenadas.map((area) => ({ valor: area, rotulo: area }));
-  }, [registrosDaCoorte]);
+  }, [registrosDoConcurso]);
 
   const opcoesMotivo = useMemo((): OpcaoFiltro[] => {
     const encontrados = new Set(
-      saidas(registrosDaCoorte)
+      saidas(registrosDoConcurso)
         .filter((registro) => areas.includes(areaDe(registro)))
         .map(motivoDe)
     );
@@ -96,7 +96,7 @@ export const useFiltrosEncadeados = (registros: RegistroAuditor[]): FiltrosEncad
       rotulo: motivo,
       cor: COR_POR_MOTIVO[motivo],
     }));
-  }, [registrosDaCoorte, areas]);
+  }, [registrosDoConcurso, areas]);
 
   // As especialidades só se sabem depois que o CSV chega, então a marcação
   // inicial é aplicada aqui, uma vez, sem sobrescrever escolha do leitor.
@@ -110,26 +110,26 @@ export const useFiltrosEncadeados = (registros: RegistroAuditor[]): FiltrosEncad
   const resumo = useMemo(
     () =>
       [
-        resumirGrupo(coortes, opcoesCoorte, 'nenhuma coorte', 'coortes'),
+        resumirGrupo(concursos, opcoesConcurso, 'nenhum concurso', 'concursos', 'todos'),
         resumirGrupo(areas, opcoesArea, 'nenhuma especialidade', 'especialidades'),
         resumirGrupo(motivos, opcoesMotivo, 'nenhum tipo de saída', 'tipos de saída'),
       ]
         .filter(Boolean)
         .join(' · '),
-    [coortes, areas, motivos, opcoesCoorte, opcoesArea, opcoesMotivo]
+    [concursos, areas, motivos, opcoesConcurso, opcoesArea, opcoesMotivo]
   );
 
   return {
-    coortes,
+    concursos,
     areas,
     motivos,
-    definirCoortes,
+    definirConcursos,
     definirAreas,
     definirMotivos,
-    opcoesCoorte,
+    opcoesConcurso,
     opcoesArea,
     opcoesMotivo,
-    registrosDaCoorte,
+    registrosDoConcurso,
     resumo,
   };
 };
@@ -145,14 +145,16 @@ export const resumirGrupo = (
   opcoes: OpcaoFiltro[],
   /** A frase inteira do caso vazio, com artigo: "nenhuma especialidade". */
   vazio: string,
-  plural: string
+  plural: string,
+  /** Concordância do caso "todos marcados", que segue o gênero do `plural`. */
+  todos: 'todas' | 'todos' = 'todas'
 ): string => {
   if (opcoes.length === 0) return '';
   const visiveis = opcoes.filter((opcao) => selecionados.includes(opcao.valor));
   if (visiveis.length === 0) return vazio;
   // Um só: vale mais dizer qual do que dizer quantos.
   if (visiveis.length === 1) return visiveis[0].rotulo;
-  if (visiveis.length === opcoes.length) return `${plural}: todas`;
+  if (visiveis.length === opcoes.length) return `${plural}: ${todos}`;
   return `${plural}: ${visiveis.length} de ${opcoes.length}`;
 };
 
@@ -198,24 +200,24 @@ const CardDeFiltros: React.FC<CardDeFiltrosProps> = ({ filtros, aberto = false, 
         className={`grid grid-cols-1 gap-6 px-5 pb-5 ${children ? 'sm:grid-cols-2 lg:grid-cols-4' : 'sm:grid-cols-3'}`}
       >
         <FiltroMultiplo
-          titulo="Coorte"
-          opcoes={filtros.opcoesCoorte}
-          selecionados={filtros.coortes}
-          aoMudar={filtros.definirCoortes}
+          titulo="Concurso"
+          opcoes={filtros.opcoesConcurso}
+          selecionados={filtros.concursos}
+          aoMudar={filtros.definirConcursos}
         />
         <FiltroMultiplo
           titulo="Especialidade"
           opcoes={filtros.opcoesArea}
           selecionados={filtros.areas}
           aoMudar={filtros.definirAreas}
-          mensagemVazia="Marque uma coorte ao lado."
+          mensagemVazia="Marque um concurso ao lado."
         />
         <FiltroMultiplo
           titulo="Tipo de saída"
           opcoes={filtros.opcoesMotivo}
           selecionados={filtros.motivos}
           aoMudar={filtros.definirMotivos}
-          mensagemVazia="Nenhuma saída na coorte e na especialidade marcadas."
+          mensagemVazia="Nenhuma saída no concurso e na especialidade marcados."
         />
         {children}
       </div>

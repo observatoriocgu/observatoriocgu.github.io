@@ -32,7 +32,7 @@ export interface RegistroAuditor {
   /** SIAPE mascarado pelo Portal em 7 posições, ex.: `166****`. */
   MATRICULA: string;
 
-  /** Coorte de entrada: `CGU-2021` ou `VETERANO`. Derivada da 1ª aparição na série. */
+  /** Concurso de entrada: `CGU-2021` ou `VETERANO`. Derivado da 1ª aparição na série. */
   CONCURSO: string;
   /** Especialidade do edital (D17). Vazia = desconhecida. */
   AREA: string;
@@ -187,7 +187,7 @@ export interface DetalheSaida {
   /**
    * `true` quando a saída só existe no DOU: o ato está publicado e o Portal da
    * Transparência ainda não entregou a competência que mostraria a ausência.
-   * Sem pessoa no SIAPE, não há coorte, área nem unidade para exibir.
+   * Sem pessoa no SIAPE, não há concurso, área nem unidade para exibir.
    */
   soNoDou: boolean;
 }

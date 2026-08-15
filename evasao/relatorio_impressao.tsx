@@ -121,7 +121,7 @@ const RelatorioImpressao: React.FC = () => {
                   <tr className="bg-slate-800 text-white">
                     <th className="w-12 border border-slate-500 px-2 py-2 text-center">Nº</th>
                     <th className="border border-slate-500 px-3 py-2 text-left">Nome</th>
-                    <th className="border border-slate-500 px-3 py-2 text-left">Coorte</th>
+                    <th className="border border-slate-500 px-3 py-2 text-left">Concurso</th>
                     <th className="border border-slate-500 px-3 py-2 text-left">Unidade</th>
                     <th className="border border-slate-500 px-3 py-2 text-left">Saída</th>
                     {motivoSelecionado === TODAS && (

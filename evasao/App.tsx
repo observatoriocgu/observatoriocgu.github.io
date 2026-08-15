@@ -39,7 +39,7 @@ import {
   comoSerie,
   curvaDePermanencia,
   detalharSaida,
-  evasaoDaCoorte,
+  evasaoDoConcurso,
   filtrarSaidas,
   mesclarSaidasDoDou,
   saidas,
@@ -132,9 +132,9 @@ const App: React.FC = () => {
   const todasAsSaidas = useMemo(() => saidas(registros), [registros]);
 
   const filtros = useFiltrosEncadeados(registros);
-  const { coortes, areas, motivos } = filtros;
+  const { concursos, areas, motivos } = filtros;
 
-  const recorte = useMemo(() => ({ coortes, areas, motivos }), [coortes, areas, motivos]);
+  const recorte = useMemo(() => ({ concursos, areas, motivos }), [concursos, areas, motivos]);
   const saidasFiltradas = useMemo(() => filtrarSaidas(registros, recorte), [registros, recorte]);
 
   // === Cards (acima dos filtros: são sempre o quadro inteiro) ===
@@ -148,7 +148,7 @@ const App: React.FC = () => {
     () => motivosDoTotal.reduce((soma, grupo) => soma + grupo.total, 0),
     [motivosDoTotal]
   );
-  const coorte2021 = useMemo(() => evasaoDaCoorte(registros, ID_CONCURSO_2021), [registros]);
+  const concurso2021 = useMemo(() => evasaoDoConcurso(registros, ID_CONCURSO_2021), [registros]);
 
   const ultimoMes = serie[serie.length - 1];
 
@@ -227,12 +227,12 @@ const App: React.FC = () => {
     if (!ultimaCompetencia) return { rotulos: [], completos: [], series: [] as SerieGrafico[], vazio: true };
 
     // NENHUM filtro se aplica aqui. A curva responde a uma pergunta só, sobre a
-    // coorte inteira: de todos os Auditores que entraram pelo concurso de 2021,
+    // concurso inteiro: de todos os Auditores que entraram pelo concurso de 2021,
     // quantos ainda restam. É `registros`, e não `saidasFiltradas`.
     //
     // O filtro de tipo de saída é o que não pode entrar de jeito nenhum:
     // esconder um tipo transformaria quem saiu por ele em alguém que ficou, e a
-    // curva mentiria para cima. O de coorte já não valia — o gráfico é, por
+    // curva mentiria para cima. O de concurso já não valia — o gráfico é, por
     // definição, só de quem entrou depois de jun/2022.
     const meses = listarCompetencias(MES_INICIO_GRAFICO_SAIDAS, ultimaCompetencia);
     const pontos = curvaDePermanencia(registros, ID_CONCURSO_2021, meses);
@@ -267,7 +267,7 @@ const App: React.FC = () => {
   // esconder uma saída porque a especialidade dela está desmarcada faria o
   // painel omitir a notícia mais recente sem dizer que omitiu. E os destinos
   // são a resposta a "para onde foram os Auditores", no plural e no geral;
-  // quem quiser recortar por coorte tem o histórico de alterações.
+  // quem quiser recortar por concurso tem o histórico de alterações.
 
   const gruposDeDestino = useMemo(
     () =>
@@ -418,7 +418,10 @@ const App: React.FC = () => {
                     Desde {formatarCompetenciaLonga(MES_INICIO_GRAFICO_SAIDAS)}
                     {atualizadoAte ? ` até ${atualizadoAte}` : ''}.
                   </div>
-                  <div className="flex flex-wrap justify-center gap-x-3 gap-y-1 border-t border-gray-700 pt-2">
+                  {/* Um motivo por linha: em `flex-wrap` a quebra depende da
+                      largura do card, e "Outros" acabava emendado na linha de
+                      cima como se fosse parte do rótulo anterior. */}
+                  <div className="flex flex-col items-center gap-1 border-t border-gray-700 pt-2">
                     {motivosDoTotal.map((grupo) => (
                       <span key={grupo.rotulo} className="text-xs text-gray-400">
                         {grupo.rotulo}: <span className="font-medium text-amber-400">{grupo.total}</span>
@@ -431,14 +434,14 @@ const App: React.FC = () => {
             />
 
             <CounterCard
-              value={percentual(coorte2021.percentual)}
+              value={percentual(concurso2021.percentual)}
               label="Evasão de quem entrou depois de jun/2022"
               icon={icone(faArrowTrendDown)}
               footer={
                 <div className="space-y-1">
                   <div>
-                    <span className="font-medium text-amber-400">{numero(coorte2021.saiu)}</span> de{' '}
-                    {numero(coorte2021.total)} da coorte {rotuloDoConcurso(ID_CONCURSO_2021)}
+                    <span className="font-medium text-amber-400">{numero(concurso2021.saiu)}</span> de{' '}
+                    {numero(concurso2021.total)} do concurso {rotuloDoConcurso(ID_CONCURSO_2021)}
                     {atualizadoAte ? ` até ${atualizadoAte}` : ''}.
                   </div>
                 </div>
@@ -451,7 +454,7 @@ const App: React.FC = () => {
             <h2 className="mb-1 text-lg font-semibold text-red-300">Saídas mês a mês</h2>
             <p className="mb-3 text-sm text-gray-400">
               Quantos Auditores deixaram a CGU em cada competência, no recorte escolhido abaixo. A série começa em
-              agosto de 2022, primeira competência em que alguém da coorte de 2022 poderia aparecer ausente.
+              agosto de 2022, primeira competência em que alguém do concurso de 2022 poderia aparecer ausente.
               {!carregando && (
                 <>
                   {' '}
@@ -491,7 +494,7 @@ const App: React.FC = () => {
               Em cada competência do eixo, a conta é (entradas até aquele mês &minus; saídas até aquele mês) dividido
               pelas entradas até aquele mês — as duas pontas contadas por pessoa. O denominador cresce ao longo do
               eixo, conforme novas turmas tomam posse.{' '}
-              <span className="text-gray-300">Esta curva não acompanha os filtros acima</span>: é sempre a coorte de
+              <span className="text-gray-300">Esta curva não acompanha os filtros acima</span>: é sempre o concurso de
               2021 inteira. Recortá-la por tipo de saída transformaria quem saiu em alguém que ficou, e ela mentiria
               para cima.
             </p>
@@ -518,7 +521,7 @@ const App: React.FC = () => {
           <section className="mb-8 rounded-xl border border-gray-800 bg-gray-900 p-4">
             <h2 className="mb-1 text-2xl font-bold text-amber-400">Últimas saídas registradas</h2>
             <p className="mb-3 text-sm text-gray-400">
-              As seis mais recentes de toda a série, coorte de 2021 e veteranos juntos.{' '}
+              As seis mais recentes de toda a série, concurso de 2021 e veteranos juntos.{' '}
               <span className="text-gray-300">Não acompanha os filtros acima</span>: é o que acabou de acontecer, e
               esconder uma saída porque a especialidade dela está desmarcada omitiria a notícia mais recente sem dizer
               que omitiu.
@@ -596,9 +599,9 @@ const App: React.FC = () => {
               SIAPE que o diga, e cada linha traz de onde veio a informação. Quem saiu há pouco costuma aparecer sem
               destino: a busca do órgão de chegada parte de quem o SIAPE já mostrou saindo, então ela vem depois. São{' '}
               <span className="font-bold text-orange-400">{numero(todasAsSaidas.length)}</span> saída
-              {todasAsSaidas.length === 1 ? '' : 's'} em toda a série, coorte de 2021 e veteranos juntos.{' '}
+              {todasAsSaidas.length === 1 ? '' : 's'} em toda a série, concurso de 2021 e veteranos juntos.{' '}
               <span className="text-gray-300">Esta tabela não acompanha os filtros acima</span> — para recortar por
-              coorte ou por especialidade, use o{' '}
+              concurso ou por especialidade, use o{' '}
               <a href="./historico_alteracoes.html" className="text-amber-400 hover:text-amber-300">
                 histórico de alterações
               </a>

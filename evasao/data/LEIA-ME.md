@@ -103,7 +103,7 @@ Enquanto o Portal não alcança, o nome de quem saiu é lido do **texto do próp
 ato** (`dou.nome_do_ato`) e a saída é **sobreposta ao registro da pessoa**, que
 já está no `dados.csv` — ativa. Por isso ela conta **em tudo** (**D22**): cards,
 gráficos, curva de permanência, destinos, tabela detalhada, histórico e
-relatório impresso, com coorte, área e unidade de verdade, respondendo aos
+relatório impresso, com concurso, área e unidade de verdade, respondendo aos
 filtros como qualquer outra. O que a distingue na tela é o selo: `DOU` sozinho
 até o cadastro alcançar o mês.
 

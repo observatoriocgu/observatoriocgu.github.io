@@ -61,7 +61,7 @@ export const motivoDe = (registro: RegistroAuditor): string =>
  * Área já pronta para exibir.
  *
  * Vazia não é um caso só: no veterano é "não se aplica", porque a especialidade
- * só existe no edital do concurso de 2021 e ele não o fez; em quem é da coorte
+ * só existe no edital do concurso de 2021 e ele não o fez; em quem é do concurso
  * de 2021 é lacuna — o nome não casou com documento nenhum do concurso.
  */
 export const areaDe = (registro: RegistroAuditor): string => {
@@ -95,7 +95,7 @@ const SITUACAO_POR_TIPO: Readonly<Record<string, string>> = {
  * O ato já foi publicado; o Portal da Transparência é que ainda não entregou a
  * competência que mostraria a ausência (~2 meses de atraso). A pessoa JÁ ESTÁ no
  * `dados.csv` — ativa —, então aqui não se cria linha nova: sobrepõe-se a saída
- * ao registro que já existe. É por isso que ela chega à tela com coorte, área e
+ * ao registro que já existe. É por isso que ela chega à tela com concurso, área e
  * unidade, e responde aos filtros como qualquer outra.
  *
  * POR QUE ISTO ACONTECE NO NAVEGADOR, e não no `construir_painel.py`. Porque o
@@ -274,7 +274,7 @@ export const porSaidaMaisRecente = (a: DetalheSaida, b: DetalheSaida): number =>
  * que o leitor pediu ao desmarcar tudo.
  */
 export interface RecorteDeSaidas {
-  coortes: readonly string[];
+  concursos: readonly string[];
   areas: readonly string[];
   motivos: readonly string[];
 }
@@ -286,7 +286,7 @@ export const filtrarSaidas = (
 ): RegistroAuditor[] =>
   saidas(registros).filter(
     (registro) =>
-      recorte.coortes.includes(registro.CONCURSO) &&
+      recorte.concursos.includes(registro.CONCURSO) &&
       recorte.areas.includes(areaDe(registro)) &&
       recorte.motivos.includes(motivoDe(registro))
   );
@@ -419,19 +419,19 @@ export interface PontoPermanencia {
 }
 
 /**
- * Permanência de uma coorte mês a mês do calendário.
+ * Permanência de um concurso mês a mês do calendário.
  *
- * Em cada competência `t`: quantas pessoas da coorte já tinham entrado até `t`
+ * Em cada competência `t`: quantas pessoas do concurso já tinham entrado até `t`
  * (ENTRADAS), quantas dessas já tinham saído até `t` (SAÍDAS), e o quociente
- * `(ENTRADAS - SAÍDAS) / ENTRADAS` — a fração da coorte que ainda estava lá.
+ * `(ENTRADAS - SAÍDAS) / ENTRADAS` — a fração do concurso que ainda estava lá.
  *
  * Duas escolhas que mudam o número e por isso ficam escritas:
  *
  * 1. Entradas e saídas são contadas por PESSOA, sobre `dados.csv`, e não pelos
  *    campos `ENTRADAS`/`SAIDAS` de `serie_mensal.csv`. Aqueles são EVENTOS: as
  *    seis pessoas que somem do SIAPE por alguns meses e voltam (D13) aparecem
- *    lá duas vezes, e o denominador ficaria maior que o tamanho da coorte.
- * 2. O numerador só desconta saídas de quem é DA COORTE. Descontar as saídas de
+ *    lá duas vezes, e o denominador ficaria maior que o tamanho do concurso.
+ * 2. O numerador só desconta saídas de quem é DO CONCURSO. Descontar as saídas de
  *    todo mundo — veteranos inclusive — de um denominador que só tem entrantes
  *    daria um número que não é permanência de ninguém.
  *
@@ -445,10 +445,10 @@ export const curvaDePermanencia = (
   idConcurso: string,
   meses: readonly string[]
 ): PontoPermanencia[] => {
-  const coorte = registros.filter((registro) => registro.CONCURSO === idConcurso && registro.MES_ENTRADA);
+  const doConcurso = registros.filter((registro) => registro.CONCURSO === idConcurso && registro.MES_ENTRADA);
 
   return meses.map((mes) => {
-    const entrantes = coorte.filter((registro) => registro.MES_ENTRADA <= mes);
+    const entrantes = doConcurso.filter((registro) => registro.MES_ENTRADA <= mes);
     // D13: `MES_SAIDA` é o primeiro mês de AUSÊNCIA, então quem saiu em `mes`
     // já não está na CGU no fim de `mes`.
     const saidas = entrantes.filter((registro) => registro.MES_SAIDA && registro.MES_SAIDA <= mes).length;
@@ -474,16 +474,16 @@ export const saidasPorMes = (registros: RegistroAuditor[]): Map<string, Registro
   return mapa;
 };
 
-/** Taxa de evasão de uma coorte: quantos saíram sobre quantos passaram por ela. */
-export const evasaoDaCoorte = (registros: RegistroAuditor[], idConcurso: string) => {
-  const coorte = registros.filter((registro) => registro.CONCURSO === idConcurso);
-  const saiu = coorte.filter(saiuDaCgu).length;
+/** Taxa de evasão de um concurso: quantos saíram sobre quantos passaram por ele. */
+export const evasaoDoConcurso = (registros: RegistroAuditor[], idConcurso: string) => {
+  const doConcurso = registros.filter((registro) => registro.CONCURSO === idConcurso);
+  const saiu = doConcurso.filter(saiuDaCgu).length;
   return {
-    total: coorte.length,
+    total: doConcurso.length,
     saiu,
-    percentual: coorte.length === 0 ? 0 : (100 * saiu) / coorte.length,
+    percentual: doConcurso.length === 0 ? 0 : (100 * saiu) / doConcurso.length,
   };
 };
 
-/** Coortes conhecidas, na ordem em que a interface as mostra. */
-export const COORTES: readonly string[] = [ID_CONCURSO_2021, ID_CONCURSO_VETERANO];
+/** Concursos conhecidos, na ordem em que a interface os mostra. */
+export const CONCURSOS: readonly string[] = [ID_CONCURSO_2021, ID_CONCURSO_VETERANO];

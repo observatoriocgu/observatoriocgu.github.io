@@ -1,7 +1,7 @@
 # Observatório CGU (fork do Observatório SEF-MG)
 Site estático (GitHub Pages) que monitora a evasão de Auditores da CGU.
 Versão original: Auditores Fiscais SEF-MG. Esta versão: cargo AFFC — Auditor
-Federal de Finanças e Controle, coortes CGU-2021 (concurso FGV) e VETERANO
+Federal de Finanças e Controle, concursos CGU-2021 (concurso FGV) e VETERANO
 (quem já estava na CGU em jun/2022).
 
 O observatório apura quem saiu da CGU pela diferença mês a mês do SIAPE e
@@ -114,7 +114,7 @@ Edital CGU nº 5 de 13/06/2022, publicado no DOU (D17).
   (D22, revoga o recorte da D21): cards, gráficos, curva, destinos, tabela
   detalhada, histórico e relatório impresso. Ela não é linha nova — é
   SOBREPOSTA ao registro da pessoa, que já está no dados.csv como ativa, e por
-  isso chega à tela com coorte, área e unidade e responde aos filtros
+  isso chega à tela com concurso, área e unidade e responde aos filtros
 - Quem faz a sobreposição é `mesclarSaidasDoDou` (lib/painel.ts), NO NAVEGADOR,
   e não o construir_painel.py. Não é preferência: o construir_painel depende dos
   snapshots do Portal, que estão fora do Git e não existem no CI. Quem roda todo

@@ -26,11 +26,11 @@ interface FiltroMultiploProps {
  * mostrar o conjunto inteiro nesse caso confundiria mais do que ajudaria.
  *
  * `selecionados` pode conter valor que não está em `opcoes` — e ele sobrevive a
- * qualquer clique daqui. Os filtros são encadeados (coorte manda na
+ * qualquer clique daqui. Os filtros são encadeados (concurso manda na
  * especialidade, que manda no tipo de saída), então uma opção some da lista
  * quando o filtro de cima muda. Se o clique reescrevesse a seleção só com o que
  * está à vista, marcar uma especialidade apagaria em silêncio a escolha que o
- * leitor tinha feito nas que sumiram — e ela não voltaria ao reabrir a coorte.
+ * leitor tinha feito nas que sumiram — e ela não voltaria ao reabrir o concurso.
  */
 const FiltroMultiplo: React.FC<FiltroMultiploProps> = ({
   titulo,
