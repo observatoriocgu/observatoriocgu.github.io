@@ -371,6 +371,8 @@ export const detalharSaida = (registro: RegistroAuditor): DetalheSaida => ({
   fontesSaida: fontesDaSaida(registro),
   destino: registro.ORGAO_DESTINO,
   fonteDestino: registro.FONTE_DESTINO,
+  dataDestino: registro.DATA_DESTINO,
+  urlDestino: registro.URL_DESTINO,
   dataPublicacao: registro.DATA_PUBLICACAO_SAIDA,
   atoTitulo: registro.ATO_SAIDA_TITULO,
   atoUrl: urlDoAto(registro),

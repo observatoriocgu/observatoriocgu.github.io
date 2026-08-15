@@ -177,6 +177,18 @@ export interface DetalheSaida {
   destino: string;
   /** Selo D14: de onde veio o destino. */
   fonteDestino: string;
+  /**
+   * Data que atesta o destino, `AAAA-MM-DD`. É a publicação do ato de nomeação
+   * no órgão de chegada quando a fonte é o DOU; vazia quando é o ranking, que
+   * lista aprovações e não sabe dizer o dia da posse.
+   */
+  dataDestino: string;
+  /**
+   * Link da fonte do destino: o ato de nomeação no `in.gov.br`, ou a ficha da
+   * pessoa no rankingdosconcursos. Vazio quando não há como mostrar de onde
+   * saiu — é o caso do destino lido do próprio SIAPE.
+   */
+  urlDestino: string;
   /** Data de publicação do ato, `AAAA-MM-DD`. */
   dataPublicacao: string;
   atoTitulo: string;

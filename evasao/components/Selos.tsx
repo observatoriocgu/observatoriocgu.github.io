@@ -69,6 +69,58 @@ export const SeloFonte: React.FC<{ fonte: string; compacto?: boolean; tema?: Tem
 };
 
 /**
+ * As cores do LINK para o documento da fonte.
+ *
+ * Mesma família de cor do selo correspondente, sem o preenchimento: o selo diz
+ * de onde veio, o link ao lado abre o documento, e um não pode ser confundido
+ * com o outro num aglomerado de pílulas coloridas. Fonte sem cor própria — ou
+ * sem documento, como o SIAPE — cai no neutro.
+ */
+const CORES_DE_LINK: Record<TemaSelo, Record<string, string>> = {
+  escuro: {
+    DOU: 'border-amber-500/40 text-amber-400 hover:border-amber-400 hover:bg-amber-500/10',
+    RANKING: 'border-violet-500/40 text-violet-300 hover:border-violet-400 hover:bg-violet-500/10',
+    MANUAL: 'border-emerald-500/40 text-emerald-300 hover:border-emerald-400 hover:bg-emerald-500/10',
+  },
+  claro: {
+    DOU: 'border-amber-600 text-amber-800 hover:bg-amber-100',
+    RANKING: 'border-violet-600 text-violet-800 hover:bg-violet-100',
+    MANUAL: 'border-emerald-600 text-emerald-800 hover:bg-emerald-100',
+  },
+};
+
+const LINK_NEUTRO: Record<TemaSelo, string> = {
+  escuro: 'border-gray-700 text-gray-400 hover:border-gray-500 hover:bg-gray-800/40',
+  claro: 'border-gray-300 text-gray-600 hover:bg-gray-100',
+};
+
+/** O documento em que a fonte se apoia, aberto em nova aba. */
+export const LinkDaFonte: React.FC<{
+  fonte: string;
+  href: string;
+  rotulo: string;
+  titulo?: string;
+  compacto?: boolean;
+  tema?: TemaSelo;
+}> = ({ fonte, href, rotulo, titulo, compacto = false, tema = 'escuro' }) => {
+  const chave = String(fonte ?? '').trim().toUpperCase();
+
+  return (
+    <a
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      title={titulo}
+      className={`inline-flex items-center whitespace-nowrap rounded border px-2 py-0.5 transition-colors ${
+        compacto ? 'text-[10px]' : 'text-xs'
+      } ${CORES_DE_LINK[tema][chave] ?? LINK_NEUTRO[tema]}`}
+    >
+      {rotulo}
+    </a>
+  );
+};
+
+/**
  * Todas as fontes que atestam o mesmo fato, lado a lado.
  *
  * Duas fontes não são enfeite: significam que o cadastro de pessoal e o ato
