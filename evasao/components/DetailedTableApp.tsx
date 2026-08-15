@@ -4,7 +4,7 @@ import {
   AREAS_SEM_ESPECIALIDADE,
   ID_CONCURSO_2021,
   ID_CONCURSO_VETERANO,
-  MOTIVOS_SAIDA,
+  MOTIVOS_SAIDA_DETALHADOS,
   SITUACAO_EM_EXERCICIO,
   rotuloDoConcurso,
 } from '../constants';
@@ -20,7 +20,7 @@ import {
   comoRegistros,
   fontesDaSaida,
   mesclarSaidasDoDou,
-  motivoDe,
+  motivoDetalhado,
   saiuDaCgu,
   urlDoAto,
 } from '../lib/painel';
@@ -123,9 +123,11 @@ const DetailedTableApp: React.FC = () => {
     [registros]
   );
 
+  // `motivoDetalhado`, e não `motivoDe`: esta é a única página que nomeia o
+  // motivo da D18, e o filtro tem de casar com o valor cru da coluna.
   const motivos = useMemo(() => {
-    const encontrados = new Set(registros.filter(saiuDaCgu).map(motivoDe));
-    return MOTIVOS_SAIDA.filter((valor) => encontrados.has(valor));
+    const encontrados = new Set(registros.filter(saiuDaCgu).map(motivoDetalhado));
+    return MOTIVOS_SAIDA_DETALHADOS.filter((valor) => encontrados.has(valor));
   }, [registros]);
 
   const filtrados = useMemo(() => {
@@ -136,7 +138,7 @@ const DetailedTableApp: React.FC = () => {
         if (area && areaDe(registro) !== area) return false;
         if (unidade && registro.UNIDADE !== unidade) return false;
         if (situacao && registro.SITUACAO !== situacao) return false;
-        if (motivo && (!saiuDaCgu(registro) || motivoDe(registro) !== motivo)) return false;
+        if (motivo && (!saiuDaCgu(registro) || motivoDetalhado(registro) !== motivo)) return false;
         if (termo && !normalizar(registro.NOME).includes(termo)) return false;
         return true;
       })
@@ -314,7 +316,7 @@ const DetailedTableApp: React.FC = () => {
                           </span>
                         )}
                       </Celula>
-                      <Celula>{saiu ? motivoDe(registro) : '-'}</Celula>
+                      <Celula>{saiu ? motivoDetalhado(registro) : '-'}</Celula>
                       <Celula className="whitespace-nowrap">
                         {registro.MES_SAIDA ? formatarCompetenciaLonga(registro.MES_SAIDA) : '-'}
                       </Celula>

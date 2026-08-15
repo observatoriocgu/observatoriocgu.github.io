@@ -15,7 +15,10 @@ import {
   ID_CONCURSO_2021,
   ID_CONCURSO_VETERANO,
   MOTIVO_APOSENTADORIA,
+  MOTIVO_DEMISSAO,
   MOTIVO_EXONERACAO,
+  MOTIVO_FALECIMENTO,
+  MOTIVO_OUTRO,
   MOTIVO_SEM_ATO,
   MOTIVO_VACANCIA,
   SITUACAO_EM_EXERCICIO,
@@ -54,9 +57,29 @@ export const saidas = (registros: RegistroAuditor[]): RegistroAuditor[] =>
 export const emExercicio = (registros: RegistroAuditor[]): RegistroAuditor[] =>
   registros.filter((registro) => registro.SITUACAO === SITUACAO_EM_EXERCICIO);
 
-/** Motivo já pronto para exibir: vazio vira o rótulo de "o DOU não disse por quê". */
-export const motivoDe = (registro: RegistroAuditor): string =>
+/**
+ * O motivo como o `dados.csv` o gravou.
+ *
+ * Vazio vira o rótulo de "o DOU não disse por quê". Devolve a demissão pelo
+ * nome: só a tabela detalhada tem licença para chamar esta função (D18) — todo
+ * o resto usa `motivoDe`.
+ */
+export const motivoDetalhado = (registro: RegistroAuditor): string =>
   registro.MOTIVO_SAIDA || MOTIVO_SEM_ATO;
+
+/**
+ * O motivo já pronto para exibir, com a demissão sob rótulo neutro (D18).
+ *
+ * Este é o caminho PADRÃO, e é de propósito: quem escrever uma tela nova daqui
+ * a seis meses vai chamar `motivoDe` sem saber que a regra existe, e vai acertar
+ * mesmo assim. A pessoa continua contada em tudo — card, gráfico, curva,
+ * destinos, histórico, relatório —, com o mesmo balde e o mesmo total; o que
+ * não vai à tela é a palavra.
+ */
+export const motivoDe = (registro: RegistroAuditor): string => {
+  const motivo = motivoDetalhado(registro);
+  return motivo === MOTIVO_DEMISSAO ? MOTIVO_OUTRO : motivo;
+};
 
 /**
  * Área já pronta para exibir.
@@ -347,7 +370,15 @@ const contarPor = (
     .sort((a, b) => posicao(a.rotulo) - posicao(b.rotulo) || b.total - a.total || a.rotulo.localeCompare(b.rotulo, 'pt-BR'));
 };
 
-/** Rótulo do balde que junta o que o card de saídas não destaca. */
+/**
+ * Rótulo do balde que junta o que o card de saídas não destaca.
+ *
+ * NÃO confundir com `MOTIVO_OUTRO`, das constantes: aquele é o rótulo neutro de
+ * um motivo só (a demissão, D18) e vale em toda a interface; este é um resumo
+ * de quatro motivos e só existe dentro deste card. Os dois somam coisas
+ * diferentes de propósito, e por isso não dividem o mesmo texto — "Outros: 21"
+ * no card e "Outro motivo: 1" na tabela de destinos não se contradizem.
+ */
 export const MOTIVO_OUTROS = 'Outros';
 
 const MOTIVOS_DESTACADOS: readonly string[] = [
@@ -399,16 +430,15 @@ export const SAIDA_MUDOU_ORGAO = 'Mudou de órgão na carreira';
  * onde foi", e nesses dois casos não há para onde: não é destino desconhecido,
  * é destino inexistente. O resto é um balde por motivo.
  *
- * `Desligamento` é o rótulo neutro da D18 — o observatório mede evasão, e o
- * motivo detalhado da penalidade disciplinar não é publicado. Ele aparece aqui
- * porque a pessoa existe e o total da tabela tem de fechar; o que não aparece,
- * nem aqui nem em lugar nenhum, é por que ela saiu.
+ * `MOTIVO_OUTRO` chega aqui já mascarado por `motivoDe` (D18): a pessoa entra
+ * na tabela e no total, com balde próprio, e o que não aparece é o nome do
+ * motivo. Nada a fazer nesta função — ela nunca vê a demissão.
  */
 const BALDE_POR_MOTIVO: Readonly<Record<string, string>> = {
   [MOTIVO_VACANCIA]: SAIDA_POSSE,
   [MOTIVO_EXONERACAO]: MOTIVO_EXONERACAO,
   [MOTIVO_APOSENTADORIA]: DESTINO_INATIVIDADE,
-  Falecimento: DESTINO_INATIVIDADE,
+  [MOTIVO_FALECIMENTO]: DESTINO_INATIVIDADE,
   [SITUACAO_MUDOU_ORGAO]: SAIDA_MUDOU_ORGAO,
 };
 
@@ -419,6 +449,7 @@ const ORDEM_DOS_BALDES: readonly string[] = [
   DESTINO_INATIVIDADE,
   SAIDA_MUDOU_ORGAO,
   MOTIVO_SEM_ATO,
+  MOTIVO_OUTRO,
 ];
 
 /** Um órgão de chegada, dentro de um tipo de saída. */

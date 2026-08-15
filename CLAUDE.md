@@ -71,11 +71,24 @@ Edital CGU nº 5 de 13/06/2022, publicado no DOU (D17).
   mês n. Isso é a própria definição da D13, não uma checagem à parte: toda linha
   do dados.csv com MES_SAIDA tem o selo por construção
 - Nenhum destino ("foi para o TCU") vai ao ar sem fonte registrada e link
-- DEMISSÃO NÃO É PUBLICADA (D18): é penalidade disciplinar, e o observatório
-  mede evasão. O classificador reconhece o tipo, mas grava SITUACAO=DESLIGADO,
-  sem motivo detalhado e SEM link nem cópia do ato — saidas_dou.csv e a pasta
-  saidas_dou/ vão para repositório público e para o site. Ver
-  dou.MOTIVOS_NAO_PUBLICADOS. Não dar a DESLIGADO rótulo que revele o motivo
+- O ATO DE DEMISSÃO NÃO VAI AO AR (D18, alcance revisto em 16/08/2026): é
+  penalidade disciplinar, e o observatório mede evasão. O classificador
+  reconhece o tipo, e o ato NÃO entra no índice, NÃO é arquivado em saidas_dou/
+  e NÃO ganha link em tela nenhuma — o índice e a pasta vão para repositório
+  público e para o site. Ver dou.MOTIVOS_NAO_PUBLICADOS
+- O DADO grava o motivo real: MOTIVO_SAIDA=Demissão, SITUACAO=DEMITIDO. Até
+  15/08/2026 gravava-se DESLIGADO/Desligamento, o que era impreciso —
+  desligamento não é o nome do que aconteceu. Quem mascara é a TELA
+- Quem mascara é `motivoDe` (lib/painel.ts), e SÓ ela: devolve MOTIVO_OUTRO
+  ("Outro motivo") no lugar da demissão. É o caminho PADRÃO de propósito — tela
+  nova que chamar motivoDe acerta sem saber que a regra existe. Revelar exige
+  pedido explícito, via `motivoDetalhado`, e só dados_detalhados.html o faz.
+  NÃO repetir a regra em componente: mascarar caso a caso vaza no primeiro
+  componente novo. NÃO confundir MOTIVO_OUTRO com MOTIVO_OUTROS ("Outros"), que
+  é o balde-resumo de quatro motivos do card de saídas
+- A pessoa CONTINUA CONTADA EM TUDO: card, gráfico, curva, destinos, histórico e
+  relatório impresso, com balde próprio e o mesmo total. O que não vai à tela é
+  a palavra, não a pessoa
 - Padrões de regex do DOU já vêm normalizados: NÃO passar por normalizar(),
   senão .upper() transforma \s em \S e o padrão nunca casa (bug real da
   Fase 2.5)

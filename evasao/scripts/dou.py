@@ -387,21 +387,28 @@ SITUACAO_POR_TIPO = {
     "exoneracao": "EXONERADO",
 }
 
-# DECISÃO EDITORIAL (usuário, 14/08/2026): a demissão NÃO vai ao ar.
+# DECISÃO EDITORIAL (usuário, 14/08/2026, alcance revisto em 16/08/2026): o ATO
+# de demissão não vai ao ar.
 #
 # Demissão é penalidade de processo disciplinar. O ato é público no DOU, mas o
 # observatório existe para medir evasão — quem é demitido não escolheu sair —, e
 # repetir a penalidade numa página que agrega e ranqueia pessoas nomeadas é outra
-# coisa, com outro efeito sobre a vida de alguém.
+# coisa, com outro efeito sobre a vida de alguém. Por isso o ato não entra no
+# índice, não é arquivado em `saidas_dou/` e não recebe link em tela nenhuma.
 #
 # O tipo continua sendo RECONHECIDO pelo classificador, de propósito: sem isso a
 # pessoa cairia em "saída sem ato identificado", o crawler tentaria de novo todo
-# mês, e o site afirmaria não saber uma coisa que sabe. O que muda é o que se
-# GRAVA: situação neutra, sem motivo detalhado e sem link para o ato.
+# mês, e o site afirmaria não saber uma coisa que sabe.
+#
+# O QUE MUDOU EM 16/08/2026. Até aqui o dado gravado também era neutro
+# (`SITUACAO=DESLIGADO`, `MOTIVO_SAIDA=Desligamento`), e isso era impreciso:
+# desligamento não é o nome do que aconteceu. Agora o `dados.csv` grava o motivo
+# real, como qualquer outro, e quem decide o que mostrar é a TELA — `motivoDe`,
+# em lib/painel.ts, devolve um rótulo neutro para todo mundo, e só a tabela
+# detalhada pede o motivo sem máscara. A regra continua a mesma; o que mudou é
+# onde ela é aplicada, de um lugar onde apagava o dado para um lugar onde apenas
+# não o exibe.
 MOTIVOS_NAO_PUBLICADOS = frozenset({"demissao"})
-
-SITUACAO_NAO_PUBLICADA = "DESLIGADO"
-ROTULO_NAO_PUBLICADO = "Desligamento"
 
 # Exoneração de cargo em comissão / função não é saída da CGU: o servidor deixa
 # a chefia e continua Auditor. Sem este recorte, contaria troca de chefia como

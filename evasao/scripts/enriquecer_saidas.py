@@ -213,21 +213,21 @@ def analisar(pessoa: dict, indice: dict, usar_cache: bool, verboso: bool = False
         registro["FONTE_MOTIVO"] = "DOU"
         registro["DATA_PUBLICACAO_SAIDA"] = dou.data_iso(ato)
 
-        # `atos.registrar` devolve None para motivo não publicado (D18) e é o
-        # único ponto que precisa decidir isso. Aqui basta respeitar: sem linha
-        # no índice, sem título, sem URL e sem cópia arquivada — o índice e a
-        # pasta `saidas_dou/` vão inteiros para repositório público e para o site.
+        # O motivo é sempre o real: o dado não mente sobre o que aconteceu, e
+        # quem decide o que mostrar é a tela (ver `MOTIVOS_NAO_PUBLICADOS`).
+        registro["MOTIVO_SAIDA"] = dou.ROTULOS[tipo]
+        registro["SITUACAO"] = dou.SITUACAO_POR_TIPO[tipo]
+
+        # `atos.registrar` devolve None para ato não publicado (D18) e é o único
+        # ponto que precisa decidir isso. Aqui basta respeitar: sem linha no
+        # índice, sem título, sem URL e sem cópia arquivada — o índice e a pasta
+        # `saidas_dou/` vão inteiros para repositório público e para o site.
         linha = atos.registrar(
             indice, ato, tipo, texto, atos.FONTE_NOME,
             id_servidor=pessoa["ID_SERVIDOR_PORTAL"],
             nome=nome,
         )
-        if linha is None:
-            registro["MOTIVO_SAIDA"] = dou.ROTULO_NAO_PUBLICADO
-            registro["SITUACAO"] = dou.SITUACAO_NAO_PUBLICADA
-        else:
-            registro["MOTIVO_SAIDA"] = dou.ROTULOS[tipo]
-            registro["SITUACAO"] = dou.SITUACAO_POR_TIPO[tipo]
+        if linha is not None:
             registro["ATO_SAIDA_TITULO"] = linha["TITULO"]
             registro["ATO_SAIDA_URL"] = linha["URL"]
             registro["ATO_SAIDA_ARQUIVO"] = linha["ARQUIVO"]

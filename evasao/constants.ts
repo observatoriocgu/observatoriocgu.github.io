@@ -151,16 +151,46 @@ export const MOTIVO_SEM_ATO = 'Sem ato identificado';
 export const MOTIVO_EXONERACAO = 'Exoneração';
 export const MOTIVO_VACANCIA = 'Vacância (posse em outro cargo)';
 export const MOTIVO_APOSENTADORIA = 'Aposentadoria';
+export const MOTIVO_FALECIMENTO = 'Falecimento';
 
+/**
+ * O motivo que o dado grava e a tela não nomeia (D18).
+ *
+ * `MOTIVO_DEMISSAO` é o valor real, escrito no `dados.csv` por `dou.py`.
+ * `MOTIVO_OUTRO` é o que o leitor vê no lugar dele em toda página que não seja
+ * a tabela detalhada — a pessoa continua contada em tudo, o balde continua no
+ * lugar, e o que não se publica é a palavra.
+ *
+ * Quem faz a troca é `motivoDe`, em `lib/painel.ts`, e só ela. Não repetir esta
+ * regra em componente nenhum: o rótulo neutro tem de ser o CAMINHO PADRÃO, e
+ * revelar o motivo tem de exigir um pedido explícito (`motivoDetalhado`). O
+ * contrário — mascarar caso a caso — vaza no primeiro componente novo que
+ * alguém escrever sem saber que a regra existe.
+ */
+export const MOTIVO_DEMISSAO = 'Demissão';
+export const MOTIVO_OUTRO = 'Outro motivo';
+
+/** Motivos como a tela os mostra, na ordem em que aparecem nos gráficos. */
 export const MOTIVOS_SAIDA: readonly string[] = [
   MOTIVO_EXONERACAO,
   MOTIVO_VACANCIA,
   MOTIVO_APOSENTADORIA,
-  'Falecimento',
-  'Demissão',
+  MOTIVO_FALECIMENTO,
+  MOTIVO_OUTRO,
   SITUACAO_MUDOU_ORGAO,
   MOTIVO_SEM_ATO,
 ];
+
+/**
+ * A mesma lista com o motivo real no lugar do rótulo neutro.
+ *
+ * Só `dados_detalhados.html` usa. É a lista que casa com o que está gravado no
+ * `dados.csv`, e por isso é a única que serve para montar um filtro sobre o
+ * valor cru da coluna.
+ */
+export const MOTIVOS_SAIDA_DETALHADOS: readonly string[] = MOTIVOS_SAIDA.map((motivo) =>
+  motivo === MOTIVO_OUTRO ? MOTIVO_DEMISSAO : motivo
+);
 
 /**
  * Os dois motivos que o painel mostra por padrão.
@@ -174,11 +204,11 @@ export const MOTIVOS_PADRAO: readonly string[] = [MOTIVO_EXONERACAO, MOTIVO_VACA
 
 /** Cor de cada motivo. Uma só definição, para gráfico e legenda não divergirem. */
 export const COR_POR_MOTIVO: Readonly<Record<string, string>> = {
-  'Exoneração': '#dc2626',
-  'Vacância (posse em outro cargo)': '#f97316',
-  'Aposentadoria': '#d4af37',
-  'Falecimento': '#94a3b8',
-  'Demissão': '#a21caf',
+  [MOTIVO_EXONERACAO]: '#dc2626',
+  [MOTIVO_VACANCIA]: '#f97316',
+  [MOTIVO_APOSENTADORIA]: '#d4af37',
+  [MOTIVO_FALECIMENTO]: '#94a3b8',
+  [MOTIVO_OUTRO]: '#a21caf',
   [SITUACAO_MUDOU_ORGAO]: '#2563eb',
   [MOTIVO_SEM_ATO]: '#4b5563',
 };

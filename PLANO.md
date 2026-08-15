@@ -543,6 +543,34 @@ público e para o site. Implementado em `dou.MOTIVOS_NAO_PUBLICADOS`.
 > leitor atento nota que ela destoa das outras seis categorias. A alternativa — classificá-la como
 > "saída sem ato identificado" — foi descartada por ser **falsa**: o ato existe e foi encontrado.
 
+**D23 — a máscara sai do dado e vai para a tela** *(decisão do usuário, 16/08/2026; revê o alcance
+da D18, não a decisão)*. Gravar `DESLIGADO`/`Desligamento` era **impreciso**: desligamento não é o
+nome do que aconteceu, e o dado passava a afirmar algo diferente do que o ato diz. Agora o
+`dados.csv` grava o motivo real (`SITUACAO = DEMITIDO`, `MOTIVO_SAIDA = Demissão`), como qualquer
+outra saída, e quem decide o que **mostrar** é a interface.
+
+O que continua igual: o **ato** não vai ao ar. Sem linha no `atos_dou.csv`, sem cópia em
+`saidas_dou/`, sem link em tela nenhuma. `dou.MOTIVOS_NAO_PUBLICADOS` não mudou.
+
+O que muda: `motivoDe` (lib/painel.ts) devolve `MOTIVO_OUTRO` — **"Outro motivo"** — no lugar da
+demissão, e é o **único** ponto que aplica a regra. Isso é deliberado: o rótulo neutro é o caminho
+padrão, então uma tela escrita daqui a seis meses acerta sem saber que a regra existe; revelar o
+motivo exige pedir por outro nome (`motivoDetalhado`), e só `dados_detalhados.html` pede. O
+contrário — mascarar caso a caso — vaza no primeiro componente novo.
+
+A pessoa **continua contada em tudo** (card, gráfico, curva, destinos, histórico, relatório), com
+balde próprio e o mesmo total de 279. O que não vai à tela é a palavra, não a pessoa.
+
+> ⚠️ Não confundir `MOTIVO_OUTRO` ("Outro motivo", rótulo neutro de um motivo só, vale em toda a
+> interface) com `MOTIVO_OUTROS` ("Outros", balde-resumo de quatro motivos, só existe no card de
+> saídas). Somam coisas diferentes de propósito, e por isso não dividem o mesmo texto.
+>
+> ⚠️ Efeito colateral herdado da D18: a saída da regra corrigiu um defeito silencioso. `MOTIVOS_SAIDA`
+> em `constants.ts` listava `'Demissão'` enquanto `dou.py` gravava `'Desligamento'` — os dois nunca
+> casavam, então a pessoa **não aparecia como opção** na caixinha "Tipo de saída" nem no filtro da
+> tabela detalhada, e ficava permanentemente fora do gráfico filtrado e sem cor. É exatamente o erro
+> contra o qual o comentário do próprio `constants.ts` avisa.
+
 **Curadoria aplicada.** Das 15 sugestões de casamento com o edital, **12 foram conferidas contra o
 Edital CGU nº 5 e aplicadas** em `curadoria.csv`, com a razão de cada uma registrada na
 `OBSERVACAO` (erro de digitação no edital, partícula omitida, apóstrofo, sobrenome acrescentado ou
@@ -554,7 +582,8 @@ trocado após o concurso). **3 foram recusadas** e seguem em `curadoria_sugestoe
 
 ⚠️ **Pendências que a Fase 3 herda:**
 - **Destino é indício, não fato** (§2.3.3) — não usar em número agregado de card sem curadoria.
-- **`SITUACAO = DESLIGADO` não pode ganhar rótulo que revele o motivo** na interface (**D18**).
+- **`SITUACAO = DEMITIDO` não pode ganhar rótulo que revele o motivo** na interface, fora do
+  `dados_detalhados.html` (**D18** + **D23**).
 - **3 linhas em `curadoria_sugestoes.csv`** aguardando decisão humana.
 - **O dashboard está quebrado até a Fase 3**: o `App.tsx` ainda lê `MASP`, `INSCRICAO` e os dois
   CSVs de outros concursos, que deixaram de existir. O build passa porque o Vite não valida CSV.
