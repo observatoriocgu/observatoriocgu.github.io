@@ -13,16 +13,19 @@ import EvasionChart, { SerieGrafico } from './components/EvasionChart';
 import EvasionTable from './components/EvasionTable';
 import CardDeFiltros, { useFiltrosEncadeados } from './components/CardDeFiltros';
 import { SelosDaLinha } from './components/Selos';
+import TopAprovadosTable from './components/TopAprovadosTable';
 
 import {
   COR_POR_CONCURSO,
   COR_POR_MOTIVO,
   ID_CONCURSO_2021,
   MES_INICIO_GRAFICO_SAIDAS,
+  areasDoConcurso,
   rotuloDoConcurso,
 } from './constants';
 import { PontoSerieMensal, RegistroAuditor, SaidasDou } from './types';
 import {
+  LinhaCsv,
   baseDoSite,
   carregarCsv,
   carregarJsonPublico,
@@ -40,6 +43,7 @@ import {
   curvaDePermanencia,
   detalharSaida,
   evasaoDoConcurso,
+  evasaoDosPrimeirosColocados,
   filtrarSaidas,
   mesclarSaidasDoDou,
   porSaidaMaisRecente,
@@ -60,6 +64,7 @@ const App: React.FC = () => {
   const [registrosDoCsv, setRegistrosDoCsv] = useState<RegistroAuditor[]>([]);
   const [serie, setSerie] = useState<PontoSerieMensal[]>([]);
   const [saidasDou, setSaidasDou] = useState<SaidasDou | null>(null);
+  const [aprovados, setAprovados] = useState<LinhaCsv[]>([]);
 
   const [erroDados, setErroDados] = useState<string | null>(null);
   const [erroSaidasDou, setErroSaidasDou] = useState<string | null>(null);
@@ -82,6 +87,29 @@ const App: React.FC = () => {
         if (montado) setErroDados(erro instanceof Error ? erro.message : 'Erro ao carregar os dados.');
       } finally {
         if (montado) setCarregando(false);
+      }
+    })();
+
+    return () => {
+      montado = false;
+    };
+  }, []);
+
+  // A lista de aprovados do Edital CGU nº 5 (D17) — alimenta a tabela dos
+  // primeiros colocados, e nada mais.
+  //
+  // Carrega sozinha, e não junto do dados.csv, de propósito: é o único lugar da
+  // página que precisa dela, e uma falha aqui tem de custar uma tabela, não o
+  // painel inteiro.
+  useEffect(() => {
+    let montado = true;
+
+    (async () => {
+      try {
+        const linhas = await carregarCsv('concurso_2021.csv');
+        if (montado) setAprovados(linhas);
+      } catch {
+        if (montado) setAprovados([]);
       }
     })();
 
@@ -283,6 +311,31 @@ const App: React.FC = () => {
       })),
     }));
   }, [todasAsSaidas]);
+
+  // === Os dez primeiros de cada especialidade ===
+  //
+  // As colunas saem em ordem alfabética da especialidade — é o que põe
+  // Auditoria, Contabilidade, Correição e TI nesta ordem — e a lista vem do
+  // catálogo do concurso, para não haver uma segunda cópia dos nomes das áreas.
+  const areasDoCard = useMemo(
+    () => areasDoConcurso(ID_CONCURSO_2021).slice().sort((a, b) => a.localeCompare(b, 'pt-BR')),
+    []
+  );
+
+  const topAprovados = useMemo(
+    () => evasaoDosPrimeirosColocados(registros, aprovados, areasDoCard, 10),
+    [registros, aprovados, areasDoCard]
+  );
+
+  /** Quantos dos primeiros colocados não estão na CGU, e por qual dos dois motivos. */
+  const resumoDoTopo = useMemo(() => {
+    const todos = topAprovados.flatMap((especialidade) => especialidade.aprovados);
+    return {
+      total: todos.length,
+      saiu: todos.filter((aprovado) => aprovado.situacao === 'saiu').length,
+      semPosse: todos.filter((aprovado) => aprovado.situacao === 'sem_registro').length,
+    };
+  }, [topAprovados]);
 
   const ultimasSaidas = useMemo(
     () =>
@@ -612,6 +665,40 @@ const App: React.FC = () => {
               .
             </p>
             <EvasionTable grupos={gruposDeDestino} />
+          </section>
+
+          <section className="mt-8 rounded-xl border border-gray-800 bg-gray-900 p-6 shadow-2xl">
+            <h2 className="mb-4 text-2xl font-bold text-red-300">Evasão dos top 10 aprovados</h2>
+            <p className="mb-6 text-gray-400">
+              Os dez primeiros colocados de cada especialidade do concurso de 2021 e onde cada um está hoje. Os nomes e
+              as notas são os do <span className="text-gray-300">Edital CGU nº 5, de 13/06/2022</span>, e a ordem é a da
+              nota final na especialidade — quem concorreu a vaga de estado fez a mesma prova e disputa a mesma lista,
+              sem recorte de UF. A situação vem do SIAPE, com as saídas que o DOU já publicou e o cadastro ainda não
+              registrou.{' '}
+              {resumoDoTopo.total > 0 ? (
+                <>
+                  Dos <span className="font-bold text-orange-400">{numero(resumoDoTopo.total)}</span> nomes,{' '}
+                  <span className="font-bold text-orange-400">{numero(resumoDoTopo.saiu)}</span> já deixaram a CGU
+                  {resumoDoTopo.semPosse > 0 ? (
+                    <>
+                      {' '}
+                      e <span className="font-bold text-orange-400">{numero(resumoDoTopo.semPosse)}</span> nunca
+                      chegaram a tomar posse
+                    </>
+                  ) : null}
+                  .{' '}
+                </>
+              ) : null}
+              <span className="text-gray-300">Esta tabela não acompanha os filtros acima</span> — ela é sempre o
+              concurso de 2021 inteiro, porque a pergunta que ela responde é se a evasão poupa quem passou na frente.
+            </p>
+            {aprovados.length === 0 ? (
+              <div className="text-sm text-gray-400">
+                {carregando ? 'Carregando...' : 'Não foi possível carregar a lista de aprovados do edital.'}
+              </div>
+            ) : (
+              <TopAprovadosTable especialidades={topAprovados} />
+            )}
           </section>
         </main>
 

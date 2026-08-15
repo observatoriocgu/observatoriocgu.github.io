@@ -578,5 +578,149 @@ export const evasaoDoConcurso = (registros: RegistroAuditor[], idConcurso: strin
   };
 };
 
+// === Os primeiros colocados de cada especialidade ===
+//
+// A pergunta é antiga e sempre foi respondida de ouvido: a CGU perde mais quem
+// passou na frente? Aqui ela vira tabela — os dez primeiros de cada
+// especialidade do concurso de 2021, e se cada um continua na CGU.
+//
+// A lista de aprovados NÃO é o dados.csv: quem nunca tomou posse não está lá, e
+// é justamente essa a informação que faria a tabela mentir. Ela vem do
+// `data/concurso_2021.csv`, que é o Edital CGU nº 5 (D17), e o dados.csv entra
+// só para dizer o que aconteceu depois com cada nome.
+
+/**
+ * A lista do edital que serve de classificação geral.
+ *
+ * `POSICAO_CONCURSO` no CSV é a posição DENTRO de uma lista de vaga — por
+ * modalidade e por UF —, e não uma classificação geral: em Auditoria há oito
+ * pessoas com "posição 1", uma por UF. Uma classificação geral por
+ * especialidade NÃO EXISTE no edital, e por isso ela é reconstruída aqui: a
+ * ordem é a nota, que é a mesma prova para todo mundo da especialidade.
+ *
+ * Vaga regional não é especialidade à parte: quem concorreu a vaga de estado
+ * fez a prova de Auditoria e Fiscalização e disputa a mesma lista, sem recorte
+ * de UF em lugar nenhum do painel. As quatro especialidades saem do edital, e
+ * só Auditoria tem vagas regionais.
+ *
+ * A lista de ampla concorrência da vaga de Brasília entra só como desempate,
+ * porque é a única que ordena quase todo o topo das quatro especialidades, e
+ * ela resolve os empates de nota do jeito que o edital os resolveu. Quem não
+ * está nela — as vagas regionais — não tem como ser ordenado contra ela e fica
+ * atrás em caso de empate. Isso é critério do observatório, não do edital, e é
+ * por isso que `empatadosNoCorte` existe: quem empatou com o último e ficou de
+ * fora aparece embaixo da tabela em vez de sumir.
+ */
+const MODALIDADE_CLASSIFICACAO_GERAL = 'Ampla Concorrência';
+const UF_CLASSIFICACAO_GERAL = 'DF';
+
+/** Posição de quem não está na lista de desempate: vai para o fim, sem virar `NaN`. */
+const SEM_POSICAO = Number.MAX_SAFE_INTEGER;
+
+/**
+ * O que o observatório sabe sobre um aprovado.
+ *
+ * São três estados, não dois. `sem_registro` é quem passou no concurso e nunca
+ * apareceu no quadro da CGU — não é "continua na CGU" nem "saiu da CGU", e
+ * empurrá-lo para um dos dois publicaria como Auditor da casa alguém que nunca
+ * tomou posse.
+ */
+export type SituacaoDoAprovado = 'ativo' | 'saiu' | 'sem_registro';
+
+export interface AprovadoDoTopo {
+  /** 1 a N, a classificação na especialidade. `0` em quem ficou de fora por empate. */
+  posicao: number;
+  nome: string;
+  /** Nota final na especialidade, como o edital a publicou. */
+  nota: string;
+  situacao: SituacaoDoAprovado;
+  /** Competência da saída; `''` em quem não saiu. */
+  mesSaida: string;
+  /** Já mascarado pela D18: nunca traz a demissão pelo nome. `''` em quem não saiu. */
+  motivo: string;
+}
+
+export interface TopoDaEspecialidade {
+  area: string;
+  aprovados: AprovadoDoTopo[];
+  /**
+   * Quem tem a mesma nota do último colocado da tabela e ficou de fora só pelo
+   * desempate. Quase sempre vazio — e, quando não está, a tabela tem de dizer,
+   * porque aí o corte foi do observatório e não da prova.
+   */
+  empatadosNoCorte: AprovadoDoTopo[];
+}
+
+/**
+ * Os `quantidade` primeiros colocados de cada especialidade, e o que houve com
+ * cada um.
+ *
+ * `registros` tem de ser a lista já mesclada com as saídas do DOU (D22) — é o
+ * que faz uma saída publicada ontem aparecer aqui hoje, e não daqui a dois
+ * meses. Casa-se por `INSCRICAO`, que é a chave do concurso e é o que o
+ * pipeline já gravou no dados.csv; o nome não casa nada (D12).
+ */
+export const evasaoDosPrimeirosColocados = (
+  registros: RegistroAuditor[],
+  aprovados: LinhaCsv[],
+  areas: readonly string[],
+  quantidade: number
+): TopoDaEspecialidade[] => {
+  const porInscricao = new Map<string, RegistroAuditor>();
+  for (const registro of registros) {
+    if (registro.INSCRICAO) porInscricao.set(registro.INSCRICAO, registro);
+  }
+
+  const posicaoDeDesempate = new Map<string, number>();
+  for (const linha of aprovados) {
+    if (!linha.INSCRICAO) continue;
+    if (linha.MODALIDADE !== MODALIDADE_CLASSIFICACAO_GERAL) continue;
+    if (linha.UF_VAGA !== UF_CLASSIFICACAO_GERAL) continue;
+    const posicao = Number(linha.POSICAO_CONCURSO);
+    if (posicao > 0) posicaoDeDesempate.set(linha.INSCRICAO, posicao);
+  }
+
+  // Um aprovado por inscrição: quem concorreu por cota aparece duas vezes no
+  // edital, na lista da cota e na de ampla concorrência. Sem isto, um nome
+  // ocuparia duas posições da tabela. Linha sem nota é sub judice, que o edital
+  // publica sem classificação — não dá para ordenar, e fica de fora.
+  const unicos = new Map<string, LinhaCsv>();
+  for (const linha of aprovados) {
+    if (!linha.INSCRICAO || !linha.NOTA) continue;
+    if (!unicos.has(linha.INSCRICAO)) unicos.set(linha.INSCRICAO, linha);
+  }
+  const todos = Array.from(unicos.values());
+
+  /** O que se sabe de um aprovado, a partir da linha do edital. */
+  const comoAprovado = (linha: LinhaCsv, posicao: number): AprovadoDoTopo => {
+    const registro = porInscricao.get(linha.INSCRICAO);
+    const base = { posicao, nome: linha.NOME, nota: linha.NOTA };
+    if (!registro) return { ...base, situacao: 'sem_registro', mesSaida: '', motivo: '' };
+    if (!saiuDaCgu(registro)) return { ...base, situacao: 'ativo', mesSaida: '', motivo: '' };
+    return { ...base, situacao: 'saiu', mesSaida: registro.MES_SAIDA, motivo: motivoDe(registro) };
+  };
+
+  return areas.map((area) => {
+    const classificados = todos
+      .filter((linha) => linha.AREA === area)
+      .sort(
+        (a, b) =>
+          Number(b.NOTA) - Number(a.NOTA) ||
+          (posicaoDeDesempate.get(a.INSCRICAO) ?? SEM_POSICAO) -
+            (posicaoDeDesempate.get(b.INSCRICAO) ?? SEM_POSICAO) ||
+          a.NOME.localeCompare(b.NOME, 'pt-BR')
+      );
+
+    const aprovados = classificados.slice(0, quantidade).map((linha, indice) => comoAprovado(linha, indice + 1));
+    const notaDeCorte = aprovados.length === quantidade ? Number(aprovados[aprovados.length - 1].nota) : NaN;
+    const empatadosNoCorte = classificados
+      .slice(quantidade)
+      .filter((linha) => Number(linha.NOTA) === notaDeCorte)
+      .map((linha) => comoAprovado(linha, 0));
+
+    return { area, aprovados, empatadosNoCorte };
+  });
+};
+
 /** Concursos conhecidos, na ordem em que a interface os mostra. */
 export const CONCURSOS: readonly string[] = [ID_CONCURSO_2021, ID_CONCURSO_VETERANO];
