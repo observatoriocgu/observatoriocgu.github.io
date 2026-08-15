@@ -244,6 +244,33 @@ export interface SaidaRecenteDou {
   jaNoSiape: boolean;
 }
 
+/**
+ * Uma linha de `data/destinos_ranking.csv` — o destino que o
+ * rankingdosconcursos identificou para quem já saiu (D24).
+ *
+ * O arquivo guarda TODAS as saídas sem destino que foram consultadas, inclusive
+ * as que o ranking não resolveu, para que a próxima execução saiba o que já
+ * perguntou. Só as linhas com `orgaoDestino` preenchido vão à tela — as demais
+ * são pauta de curadoria. Quem aplica a regra é `mesclarDestinosDoRanking`.
+ */
+export interface DestinoDoRanking {
+  /** `ID_SERVIDOR_PORTAL`, a única chave de identidade (D12). */
+  idServidor: string;
+  nome: string;
+  /**
+   * `UNICO` (sobrou um candidato — é o único caso que preenche destino),
+   * `AMBIGUO`, `SEM_FICHA`, `SEM_CANDIDATO`, `SEM_CATALOGO` ou
+   * `FALHA_NA_CONSULTA`.
+   */
+  decisao: string;
+  /** Vazio em tudo que não seja `UNICO`. */
+  orgaoDestino: string;
+  /** A consulta que qualquer pessoa pode repetir no navegador. */
+  urlDestino: string;
+  /** Os órgãos possíveis, quando há mais de um. Só para a pauta de curadoria. */
+  candidatos: string[];
+}
+
 export interface SaidasDou {
   /** `AAAA-MM-DD` até onde a varredura do DOU já cobriu. */
   varreduraAte: string;

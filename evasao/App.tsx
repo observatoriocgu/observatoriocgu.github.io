@@ -23,7 +23,7 @@ import {
   areasDoConcurso,
   rotuloDoConcurso,
 } from './constants';
-import { PontoSerieMensal, RegistroAuditor, SaidasDou } from './types';
+import { DestinoDoRanking, PontoSerieMensal, RegistroAuditor, SaidasDou } from './types';
 import {
   LinhaCsv,
   baseDoSite,
@@ -38,6 +38,7 @@ import {
 import {
   agregarPorMotivoResumido,
   agregarPorTipoDeSaida,
+  comoDestinosDoRanking,
   comoRegistros,
   comoSerie,
   curvaDePermanencia,
@@ -45,7 +46,7 @@ import {
   evasaoDoConcurso,
   evasaoDosPrimeirosColocados,
   filtrarSaidas,
-  mesclarSaidasDoDou,
+  mesclarFontesExternas,
   porSaidaMaisRecente,
   saidas,
   serieDeSaidasPorMotivo,
@@ -62,6 +63,7 @@ const percentual = (valor: number) => `${valor.toFixed(1).replace('.', ',')}%`;
 
 const App: React.FC = () => {
   const [registrosDoCsv, setRegistrosDoCsv] = useState<RegistroAuditor[]>([]);
+  const [destinosDoRanking, setDestinosDoRanking] = useState<DestinoDoRanking[]>([]);
   const [serie, setSerie] = useState<PontoSerieMensal[]>([]);
   const [saidasDou, setSaidasDou] = useState<SaidasDou | null>(null);
   const [aprovados, setAprovados] = useState<LinhaCsv[]>([]);
@@ -75,13 +77,17 @@ const App: React.FC = () => {
 
     (async () => {
       try {
-        const [linhasDados, linhasSerie] = await Promise.all([
+        const [linhasDados, linhasSerie, linhasDestinos] = await Promise.all([
           carregarCsv('dados.csv'),
           carregarCsv('serie_mensal.csv'),
+          // O destino do ranking é acessório: sem ele a tela só mostra menos
+          // destino identificado. Por isso ele cai sozinho, sem derrubar o painel.
+          carregarCsv('destinos_ranking.csv').catch(() => []),
         ]);
         if (!montado) return;
         setRegistrosDoCsv(comoRegistros(linhasDados));
         setSerie(comoSerie(linhasSerie));
+        setDestinosDoRanking(comoDestinosDoRanking(linhasDestinos));
         setErroDados(null);
       } catch (erro) {
         if (montado) setErroDados(erro instanceof Error ? erro.message : 'Erro ao carregar os dados.');
@@ -144,12 +150,13 @@ const App: React.FC = () => {
   }, []);
 
   // O painel inteiro — cards, gráficos, tabelas — trabalha sobre o CSV do SIAPE
-  // JÁ MESCLADO com as saídas que só o DOU conhece (D22). É uma linha só, e é o
-  // que faz o resto da tela chegar até hoje em vez de parar na última
-  // competência do Portal, dois meses atrás.
+  // JÁ MESCLADO com as saídas que só o DOU conhece (D22) e com os destinos que o
+  // ranking identificou (D24). É uma linha só, e é o que faz o resto da tela
+  // chegar até hoje em vez de parar na última competência do Portal, dois meses
+  // atrás.
   const registros = useMemo(
-    () => mesclarSaidasDoDou(registrosDoCsv, saidasDou?.saidasRecentes ?? []),
-    [registrosDoCsv, saidasDou]
+    () => mesclarFontesExternas(registrosDoCsv, saidasDou?.saidasRecentes ?? [], destinosDoRanking),
+    [registrosDoCsv, saidasDou, destinosDoRanking]
   );
 
   // === Recorte ===
@@ -652,9 +659,11 @@ const App: React.FC = () => {
             <h2 className="mb-4 text-2xl font-bold text-red-300">Destinos da evasão</h2>
             <p className="mb-6 text-gray-400">
               Para onde foram os Auditores que deixaram a CGU, primeiro pelo tipo da saída e, dentro de quem tomou posse
-              em outro cargo, pelo órgão de chegada. O destino só aparece quando há ato do DOU ou registro do SIAPE que
-              o diga, e cada linha traz de onde veio a informação. Quem saiu há pouco costuma aparecer sem destino: a
-              busca do órgão de chegada parte de quem o SIAPE já mostrou saindo, então ela vem depois. São{' '}
+              em outro cargo, pelo órgão de chegada. O destino só aparece quando alguma fonte o diz, e cada linha traz{' '}
+              <span className="text-gray-300">qual</span>: o ato de nomeação publicado no DOU, o registro do SIAPE, ou a
+              aprovação em concurso registrada no Ranking dos Concursos — esta última só para quem já saiu, e só quando
+              sobra um concurso possível. Quem saiu há pouco costuma aparecer sem destino: a busca do órgão de chegada
+              parte de quem o SIAPE já mostrou saindo, então ela vem depois. São{' '}
               <span className="font-bold text-orange-400">{numero(todasAsSaidas.length)}</span> saída
               {todasAsSaidas.length === 1 ? '' : 's'} em toda a série, concurso de 2021 e veteranos juntos.{' '}
               <span className="text-gray-300">Esta tabela não acompanha os filtros acima</span> — para recortar por

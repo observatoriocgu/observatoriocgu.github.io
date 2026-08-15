@@ -11,6 +11,7 @@ Encadeia o pipeline inteiro:
     varrer_dou        o que o DOU publicou desde a última varredura, por FRASE
     construir_painel  de novo, agora com o que o DOU achou
     gerar_card_dou    o card "dias sem perder um Auditor", a partir do índice
+    enriquecer_destinos_ranking  destino de quem o DOU não disse para onde foi
 
 O segundo `construir_painel` não é engano: o primeiro descobre QUEM saiu, o
 enriquecedor descobre POR QUE, e o segundo costura isso no `dados.csv`.
@@ -76,13 +77,13 @@ def main() -> int:
     # Sem `--manter-original` os CSVs brutos são apagados depois de filtrados —
     # é o comportamento padrão do script, e o que impede a pasta de crescer para
     # dezenas de GB. Nada a perder: o Portal republica.
-    if not rodar("1/6 Filtrando os snapshots do Portal", ["filtrar_affc.py"]):
+    if not rodar("1/7 Filtrando os snapshots do Portal", ["filtrar_affc.py"]):
         return 1
 
     if args.concurso and not rodar("Resultado final do concurso (DOU)", ["concurso.py"]):
         return 1
 
-    if not rodar("2/6 Construindo o painel", ["construir_painel.py"]):
+    if not rodar("2/7 Construindo o painel", ["construir_painel.py"]):
         return 1
 
     if args.sem_dou:
@@ -96,18 +97,27 @@ def main() -> int:
     enriquecer = ["enriquecer_saidas.py"]
     if args.limite:
         enriquecer += ["--limite", str(args.limite)]
-    if not rodar("3/6 Buscando motivo e destino no DOU, por nome", enriquecer):
+    if not rodar("3/7 Buscando motivo e destino no DOU, por nome", enriquecer):
         return 1
 
-    if not rodar("4/6 Varrendo o DOU por frase (o que o SIAPE ainda não mostra)",
+    if not rodar("4/7 Varrendo o DOU por frase (o que o SIAPE ainda não mostra)",
                  ["varrer_dou.py"]):
         return 1
 
-    if not rodar("5/6 Reconstruindo o painel com o que o DOU achou", ["construir_painel.py"]):
+    if not rodar("5/7 Reconstruindo o painel com o que o DOU achou", ["construir_painel.py"]):
         return 1
 
-    if not rodar("6/6 Gerando o card a partir do índice de atos", ["gerar_card_dou.py"]):
+    if not rodar("6/7 Gerando o card a partir do índice de atos", ["gerar_card_dou.py"]):
         return 1
+
+    # Por último, e depois do card: este crawler lê o `atos_dou.json` que o
+    # passo anterior acabou de gerar — é de lá que saem as saídas que só o DOU
+    # conhece. Uma falha aqui não invalida nada do que veio antes: o painel
+    # apenas segue com menos destino identificado.
+    if not rodar("7/7 Procurando destino de quem saiu, no Ranking dos Concursos",
+                 ["enriquecer_destinos_ranking.py"]):
+        print("! o painel continua válido; só o destino do ranking não foi atualizado.",
+              file=sys.stderr)
 
     print()
     print("Pronto. Antes de commitar:")
@@ -116,6 +126,8 @@ def main() -> int:
     print("  - saídas marcadas SAIDA_PROVISORIA=SIM só se confirmam no mês seguinte")
     print("  - atos do índice sem ID_SERVIDOR_PORTAL são os que o SIAPE ainda não")
     print("    confirmou — é a defasagem do Portal, não erro de varredura")
+    print("  - em data/destinos_ranking.csv, DECISAO=AMBIGUO é pauta humana: o")
+    print("    ranking achou mais de um concurso e não diz qual a pessoa exerceu")
     return 0
 
 

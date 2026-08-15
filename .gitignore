@@ -28,6 +28,11 @@ evasao/data/historico_transparencia_cgu/
 # rebaixar as mesmas ~3.000 páginas do backfill — é acelerador local, não dado.
 evasao/data/cache_dou/
 
+# Cache das buscas no rankingdosconcursos. Ao contrário do ato do DOU, a ficha
+# de um candidato MUDA — vale 12 horas, e versionar cópia velha de dado que
+# muda é pior que não ter cache nenhum. Cada página comprimida tem 218 KB.
+evasao/data/cache_ranking/
+
 # Python (evasao/scripts/)
 __pycache__/
 *.py[cod]

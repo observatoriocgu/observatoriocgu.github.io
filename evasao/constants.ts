@@ -226,7 +226,7 @@ export const COR_POR_CONCURSO: Readonly<Record<string, string>> = {
 export const ROTULO_POR_FONTE: Readonly<Record<string, string>> = {
   SIAPE: 'SIAPE',
   DOU: 'DOU',
-  RANKING: 'Edital',
+  RANKING: 'Ranking',
   BUSCA: 'Busca',
   MANUAL: 'Curadoria',
 };
@@ -237,7 +237,13 @@ export const DESCRICAO_POR_FONTE: Readonly<Record<string, string>> = {
     'Cadastro de Servidores Civis do Portal da Transparência: a pessoa consta ' +
     'do quadro num mês e não consta no seguinte',
   DOU: 'Ato publicado no Diário Oficial da União, com cópia arquivada aqui',
-  RANKING: 'Edital CGU nº 5, de 13/06/2022, publicado no DOU',
+  // O rótulo dizia "Edital CGU nº 5" enquanto nada gravava `RANKING` — o slot
+  // estava reservado para o rankingdosconcursos desde a D14, e a descrição foi
+  // preenchida com a fonte errada no caminho. Quem realmente atesta a área e a
+  // classificação do concurso de entrada é o DOU, que já tem selo próprio.
+  RANKING:
+    'Aprovação em concurso registrada no rankingdosconcursos.com.br, para quem ' +
+    'o SIAPE ou o DOU já mostraram sair. É indício com fonte, não ato publicado',
   BUSCA: 'Busca por nome no DOU',
   MANUAL: 'Correção humana registrada em data/curadoria.csv',
 };

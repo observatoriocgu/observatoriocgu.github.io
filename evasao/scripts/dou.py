@@ -36,6 +36,7 @@ Como a busca do DOU se comporta (verificado em 13 e 14/08/2026):
 
 from __future__ import annotations
 
+import gzip
 import hashlib
 import html as html_mod
 import json
@@ -131,13 +132,13 @@ def normalizar_com_mapa(texto: str) -> tuple[str, list[int]]:
 
 # ------------------------------------------------------------------ rede/cache
 
-def _caminho_cache(url: str) -> Path:
-    return DIR_CACHE / (hashlib.sha1(url.encode("utf-8")).hexdigest() + ".html")
+def _caminho_cache(url: str, dir_cache: Path | None = None) -> Path:
+    return (dir_cache or DIR_CACHE) / (hashlib.sha1(url.encode("utf-8")).hexdigest() + ".html")
 
 
-def _respeitar_pausa() -> None:
+def _respeitar_pausa(pausa: float | None = None) -> None:
     global _ultima_requisicao
-    espera = PAUSA_SEGUNDOS - (time.monotonic() - _ultima_requisicao)
+    espera = (PAUSA_SEGUNDOS if pausa is None else pausa) - (time.monotonic() - _ultima_requisicao)
     if espera > 0:
         time.sleep(espera)
     _ultima_requisicao = time.monotonic()
@@ -148,6 +149,9 @@ def baixar(
     timeout: int = 90,
     usar_cache: bool = True,
     validade_horas: float | None = None,
+    dir_cache: Path | None = None,
+    aceitar_gzip: bool = False,
+    pausa_segundos: float | None = None,
 ) -> str:
     """
     Baixa uma URL como texto, com cache em disco e pausa entre requisições.
@@ -156,11 +160,25 @@ def baixar(
     muda depois de publicada. Com um valor, a cópia em disco mais velha que isso
     é ignorada e a URL vai à rede de novo (ver VALIDADE_BUSCA_ABERTA_HORAS).
 
+    `dir_cache` separa a prateleira: o DOU e o rankingdosconcursos guardam coisas
+    de validade diferente, e misturá-las na mesma pasta faria a limpeza de uma
+    apagar a outra. Sem o parâmetro, tudo continua indo para `data/cache_dou`.
+
+    `pausa_segundos` sobrepõe o intervalo entre requisições. Existe porque nem
+    todo servidor tolera o mesmo ritmo: o in.gov.br aceita uma por segundo, e o
+    rankingdosconcursos responde uma página de erro "Muitas Consultas" nesse
+    ritmo — com status 200, o que a fazia passar por resposta boa.
+
+    `aceitar_gzip` pede a resposta comprimida. Fica DESLIGADO por padrão de
+    propósito: o in.gov.br já entrega páginas pequenas e mexer no que funciona
+    não paga. Para o rankingdosconcursos paga muito — a mesma página vai de
+    2,9 MB para 218 KB, e a varredura inteira de 480 MB para 9 MB.
+
     Tenta urllib e cai para o curl se levar 403 — alguns proxies bloqueiam o
     User-Agent do urllib mas deixam o curl passar. Este fallback não é
     decorativo: sem ele a busca do DOU responde 403 nesta máquina.
     """
-    cache = _caminho_cache(url)
+    cache = _caminho_cache(url, dir_cache)
     vencido = False
     if usar_cache and cache.is_file():
         if validade_horas is None:
@@ -175,17 +193,28 @@ def baixar(
         "Accept": "text/html,application/xhtml+xml",
         "Accept-Language": "pt-BR,pt;q=0.9",
     }
+    if aceitar_gzip:
+        cabecalhos["Accept-Encoding"] = "gzip"
 
-    _respeitar_pausa()
+    _respeitar_pausa(pausa_segundos)
     conteudo = ""
     try:
         req = urllib.request.Request(url, headers=cabecalhos)
         with urllib.request.urlopen(req, timeout=timeout) as resp:
-            conteudo = resp.read().decode("utf-8", errors="replace")
+            bruto = resp.read()
+            # O servidor pode ignorar o pedido e responder sem comprimir; quem
+            # manda é o cabeçalho da RESPOSTA, nunca o do pedido.
+            if (resp.headers.get("Content-Encoding") or "").lower() == "gzip":
+                bruto = gzip.decompress(bruto)
+            conteudo = bruto.decode("utf-8", errors="replace")
     except Exception:
         try:
+            comando = ["curl", "-sS", "-m", str(timeout), "-A", cabecalhos["User-Agent"]]
+            if aceitar_gzip:
+                # `--compressed` faz o próprio curl descomprimir.
+                comando.append("--compressed")
             proc = subprocess.run(
-                ["curl", "-sS", "-m", str(timeout), "-A", cabecalhos["User-Agent"], url],
+                [*comando, url],
                 capture_output=True,
                 check=True,
             )
@@ -204,7 +233,7 @@ def baixar(
     # Só grava resposta não-vazia: cachear "" transformaria uma falha de rede
     # momentânea em ausência permanente de resultado.
     if usar_cache and conteudo:
-        DIR_CACHE.mkdir(parents=True, exist_ok=True)
+        cache.parent.mkdir(parents=True, exist_ok=True)
         cache.write_text(conteudo, encoding="utf-8")
     return conteudo
 

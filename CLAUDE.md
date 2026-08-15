@@ -104,9 +104,15 @@ Edital CGU nº 5 de 13/06/2022, publicado no DOU (D17).
 - varrer_dou.py        varre o DOU por FRASE e registra toda saída de AFFC
 - gerar_card_dou.py    card "dias sem perder um Auditor", derivado do índice
 - filtrar_affc.py      reduz o CSV bruto do Portal aos AFFC
+- ranking.py           biblioteca: rankingdosconcursos, catálogo de órgãos e a
+                       regra de decisão do destino (D24)
+- enriquecer_destinos_ranking.py  destino de quem já saiu e o DOU não disse para
+                       onde. `--conferir` mede a regra contra o gabarito do DOU
 - testar_dou.py        regressão da classificação, sem rede. RODAR SEMPRE que
                        mexer nos padrões de dou.py: cada caso ali é um erro que
                        já foi ao ar ou quase foi
+- testar_ranking.py    regressão do catálogo de órgãos e da regra de decisão,
+                       sem rede. RODAR SEMPRE que mexer em ranking.py
 
 ## As duas varreduras do DOU escrevem no mesmo índice (D19, 15/08/2026)
 - `data/atos_dou.csv` é o índice ÚNICO dos atos de saída, com chave no ato
@@ -158,6 +164,54 @@ Edital CGU nº 5 de 13/06/2022, publicado no DOU (D17).
   falecimento, e era classificado como falecimento — mas o ato é sobre o
   pensionista, sai muito depois do óbito e o instituidor pode ser aposentado ou
   TFFC (fora do escopo, D7). Ver dou.PADROES_PENSAO
+
+## O destino pelo Ranking dos Concursos (D24, 15/08/2026)
+- A ordem é SEMPRE `já sabendo que a pessoa saiu (SIAPE/DOU) -> procurar para
+  onde`. NUNCA o contrário: passar em concurso não é sair da CGU. Há Auditor com
+  seis aprovações que continua na casa, e ele não pode aparecer em lugar nenhum
+  do `destinos_ranking.csv`. Só quem tem saída registrada é consultado
+- O ranking sabe o CONJUNTO de concursos em que a pessoa passou; NÃO sabe qual
+  ela foi exercer. Por isso só se publica quando sobra UM órgão candidato.
+  Ambíguo vai para pauta humana, com a lista e o link — nunca para a tela
+- NÃO INVENTAR DESEMPATE. Todos foram medidos contra os 118 destinos que o DOU
+  já conhece e todos reprovaram: marca "Nomeado" 6 de 18 (33,3%), melhor
+  colocação 24 de 62 (38,7%), colocação até 100º 26,7%. Nos 62 ambíguos o
+  destino certo estava entre os candidatos nos 62 — o que falta não é dado, é o
+  critério, e ele não existe
+- A ÂNCORA: só se publica se a ficha do site tiver também a linha do concurso da
+  própria CGU. É a prova de que aquela ficha é desta pessoa, e não de um
+  homônimo perfeito, e sinal de que a lista de concursos dela ali está completa.
+  Custa 2 acertos e corta 2 erros — 45 publicados e 43 certos (95,6%), contra 49
+  e 45 (91,8%) sem ela. Os 2 erros que ela remove são fichas que não conheciam o
+  concurso para o qual a pessoa de fato foi
+- O quadradinho azul do site é "Nomeado" e o verde é "Dentro das Vagas". O azul
+  parece a resposta e não é: quem passa em vários é nomeado em vários. São
+  lidos e guardados para a curadoria, e não entram na decisão
+- Nome NUNCA basta: a busca do site casa por PREFIXO, então "MARIA DE SOUZA
+  LIMA" traz "Mariana de Souza Lima Velasco" junto. `linhas_da_pessoa` exige
+  igualdade EXATA do nome normalizado. Sem isso, aprovação de uma pessoa vira
+  destino de outra
+- O nome do órgão NUNCA vem do rótulo do site — vem de `ranking.ORGAO_POR_ROTULO`.
+  "TCU", "TCU TI 25" e "Tribunal de Contas da União" são a mesma casa; publicar
+  os três rótulos criaria três destinos onde há um. Rótulo fora do catálogo NÃO
+  vira destino: `canonico` devolve `""`, o caso fica ambíguo e o rótulo aparece
+  no relatório para alguém acrescentar. Órgão que também vem do DOU é escrito
+  EXATAMENTE como o DOU escreve, senão a tabela racha pela outra ponta
+- Concurso UNIFICADO (CNU, TSE Unificado) é aprovação real com órgão indefinido:
+  `canonico` devolve `None` e o caso vira AMBÍGUO. Descartá-lo em silêncio faria
+  "TCU + CNU" parecer candidato único
+- O site tem limitador de ritmo que responde uma página "Muitas Consultas" COM
+  STATUS 200. Ela não tem tabela, então era lida como "pessoa não está no
+  ranking" e gravava SEM_FICHA para quem tem ficha — 13 das 43 saídas na
+  primeira varredura. `pagina_respondeu_a_busca` exige que o formulário ecoe o
+  nome consultado; sem eco, não é resposta. Pausa de 3s e `None` (nunca `[]`)
+  quando não se consegue perguntar
+- O resultado NÃO entra no `dados.csv`: é mesclado no NAVEGADOR, por
+  `mesclarDestinosDoRanking`, pelo mesmo motivo da D22. Só preenche destino
+  VAZIO — a precedência é CURADORIA > DOU > RANKING
+- Toda página que lê `dados.csv` chama `mesclarFontesExternas`, e não as duas
+  mescladas soltas: são duas agora, e uma regra que depende de quatro páginas
+  lembrarem da mesma sequência é uma regra que a quinta página quebra
 
 ## Ferramentas
 - Scripts Python são STDLIB ONLY: o CI não roda pip install, e requests/bs4/

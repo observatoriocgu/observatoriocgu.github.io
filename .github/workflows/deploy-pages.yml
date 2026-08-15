@@ -22,6 +22,9 @@ on:
   workflow_run:
     workflows:
       - "Atualizar saídas do DOU (AFFC)"
+      # Mesma razão: o `destinos_ranking.csv` é lido em tempo de execução de
+      # /evasao/data/, então ele só chega ao ar quando o site é remontado.
+      - "Atualizar destinos no Ranking dos Concursos (AFFC)"
     types:
       - completed
   workflow_dispatch:

@@ -19,12 +19,13 @@ import {
   areaDe,
   comoRegistros,
   fontesDaSaida,
-  mesclarSaidasDoDou,
+  comoDestinosDoRanking,
+  mesclarFontesExternas,
   motivoDetalhado,
   saiuDaCgu,
   urlDoAto,
 } from '../lib/painel';
-import { SelosDaLinha } from './Selos';
+import { SeloFonte, SelosDaLinha } from './Selos';
 
 const TODOS = '';
 
@@ -83,12 +84,17 @@ const DetailedTableApp: React.FC = () => {
         // parar na última competência do SIAPE. As saídas que só o DOU conhece
         // são sobrepostas às linhas de quem ainda consta como em exercício
         // (D22) — sem isto, quem saiu em agosto aparece aqui trabalhando.
-        const [linhas, dou] = await Promise.all([
+        const [linhas, dou, destinos] = await Promise.all([
           carregarCsv('dados.csv'),
           carregarJsonPublico<SaidasDou>('atos_dou.json').catch(() => null),
+          carregarCsv('destinos_ranking.csv').catch(() => []),
         ]);
         if (montado) {
-          setRegistros(mesclarSaidasDoDou(comoRegistros(linhas), dou?.saidasRecentes ?? []));
+          setRegistros(mesclarFontesExternas(
+            comoRegistros(linhas),
+            dou?.saidasRecentes ?? [],
+            comoDestinosDoRanking(destinos),
+          ));
         }
       } catch (falha) {
         if (montado) setErro(falha instanceof Error ? falha.message : 'Erro ao carregar dados.csv.');
@@ -320,7 +326,26 @@ const DetailedTableApp: React.FC = () => {
                       <Celula className="whitespace-nowrap">
                         {registro.MES_SAIDA ? formatarCompetenciaLonga(registro.MES_SAIDA) : '-'}
                       </Celula>
-                      <Celula>{registro.ORGAO_DESTINO || '-'}</Celula>
+                      {/* O destino tem procedência PRÓPRIA, e ela não é a da saída: a
+                          coluna "Procedência" ao lado atesta que a pessoa saiu, não para
+                          onde foi. Enquanto o destino só vinha do DOU dava para deduzir;
+                          desde a D24 ele pode vir do Ranking dos Concursos, que é indício
+                          e não ato — e Selos.tsx é explícito em que nenhuma afirmação
+                          sobre pessoa nomeada vai à tela sem dizer de onde veio. */}
+                      <Celula className="whitespace-nowrap">
+                        {registro.ORGAO_DESTINO ? (
+                          <>
+                            {registro.ORGAO_DESTINO}
+                            {registro.FONTE_DESTINO && (
+                              <span className="ml-1">
+                                <SeloFonte fonte={registro.FONTE_DESTINO} compacto tema="claro" />
+                              </span>
+                            )}
+                          </>
+                        ) : (
+                          '-'
+                        )}
+                      </Celula>
                       <Celula>
                         {saiu ? (
                           <SelosDaLinha fontes={fontesDaSaida(registro)} compacto tema="claro" />

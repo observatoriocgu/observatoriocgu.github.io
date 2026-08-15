@@ -60,6 +60,7 @@ Todas as decisões abaixo estão **fechadas**. As fases podem ser executadas sem
 | D21 | Últimas saídas | Fase 3 | a lista **mistura as duas fontes** e mostra o mais recente que existir. Saída que só o DOU conhece entra com o **nome lido do texto do ato** (`dou.nome_do_ato`) e selo `DOU` sozinho. *(A parte que a mantinha fora de contagens, gráficos e filtros foi **revogada pela D22** — ver abaixo.)* |
 | D22 | Alcance das saídas do DOU | Fase 3 | **revoga o recorte da D21.** A saída que só o DOU conhece passa a contar **em tudo** — cards, gráficos, curva, destinos, tabela detalhada, histórico e relatório impresso. Ela não vira linha nova: é **sobreposta** ao registro da pessoa, que já está no `dados.csv` como ativa, e por isso chega à tela com concurso, área e unidade e responde aos filtros. A sobreposição acontece **no navegador** (`mesclarSaidasDoDou`), porque o `construir_painel.py` depende dos snapshots, que não existem no CI, e quem roda todo dia é a varredura do DOU |
 | D19 | Entrada dos atos do DOU | Fase 2.5 + Fase 2 (v2) | **um índice único de atos**, `data/atos_dou.csv`, com chave no ato (`URL_TITLE`), alimentado pelas **duas** varreduras — a por frase (`varrer_dou.py`) e a por nome (`enriquecer_saidas.py`) — e uma pasta única de cópias, `data/saidas_dou/`. O card deixa de ter crawler próprio e passa a ser **derivado** do índice (`gerar_card_dou.py`). Some a pasta `data/dias_sem_perder_AFFC/`. **Ajusta a delimitação da D10**: a varredura por frase continua não sendo fonte de contagem, mas passa a registrar **tudo** o que encontra, em vez de parar no primeiro ato de cada tipo |
+| D24 | Destino pelo Ranking dos Concursos | Fase 2 (v2) | **um crawler por PESSOA**, `rankingdosconcursos.com.br`, que só é consultado para quem **já saiu** (SIAPE ou DOU) e está sem `ORGAO_DESTINO`. Publica **só quando sobra um órgão candidato**; ambíguo vira pauta humana. O nome do órgão vem de um **catálogo explícito**, nunca do rótulo do site. `FONTE_DESTINO = RANKING` — que é o que a **D14** sempre reservou para esta fonte. Mescla no **navegador**, como a D22, e só sobre destino vazio |
 
 **Efeito das decisões novas sobre as antigas:**
 
@@ -1069,6 +1070,83 @@ de", o rótulo de órgão sob poder/Presidência e o fallback de extração.
 
 ---
 
+### 2.6 O destino pelo Ranking dos Concursos ✅ *(15/08/2026, D24)*
+
+**O problema:** 43 das 161 saídas por posse em outro cargo estavam com "Destino não identificado", e
+a lacuna **não se fecha sozinha**. A busca de destino no DOU parte de quem o SIAPE já mostrou
+saindo, e depende de o ato de nomeação do órgão de chegada ser encontrável — quando não é, aquela
+saída fica sem destino para sempre. O usuário pediu o caminho inverso: **já sabendo que a pessoa
+saiu, perguntar ao `rankingdosconcursos.com.br` em que outro concurso ela passou.**
+
+**A ordem importa, e é a decisão editorial da fase.** O ranking é consultado **só** para quem já tem
+saída registrada. Passar em concurso não é sair da CGU: o próprio usuário deu o contraexemplo — um
+Auditor 6º colocado, com aprovação em cinco concursos posteriores, **que continua na CGU**. Sobre
+ele o observatório não diz nada, de propósito.
+
+#### O que o ranking sabe, e o que ele não sabe
+
+Ele sabe o **conjunto** de concursos em que a pessoa passou. Não sabe **qual** ela foi exercer. Isso
+foi medido, não suposto, contra os **118 destinos que o DOU já conhece** (o gabarito desta fonte,
+como os 251 atos são o do `testar_dou.py`):
+
+| Regra | Publica | Acerta | Precisão |
+|---|---|---|---|
+| candidato único **com âncora na CGU** — *adotada* | 45 | 43 | **95,6%** |
+| candidato único sem âncora | 49 | 45 | 91,8% |
+| desempate por melhor colocação | 62 | 24 | 38,7% |
+| desempate pela marca "Nomeado" do site | 18 | 6 | 33,3% |
+| desempate por colocação até 100º | 15 | 4 | 26,7% |
+
+Nos **62 casos ambíguos, o destino verdadeiro estava entre os candidatos nos 62**. A informação
+está lá; o que não existe é o critério para escolher dentro dela. Por isso **não há desempate**:
+ambíguo vai para pauta humana, com a lista e o link, nunca para a tela.
+
+**A âncora** é a linha do concurso da própria CGU na ficha do site. Sem ela, o que se tem é um nome
+batendo com um nome num site que nem sabe que essa pessoa foi da CGU. Custa 2 acertos, corta 2
+erros — e os 2 que corta são exatamente fichas incompletas, que não conheciam o concurso para o
+qual a pessoa de fato foi.
+
+#### O catálogo de órgãos, que é o pedido explícito do usuário
+
+*"Se esforce pro destino não ficar 'igual mas com nome diferente criando 2 destinos diferentes por
+diferença na digitação".* O rótulo do site **nunca** vai à tela: `ranking.ORGAO_POR_ROTULO` traduz
+para um nome canônico, e **rótulo sem regra não vira destino** — sai no relatório da execução para
+alguém acrescentar. Órgão que também vem do DOU é escrito exatamente como o DOU o escreve, ou a
+tabela racharia pela outra ponta. Casos reais que o catálogo funde: `TCU` / `TCU TI 25`;
+`Camara dos Deputados` / `Camara dos Deputados 25 NS` / `... Consultor`; `TCE PE 17` / `TCE PE 25`;
+`RFB` → *Ministério da Fazenda*; `ISS Rio de Janeiro` / `SMF RJ` → *Prefeitura do Rio de Janeiro*.
+
+#### Dois defeitos silenciosos encontrados no caminho
+
+1. **A página "Muitas Consultas", com status HTTP 200.** O site limita o ritmo devolvendo uma página
+   de 1,3 KB sem tabela — que era lida como "esta pessoa não está no ranking". Na primeira varredura
+   isso gravou `SEM_FICHA` para **13 das 43** pessoas, com data de consulta de hoje, o que adiaria a
+   correção por 30 dias. Correção: `pagina_respondeu_a_busca` exige que o formulário **ecoe o nome
+   consultado**; pausa de 3s; e `buscar_por_nome` devolve `None` (nunca `[]`) quando não conseguiu
+   perguntar. Só depois disso os números acima puderam ser medidos.
+2. **A busca do site casa por PREFIXO.** Consultar "MARIANA DE SOUZA LIMA" traz junto
+   "Mariana de Souza Lima Velasco", que é outra pessoa. Sem igualdade **exata** do nome normalizado,
+   as aprovações de uma viravam destino da outra.
+
+#### Resultado
+
+| | |
+|---|---|
+| Saídas sem destino consultadas | **43** |
+| Destino identificado (vai à tela) | **10** |
+| Aguardando curadoria (ambíguo ou sem âncora) | 28 |
+| Sem ficha no site ou sem outro concurso | 5 |
+| "Destino não identificado" na tela | **43 → 29** |
+| `testar_ranking.py` | **55 invariantes**, sem rede |
+
+Automação: `.github/workflows/atualizar-destinos-ranking.yml`, **semanal**, roda no CI porque as duas
+entradas (`dados.csv` e `atos_dou.json`) estão no Git. Incremental — quem já foi resolvido não é
+reconsultado, e quem ficou sem resposta volta à fila depois de 30 dias. A mescla é no **navegador**
+(`mesclarDestinosDoRanking`), como a D22, e só sobre destino **vazio**: DOU e curadoria continuam
+vencendo.
+
+---
+
 ## [ ] Fase 3 — Dashboard sobre dado real *(reescrita em 14/08/2026)*
 
 **Objetivo:** o dashboard deixa de mostrar 14 linhas de EXEMPLO e passa a mostrar os 268 casos
@@ -1234,10 +1312,17 @@ nenhuma decisão daquelas fases — só acrescenta colunas e telas.
 > `Edital CGU nº 5` publicado no DOU, a uma requisição de distância, e não precisavam de crawler de
 > banca nenhum. O que sobrou aqui é só o lado do **destino**.
 
-- [ ] **Crawlers de banca (FGV/Cespe/FCC) e `rankingdosconcursos.com.br`** — AFFCs inscritos ou
-      aprovados em outros concursos. É o tema dos antigos `outros_concursos.csv` /
-      `aprovacoes_outros_concursos.csv`, que a Fase 2 (v2) removeu; se voltar, volta com **fonte e
-      selo de verificação** (**D14**), não como planilha preenchida à mão.
+- [x] ~~`rankingdosconcursos.com.br` para o **destino de quem já saiu**~~ — **saiu desta fase e
+      entrou na Fase 2 (v2) em 15/08/2026** (**D24**). É a metade da ideia que fala de **fato
+      consumado**, não de intenção: a pessoa já saiu, e o que falta é o nome do lugar. Ver §2.6.
+- [ ] **Crawlers de banca (FGV/Cespe/FCC) e o ranking para quem AINDA ESTÁ na CGU** — AFFCs
+      inscritos ou aprovados em outros concursos, que é a outra metade e continua aqui: ela publica
+      **previsão** ("fulano foi aprovado em X, pode sair"). É o tema dos antigos
+      `outros_concursos.csv` / `aprovacoes_outros_concursos.csv`, que a Fase 2 (v2) removeu; se
+      voltar, volta com **fonte** (**D14**), não como planilha preenchida à mão.
+      > O caso que separa as duas metades, e que o usuário deu como exemplo: um Auditor 6º colocado
+      > na CGU, com aprovação em cinco outros concursos **posteriores**, que **continua na CGU**.
+      > A D24 não diz nada sobre ele, de propósito — sem ato de saída, não há o que afirmar.
 - [ ] **Aprovados do CGU-2021 que nunca tomaram posse** — 38 pessoas (488 aprovados − 450
       empossados). Devolveria `CADASTRO DE RESERVA` e `DESISTENTE` ao vocabulário de `SITUACAO`.
       Decidir se viram linha do painel: eles nunca foram da CGU, e o denominador do concurso

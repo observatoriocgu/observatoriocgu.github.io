@@ -14,7 +14,8 @@ import {
   areaDe,
   comoRegistros,
   fontesDaSaida,
-  mesclarSaidasDoDou,
+  comoDestinosDoRanking,
+  mesclarFontesExternas,
   motivoDe,
   urlDoAto,
 } from '../lib/painel';
@@ -61,16 +62,21 @@ const HistoryPage: React.FC = () => {
       try {
         // O CSV é opcional: sem ele o histórico ainda se lê, só perde o motivo e
         // o link do ato. O JSON, não — sem ele não há o que mostrar.
-        const [logCarregado, linhas, dou] = await Promise.all([
+        const [logCarregado, linhas, dou, destinos] = await Promise.all([
           carregarJsonPublico<LogDeAlteracoes>('alteracoes-registros.json'),
           carregarCsv('dados.csv').catch(() => []),
           carregarJsonPublico<SaidasDou>('atos_dou.json').catch(() => null),
+          carregarCsv('destinos_ranking.csv').catch(() => []),
         ]);
         if (!montado) return;
         // O log do SIAPE para na última competência do Portal. As saídas que só
         // o DOU conhece entram aqui (D22) — sem isto, quem saiu em agosto não
         // aparece em bloco nenhum desta página.
-        const mesclados = mesclarSaidasDoDou(comoRegistros(linhas), dou?.saidasRecentes ?? []);
+        const mesclados = mesclarFontesExternas(
+          comoRegistros(linhas),
+          dou?.saidasRecentes ?? [],
+          comoDestinosDoRanking(destinos),
+        );
         setRegistros(mesclados);
         setLog(acrescentarSaidasDoDou(logCarregado, mesclados));
       } catch (falha) {

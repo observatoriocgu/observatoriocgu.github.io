@@ -25,6 +25,7 @@ import {
   SITUACAO_MUDOU_ORGAO,
 } from '../constants';
 import {
+  DestinoDoRanking,
   DetalheSaida,
   LinhaSerieMensal,
   LogDeAlteracoes,
@@ -37,6 +38,17 @@ import { LinhaCsv, baseDoSite } from './dados';
 /** Converte as linhas cruas do CSV no tipo do painel. Sem validação: o CSV é derivado. */
 export const comoRegistros = (linhas: LinhaCsv[]): RegistroAuditor[] =>
   linhas as unknown as RegistroAuditor[];
+
+/** `destinos_ranking.csv` como o navegador o consome (D24). */
+export const comoDestinosDoRanking = (linhas: LinhaCsv[]): DestinoDoRanking[] =>
+  linhas.map((linha) => ({
+    idServidor: linha.ID_SERVIDOR_PORTAL,
+    nome: linha.NOME,
+    decisao: linha.DECISAO,
+    orgaoDestino: linha.ORGAO_DESTINO,
+    urlDestino: linha.URL_DESTINO,
+    candidatos: linha.CANDIDATOS ? linha.CANDIDATOS.split(' | ') : [],
+  }));
 
 export const comoSerie = (linhas: LinhaCsv[]): PontoSerieMensal[] =>
   (linhas as unknown as LinhaSerieMensal[]).map((linha) => ({
@@ -186,6 +198,85 @@ export const mesclarSaidasDoDou = (
     };
   });
 };
+
+/**
+ * Preenche o órgão de destino que o rankingdosconcursos identificou (D24).
+ *
+ * O DOU responde "para onde" em 118 das 161 saídas por posse em outro cargo.
+ * Nas outras, o ato de nomeação no órgão de chegada não foi achado — e a lacuna
+ * não se fecha sozinha, porque a busca por nome no DOU parte de quem o SIAPE já
+ * mostrou saindo. O ranking preenche parte dessa lacuna por outro caminho: ele
+ * sabe em que concursos a pessoa foi aprovada.
+ *
+ * SÓ PREENCHE O QUE ESTÁ VAZIO. Quem já tem destino tem porque o DOU ou a
+ * curadoria o deram, e essas duas fontes valem mais: o DOU é ato publicado, a
+ * curadoria é gente que conferiu. O ranking nunca sobrepõe nem corrige nenhuma
+ * das duas — é a camada de baixo, e a precedência do observatório continua
+ * sendo CURADORIA > DOU > RANKING.
+ *
+ * O QUE O ARQUIVO JÁ RESOLVEU ANTES DE CHEGAR AQUI. O Python só escreve linha
+ * com órgão quando sobrou UM candidato só: aprovação em concurso não é posse, e
+ * quem passou em cinco concursos foi exercer no máximo um. Caso ambíguo fica no
+ * arquivo sem `ORGAO_DESTINO`, aguardando curadoria, e a guarda `|| !destino.
+ * ORGAO_DESTINO` abaixo é o que garante que ele não vaze para a tela por
+ * descuido. Medida da regra contra os destinos que o DOU já conhece: 31 acertos
+ * em 33 publicados.
+ *
+ * POR QUE NO NAVEGADOR, e não no `construir_painel.py`: o mesmo motivo da D22 —
+ * o construtor depende dos snapshots do Portal, que não existem no CI, e quem
+ * roda sozinho é o crawler. A mescla no Python atrasaria cada descoberta até a
+ * próxima execução local.
+ *
+ * Recebe os registros JÁ MESCLADOS por `mesclarSaidasDoDou`: quem saiu e só o
+ * DOU sabe também merece destino, e só depois daquela mescla essa pessoa tem
+ * `MES_SAIDA`.
+ */
+export const mesclarDestinosDoRanking = (
+  registros: RegistroAuditor[],
+  destinos: DestinoDoRanking[]
+): RegistroAuditor[] => {
+  const porId = new Map(
+    destinos.filter((d) => d.idServidor && d.orgaoDestino).map((d) => [d.idServidor, d])
+  );
+  if (porId.size === 0) return registros;
+
+  return registros.map((registro) => {
+    const destino = porId.get(registro.ID_SERVIDOR_PORTAL);
+    if (!destino || !destino.orgaoDestino) return registro;
+    // Sem saída registrada não há destino a preencher, e destino já preenchido
+    // veio de fonte melhor.
+    if (!registro.MES_SAIDA || registro.ORGAO_DESTINO) return registro;
+
+    return {
+      ...registro,
+      ORGAO_DESTINO: destino.orgaoDestino,
+      FONTE_DESTINO: 'RANKING',
+      URL_DESTINO: destino.urlDestino,
+    };
+  });
+};
+
+/**
+ * O `dados.csv` mais tudo o que chegou depois dele. **É ESTA que as páginas
+ * chamam** — nenhuma delas deve chamar as duas mescladas soltas.
+ *
+ * Existe porque a regra "toda página que lê o `dados.csv` tem de mesclar" já
+ * valia para uma mescla e passou a valer para duas, e uma regra que depende de
+ * quatro páginas lembrarem da mesma sequência é uma regra que a próxima página
+ * quebra. Aqui a sequência é uma linha, e a ORDEM — DOU antes do ranking — fica
+ * garantida: o ranking preenche o destino de quem tem saída, e quem só o DOU
+ * conhece só ganha `MES_SAIDA` na mescla anterior.
+ *
+ * Os dois argumentos aceitam lista vazia: o painel funciona sem nenhum dos dois
+ * arquivos, mostrando só o que o SIAPE sabe. Falta de arquivo externo degrada a
+ * tela, não a derruba.
+ */
+export const mesclarFontesExternas = (
+  registros: RegistroAuditor[],
+  saidasRecentes: SaidaRecenteDou[],
+  destinosDoRanking: DestinoDoRanking[]
+): RegistroAuditor[] =>
+  mesclarDestinosDoRanking(mesclarSaidasDoDou(registros, saidasRecentes), destinosDoRanking);
 
 /**
  * Põe no histórico de alterações as saídas que só o DOU conhece (D22).

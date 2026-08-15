@@ -17,11 +17,18 @@
 | `atos_dou.csv` | as duas varreduras do DOU — o índice único, uma linha por **ato** | **não** |
 | `saidas_dou/*.html` | as duas varreduras do DOU — cópia do ato | **não** |
 | `varredura_dou.txt` | `varrer_dou.py` — até que dia o DOU já foi varrido | **não** |
+| `destinos_ranking.csv` | `enriquecer_destinos_ranking.py` — para onde foi quem o DOU não disse (D24) | **não** |
 | **`curadoria.csv`** | **você** | **sim** |
 | `curadoria_sugestoes.csv` | `construir_painel.py` — pauta para você conferir | não (é saída) |
 
-Precedência no merge: **curadoria > DOU > concurso > SIAPE**. Qualquer campo
-preenchido no `curadoria.csv` vence.
+Precedência no merge: **curadoria > DOU > ranking > concurso > SIAPE**. Qualquer
+campo preenchido no `curadoria.csv` vence.
+
+O `destinos_ranking.csv` é o único destes que **não** entra no `dados.csv`: ele é
+lido direto pelo navegador, como o `atos_dou.json`, e pelo mesmo motivo (o
+`construir_painel.py` precisa dos snapshots do Portal, que não existem no CI, e
+quem roda sozinho é o crawler). Por isso o `dados.csv` publicado continua sem
+esses destinos, e a tela os tem.
 
 ## Como corrigir alguma coisa
 
@@ -85,6 +92,44 @@ a tela mostra **as fontes que atestam o fato**:
 | `SIAPE` + `DOU` | o cadastro mostra a ausência **e** há ato publicado dizendo por quê — duas fontes independentes |
 | `SIAPE` sozinho | a pessoa sumiu do cadastro e o ato ainda não foi encontrado no DOU |
 | `DOU` sozinho | o ato está publicado e o Portal ainda não entregou a competência |
+
+O **órgão de destino** tem selo próprio, porque tem procedência própria e é bem
+menos firme que o motivo. `DOU` é ato de nomeação publicado. `Ranking` é
+aprovação em concurso registrada no `rankingdosconcursos.com.br` para alguém que
+já saiu — **indício com fonte, não ato**. A régua está medida contra os 118
+destinos que o DOU já conhece: onde a regra publica, ela concorda com o DOU em
+43 de 45 casos (95,6%). Ver a seção seguinte.
+
+## O destino que vem do Ranking dos Concursos (D24)
+
+A ordem é sempre **já sabendo que a pessoa saiu (SIAPE/DOU) → procurar para
+onde**, nunca o contrário: passar em concurso não é sair da CGU, e há Auditor com
+seis aprovações que continua na casa.
+
+O ranking sabe em que concursos a pessoa passou. Ele **não** sabe qual deles ela
+foi exercer. Por isso o crawler só grava destino quando, descontado o concurso da
+própria CGU e os que estão fora da janela de anos da saída, sobra **um órgão só**.
+Quando sobra mais de um, a linha fica com `DECISAO = AMBIGUO` e a lista de
+candidatos, para decisão humana. Nos 62 casos ambíguos medidos, o destino certo
+estava entre os candidatos nos **62** — a informação está lá; o que não existe é
+o critério para escolher. Nenhum desempate testado (melhor colocação, marca
+"Nomeado" do site, ano do concurso) passou de **38,7%** de acerto.
+
+Há ainda `DECISAO = SEM_ANCORA_CGU`: sobrou um candidato só, mas a ficha do site
+não traz o concurso da própria CGU — ou seja, nada prova que aquela ficha é desta
+pessoa. Vai para a mesma pauta.
+
+Para resolver um ambíguo: confira a fonte (a coluna `URL_DESTINO` da linha, ou o
+link no arquivo) e acrescente ao `curadoria.csv` uma linha com o
+`ID_SERVIDOR_PORTAL`, o `ORGAO_DESTINO`, `FONTE_DESTINO = MANUAL` e o
+`URL_DESTINO`. A curadoria vence tudo.
+
+**O nome do órgão nunca vem do rótulo do site.** "TCU", "TCU TI 25" e "Tribunal
+de Contas da União" são a mesma casa, e publicar os três criaria três destinos
+onde há um. O rótulo é traduzido por um catálogo explícito
+(`ranking.ORGAO_POR_ROTULO`), e o que o catálogo não conhece **não vira destino**
+— aparece no relatório da execução como rótulo a acrescentar. Nomes que também
+vêm do DOU são escritos exatamente como o DOU os escreve, pelo mesmo motivo.
 
 `SIAPE` numa saída quer dizer exatamente isto: a pessoa consta do quadro no mês
 n-1 e não consta no mês n. É a definição da **D13**, não uma checagem à parte.

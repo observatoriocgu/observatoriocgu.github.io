@@ -9,7 +9,14 @@ import {
   formatarCompetenciaLonga,
   formatarDataIsoParaBr,
 } from './lib/dados';
-import { comoRegistros, fontesDaSaida, mesclarSaidasDoDou, motivoDe, saidas } from './lib/painel';
+import {
+  comoDestinosDoRanking,
+  comoRegistros,
+  fontesDaSaida,
+  mesclarFontesExternas,
+  motivoDe,
+  saidas,
+} from './lib/painel';
 
 const TODAS = 'TODAS';
 
@@ -35,9 +42,14 @@ const RelatorioImpressao: React.FC = () => {
     Promise.all([
       carregarCsv('dados.csv'),
       carregarJsonPublico<SaidasDou>('atos_dou.json').catch(() => null),
+      carregarCsv('destinos_ranking.csv').catch(() => []),
     ])
-      .then(([linhas, dou]) =>
-        setRegistros(mesclarSaidasDoDou(comoRegistros(linhas), dou?.saidasRecentes ?? []))
+      .then(([linhas, dou, destinos]) =>
+        setRegistros(mesclarFontesExternas(
+          comoRegistros(linhas),
+          dou?.saidasRecentes ?? [],
+          comoDestinosDoRanking(destinos),
+        ))
       )
       .catch((falha) => setErro(falha instanceof Error ? falha.message : 'Erro ao carregar os dados.'))
       .finally(() => setCarregando(false));

@@ -1,0 +1,73 @@
+name: Atualizar destinos no Ranking dos Concursos (AFFC)
+
+# Procura, para quem JÁ SAIU da CGU e está sem órgão de destino, em que outro
+# concurso a pessoa foi aprovada — e grava o destino quando sobra um só.
+#
+# A ordem é sempre "já sabendo que saiu (SIAPE/DOU) -> para onde", nunca o
+# contrário: aprovação em concurso não é saída, e quem continua na CGU não
+# aparece em lugar nenhum do arquivo gerado.
+#
+# RODA NO CI, como a varredura do DOU e pelo mesmo motivo: as duas entradas
+# deste crawler — `data/dados.csv` e `public/atos_dou.json` — estão no Git. O
+# `construir_painel.py` continua fora daqui, porque depende dos snapshots do
+# Portal da Transparência, que não estão. Quem mescla o destino ao painel é o
+# navegador (`mesclarDestinosDoRanking`), então o que este workflow commita já
+# chega à tela no próximo deploy, sem execução local nenhuma.
+#
+# SEMANAL, e não diário, de propósito. A fila só muda quando o SIAPE ou o DOU
+# registram uma saída nova, e o próprio script só reconsulta quem ficou sem
+# resposta depois de 30 dias — rodar todo dia seria bater num site de terceiro
+# para reler o que já se sabe. O site tem limitador de ritmo próprio, que
+# responde uma página "Muitas Consultas" com status 200; o crawler o detecta e
+# espera, mas o melhor jeito de não esbarrar nele é não ir com frequência.
+
+on:
+  schedule:
+    # 07:00 UTC de segunda = 04:00 em Brasília. Fora do horário de pico do site.
+    - cron: '0 7 * * 1'
+  workflow_dispatch:
+
+concurrency:
+  group: destinos-ranking
+  cancel-in-progress: false
+
+jobs:
+  atualizar:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      # Sem rede e rápido. Roda ANTES do crawler: se o catálogo de órgãos ou a
+      # regra de decisão quebraram, é melhor falhar aqui do que gravar destino
+      # errado sobre pessoa nomeada e commitar.
+      - name: Testar a regra de decisão e o catálogo de órgãos
+        run: python scripts/testar_ranking.py
+        working-directory: evasao
+
+      - name: Procurar destino de quem saiu
+        run: python scripts/enriquecer_destinos_ranking.py
+        working-directory: evasao
+
+      - name: Commit e push do que mudou
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add evasao/data/destinos_ranking.csv
+          if ! git diff --cached --quiet; then
+            git commit -m "Atualiza destinos de quem saiu, pelo Ranking dos Concursos"
+            git push
+          else
+            echo "Nenhum destino novo"
+          fi
+        shell: bash
