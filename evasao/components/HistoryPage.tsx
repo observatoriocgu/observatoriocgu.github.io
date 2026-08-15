@@ -8,20 +8,19 @@ import {
   RegistroAuditor,
   SaidasDou,
 } from '../types';
-import { carregarCsv, carregarJsonPublico, formatarCompetenciaLonga, formatarDataIsoParaBr } from '../lib/dados';
+import { carregarCsv, carregarJsonPublico, formatarCompetenciaLonga } from '../lib/dados';
 import {
   acrescentarSaidasDoDou,
   areaDe,
   comoRegistros,
-  fontesDaSaida,
   comoDestinosDoRanking,
+  detalharSaida,
   mesclarFontesExternas,
   motivoDe,
-  urlDoAto,
 } from '../lib/painel';
 import CardDeFiltros, { resumirGrupo, useFiltrosEncadeados } from './CardDeFiltros';
 import FiltroMultiplo, { OpcaoFiltro } from './FiltroMultiplo';
-import { SelosDaLinha } from './Selos';
+import { LinhasDeProcedencia } from './Selos';
 
 /** O quarto nível da hierarquia. As cores são as dos selos de cada linha. */
 const MOVIMENTACOES: OpcaoFiltro[] = [
@@ -273,32 +272,26 @@ const HistoryPage: React.FC = () => {
               <ul className="divide-y divide-gray-800">
                 {mes.changes.map((mudanca) => {
                   const registro = registrosPorId.get(mudanca.id);
-                  const ato = registro ? urlDoAto(registro) : '';
                   return (
-                    <li key={`${mes.mes}-${mudanca.id}`} className="flex flex-wrap items-baseline gap-2 px-5 py-3 text-sm">
-                      <span
-                        className={`rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase ${
-                          mudanca.tipo === 'saida'
-                            ? 'bg-red-500/15 text-red-300'
-                            : 'bg-emerald-500/15 text-emerald-300'
-                        }`}
-                      >
-                        {mudanca.tipo === 'saida' ? 'saída' : 'entrada'}
-                      </span>
-                      <span className="text-gray-300">{descrever(mudanca)}</span>
-                      {mudanca.tipo === 'saida' && registro && (
-                        <SelosDaLinha fontes={fontesDaSaida(registro)} compacto />
-                      )}
-                      {ato && (
-                        <a
-                          href={ato}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          title={registro?.ATO_SAIDA_TITULO}
-                          className="text-xs text-amber-400 hover:text-amber-300"
+                    <li key={`${mes.mes}-${mudanca.id}`} className="space-y-1 px-5 py-3 text-sm">
+                      <div className="flex flex-wrap items-baseline gap-2">
+                        <span
+                          className={`rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase ${
+                            mudanca.tipo === 'saida'
+                              ? 'bg-red-500/15 text-red-300'
+                              : 'bg-emerald-500/15 text-emerald-300'
+                          }`}
                         >
-                          ato de {formatarDataIsoParaBr(registro?.DATA_PUBLICACAO_SAIDA ?? '') || 'data não informada'}
-                        </a>
+                          {mudanca.tipo === 'saida' ? 'saída' : 'entrada'}
+                        </span>
+                        <span className="text-gray-300">{descrever(mudanca)}</span>
+                      </div>
+                      {/* Só na saída, e é o motivo de o bloco viver aqui dentro:
+                          o link do ato saía também na linha de ENTRADA de quem
+                          entrou e depois saiu — o ato de vacância dela, pendurado
+                          na notícia de que ela chegou. */}
+                      {mudanca.tipo === 'saida' && registro && (
+                        <LinhasDeProcedencia saida={detalharSaida(registro)} />
                       )}
                     </li>
                   );

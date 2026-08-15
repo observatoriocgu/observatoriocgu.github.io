@@ -12,7 +12,7 @@ import CounterCard from './components/CounterCard';
 import EvasionChart, { SerieGrafico } from './components/EvasionChart';
 import EvasionTable from './components/EvasionTable';
 import CardDeFiltros, { useFiltrosEncadeados } from './components/CardDeFiltros';
-import { SelosDaLinha } from './components/Selos';
+import { LinhasDeProcedencia } from './components/Selos';
 import TopAprovadosTable from './components/TopAprovadosTable';
 
 import {
@@ -604,45 +604,29 @@ const App: React.FC = () => {
               </div>
             ) : (
               <>
-                <ul className="space-y-2 text-sm text-gray-200">
+                <ul className="space-y-3 text-sm text-gray-200">
                   {ultimasSaidas.map((saida) => (
-                    <li key={saida.id} className="flex flex-wrap items-baseline gap-2">
-                      <span className="text-xs uppercase tracking-wider text-gray-400">
-                        {formatarCompetenciaLonga(saida.mesSaida)}
-                      </span>
-                      <span className="text-amber-400">•</span>
-                      <span>
-                        <strong>{saida.nome || 'Auditor não identificado no ato'}</strong> —{' '}
-                        {saida.motivo.toLocaleLowerCase('pt-BR')}
-                        {saida.destino ? (
-                          <>
-                            , para <strong>{saida.destino}</strong>
-                          </>
-                        ) : null}
-                        .
-                      </span>
-                      {/* As fontes da SAÍDA. O destino, quando existe, tem
-                          procedência própria e ganha o selo dele ao lado — são
-                          duas afirmações diferentes sobre a mesma pessoa, e o
-                          destino é inferência, não leitura direta do ato. */}
-                      <SelosDaLinha fontes={saida.fontesSaida} compacto />
-                      {saida.destino && saida.fonteDestino ? (
-                        <span className="inline-flex items-baseline gap-1 text-[10px] text-gray-500">
-                          destino:
-                          <SelosDaLinha fontes={[saida.fonteDestino]} compacto />
+                    <li key={saida.id} className="space-y-1">
+                      <div className="flex flex-wrap items-baseline gap-2">
+                        <span className="text-xs uppercase tracking-wider text-gray-400">
+                          {formatarCompetenciaLonga(saida.mesSaida)}
                         </span>
-                      ) : null}
-                      {saida.atoUrl && (
-                        <a
-                          href={saida.atoUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          title={saida.atoTitulo}
-                          className="text-xs text-amber-400 hover:text-amber-300"
-                        >
-                          ver ato
-                        </a>
-                      )}
+                        <span className="text-amber-400">•</span>
+                        <span>
+                          <strong>{saida.nome || 'Auditor não identificado no ato'}</strong> —{' '}
+                          {saida.motivo.toLocaleLowerCase('pt-BR')}
+                          {saida.destino ? (
+                            <>
+                              , para <strong>{saida.destino}</strong>
+                            </>
+                          ) : null}
+                          .
+                        </span>
+                      </div>
+                      {/* A frase acima faz duas afirmações — que a pessoa saiu e
+                          para onde foi —, e elas não vêm do mesmo lugar. O bloco
+                          separa uma da outra, com os selos e o documento de cada. */}
+                      <LinhasDeProcedencia saida={saida} />
                     </li>
                   ))}
                 </ul>

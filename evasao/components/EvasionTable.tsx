@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { DetalheSaida } from '../types';
-import { formatarCompetenciaLonga, formatarDataIsoParaBr } from '../lib/dados';
+import { formatarCompetenciaLonga } from '../lib/dados';
 import { SAIDA_POSSE } from '../lib/painel';
-import { LinkDaFonte, SelosDaLinha } from './Selos';
+import { LinhasDeProcedencia } from './Selos';
 
 export interface GrupoDeDestino {
   rotulo: string;
@@ -20,47 +20,15 @@ interface EvasionTableProps {
 }
 
 /**
- * O que o link do destino abre.
- *
- * No DOU é o ato de nomeação no órgão de chegada, e ele tem data própria — que
- * não é a da saída, e costuma vir ANTES dela: a posse no novo órgão se publica
- * enquanto a vacância na CGU ainda tramita. No ranking é a ficha de aprovações
- * da pessoa, que não tem data de posse nenhuma para mostrar.
- */
-const rotuloDoDestino = (saida: DetalheSaida): string => {
-  if (saida.fonteDestino === 'RANKING') return 'ficha no ranking';
-  const data = formatarDataIsoParaBr(saida.dataDestino);
-  return data ? `ato de ${data}` : 'ato de nomeação';
-};
-
-const tituloDoDestino = (saida: DetalheSaida): string =>
-  saida.fonteDestino === 'RANKING'
-    ? `Aprovações de ${saida.nome} no rankingdosconcursos. É indício com fonte, não ato publicado.`
-    : `Ato de nomeação em ${saida.destino}, publicado no DOU`;
-
-/** Rótulo do lado esquerdo de uma linha de procedência, com largura fixa. */
-const Rotulo: React.FC<{ children: React.ReactNode }> = ({ children }) => (
-  <span className="text-xs text-gray-500 sm:w-32 sm:flex-shrink-0 sm:text-right">{children}</span>
-);
-
-/**
  * Uma pessoa dentro de um destino.
  *
- * SÃO DUAS AFIRMAÇÕES, E CADA UMA TEM SUA LINHA. "Fulano saiu da CGU em agosto"
- * e "fulano foi para o TCU" não vêm do mesmo lugar nem valem o mesmo: a primeira
- * é leitura do cadastro e do ato de vacância, a segunda é o ato de nomeação no
- * órgão de chegada ou, mais fraco, uma aprovação em concurso (D24). Enquanto os
- * selos das duas dividiam a mesma faixa, o leitor via seis pílulas em fila e não
- * tinha como saber qual atestava o quê — o `SIAPE` da saída parecia responder
- * pelo destino, e o link do ato de vacância parecia ser o da nomeação.
- *
- * Daí o empilhamento: o fato na primeira linha, a procedência da SAÍDA na
- * segunda, a do DESTINO na terceira, cada uma com seus selos e o link do
- * documento correspondente. Onde não há ato, a linha diz isso em vez de omitir.
+ * O fato na primeira linha — o que aconteceu e quando —, e logo abaixo o bloco
+ * de procedência, que diz quem atesta a saída e quem atesta o órgão de chegada,
+ * cada um na sua linha. O bloco é o mesmo das últimas saídas e do histórico de
+ * alterações, e mora em `LinhasDeProcedencia` justamente por isso.
  */
 const LinhaAuditor: React.FC<{ saida: DetalheSaida }> = ({ saida }) => {
   const localizacao = [saida.area, saida.unidade].filter(Boolean).join(' · ');
-  const temDestino = Boolean(saida.destino && saida.fonteDestino);
 
   return (
     <li className="rounded border border-gray-700/50 bg-gray-800/40 px-4 py-2">
@@ -70,7 +38,6 @@ const LinhaAuditor: React.FC<{ saida: DetalheSaida }> = ({ saida }) => {
       </div>
 
       <div className="mt-2 space-y-1">
-        {/* 1. O que aconteceu, e quando. */}
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-sm text-gray-300">
             {saida.motivo} em {formatarCompetenciaLonga(saida.mesSaida)}
@@ -86,49 +53,7 @@ const LinhaAuditor: React.FC<{ saida: DetalheSaida }> = ({ saida }) => {
           )}
         </div>
 
-        {/* 2. Quem atesta que a pessoa saiu, e o ato que o observatório leu. */}
-        <div className="flex flex-wrap items-center gap-2 sm:flex-nowrap">
-          <Rotulo>saída da CGU:</Rotulo>
-          <span className="flex flex-wrap items-center gap-2">
-            <SelosDaLinha fontes={saida.fontesSaida} compacto />
-            {saida.atoUrl ? (
-              <LinkDaFonte
-                fonte="DOU"
-                href={saida.atoUrl}
-                rotulo={`ato de ${formatarDataIsoParaBr(saida.dataPublicacao) || 'data não informada'}`}
-                titulo={saida.atoTitulo || 'Ato de saída publicado no DOU'}
-                compacto
-              />
-            ) : (
-              <span
-                className="text-xs text-gray-600"
-                title="A busca por nome no DOU não encontrou ato para esta saída."
-              >
-                sem ato no DOU
-              </span>
-            )}
-          </span>
-        </div>
-
-        {/* 3. Quem atesta o órgão de chegada. Só existe quando alguma fonte o
-            disse — sem fonte, o destino não vai à tela (D14). */}
-        {temDestino && (
-          <div className="flex flex-wrap items-center gap-2 sm:flex-nowrap">
-            <Rotulo>órgão de destino:</Rotulo>
-            <span className="flex flex-wrap items-center gap-2">
-              <SelosDaLinha fontes={[saida.fonteDestino]} compacto />
-              {saida.urlDestino && (
-                <LinkDaFonte
-                  fonte={saida.fonteDestino}
-                  href={saida.urlDestino}
-                  rotulo={rotuloDoDestino(saida)}
-                  titulo={tituloDoDestino(saida)}
-                  compacto
-                />
-              )}
-            </span>
-          </div>
-        )}
+        <LinhasDeProcedencia saida={saida} />
       </div>
     </li>
   );

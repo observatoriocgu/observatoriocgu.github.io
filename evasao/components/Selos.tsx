@@ -1,5 +1,7 @@
 import React from 'react';
 import { DESCRICAO_POR_FONTE, ROTULO_POR_FONTE } from '../constants';
+import { DetalheSaida } from '../types';
+import { formatarDataIsoParaBr } from '../lib/dados';
 
 /**
  * O selo de procedência (D14, revisto pela D20).
@@ -142,3 +144,106 @@ export const SelosDaLinha: React.FC<{
     </span>
   );
 };
+
+/**
+ * O que o link do destino abre.
+ *
+ * No DOU é o ato de nomeação no órgão de chegada, e ele tem data própria — que
+ * não é a da saída, e costuma vir ANTES dela: a posse no novo órgão se publica
+ * enquanto a vacância na CGU ainda tramita. No ranking é a ficha de aprovações
+ * da pessoa, que não tem data de posse nenhuma para mostrar.
+ */
+const rotuloDoDestino = (saida: DetalheSaida): string => {
+  if (saida.fonteDestino === 'RANKING') return 'ficha no ranking';
+  const data = formatarDataIsoParaBr(saida.dataDestino);
+  return data ? `ato de ${data}` : 'ato de nomeação';
+};
+
+const tituloDoDestino = (saida: DetalheSaida): string =>
+  saida.fonteDestino === 'RANKING'
+    ? `Aprovações de ${saida.nome} no rankingdosconcursos. É indício com fonte, não ato publicado.`
+    : `Ato de nomeação em ${saida.destino}, publicado no DOU`;
+
+/**
+ * O rótulo à esquerda de cada linha de procedência.
+ *
+ * Coluna de largura fixa e alinhada à direita a partir do `sm`: os dois rótulos
+ * têm comprimentos diferentes, e sem a coluna os selos começariam em pontos
+ * distintos, desfazendo justamente a leitura vertical que separa as duas
+ * afirmações. Abaixo do `sm` a coluna some e a linha simplesmente quebra.
+ * O cinza médio serve aos dois temas: some no fundo escuro sem sumir no claro.
+ */
+const ROTULO = 'text-xs text-gray-500 sm:w-32 sm:flex-shrink-0 sm:text-right';
+
+/**
+ * A procedência de uma saída, em duas linhas rotuladas.
+ *
+ * SÃO DUAS AFIRMAÇÕES, E CADA UMA TEM SUA LINHA. "Fulano saiu da CGU em agosto"
+ * e "fulano foi para o TCU" não vêm do mesmo lugar nem valem o mesmo: a primeira
+ * é leitura do cadastro e do ato de vacância, a segunda é o ato de nomeação no
+ * órgão de chegada ou, mais fraco, uma aprovação em concurso (D24). Enquanto os
+ * selos das duas dividiam a mesma faixa, o leitor via seis pílulas em fila e não
+ * tinha como saber qual atestava o quê — o `SIAPE` da saída parecia responder
+ * pelo destino, e o link do ato de vacância parecia ser o da nomeação.
+ *
+ * MORA AQUI, E NÃO EM CADA TELA, porque três páginas mostram a mesma saída — os
+ * destinos, as últimas saídas e o histórico de alterações — e uma regra de
+ * procedência copiada em três lugares é uma regra que a quarta tela quebra. Cada
+ * página escreve a FRASE do seu jeito, e chama este bloco para dizer de onde
+ * veio o que ela afirmou.
+ *
+ * Recebe o `DetalheSaida` pronto, do `detalharSaida`: é ele quem sabe compor as
+ * fontes com `fontesDaSaida` e escolher entre o ato arquivado e o do in.gov.br.
+ */
+export const LinhasDeProcedencia: React.FC<{ saida: DetalheSaida; tema?: TemaSelo }> = ({
+  saida,
+  tema = 'escuro',
+}) => (
+  <div className="space-y-1">
+    {/* Quem atesta que a pessoa saiu, e o ato que o observatório leu. */}
+    <div className="flex flex-wrap items-center gap-2 sm:flex-nowrap">
+      <span className={ROTULO}>saída da CGU:</span>
+      <span className="flex flex-wrap items-center gap-2">
+        <SelosDaLinha fontes={saida.fontesSaida} compacto tema={tema} />
+        {saida.atoUrl ? (
+          <LinkDaFonte
+            fonte="DOU"
+            href={saida.atoUrl}
+            rotulo={`ato de ${formatarDataIsoParaBr(saida.dataPublicacao) || 'data não informada'}`}
+            titulo={saida.atoTitulo || 'Ato de saída publicado no DOU'}
+            compacto
+            tema={tema}
+          />
+        ) : (
+          <span
+            className="text-xs text-gray-600"
+            title="A busca por nome no DOU não encontrou ato para esta saída."
+          >
+            sem ato no DOU
+          </span>
+        )}
+      </span>
+    </div>
+
+    {/* Quem atesta o órgão de chegada. Só existe quando alguma fonte o disse —
+        sem fonte, o destino não vai à tela (D14). */}
+    {Boolean(saida.destino && saida.fonteDestino) && (
+      <div className="flex flex-wrap items-center gap-2 sm:flex-nowrap">
+        <span className={ROTULO}>órgão de destino:</span>
+        <span className="flex flex-wrap items-center gap-2">
+          <SelosDaLinha fontes={[saida.fonteDestino]} compacto tema={tema} />
+          {saida.urlDestino && (
+            <LinkDaFonte
+              fonte={saida.fonteDestino}
+              href={saida.urlDestino}
+              rotulo={rotuloDoDestino(saida)}
+              titulo={tituloDoDestino(saida)}
+              compacto
+              tema={tema}
+            />
+          )}
+        </span>
+      </div>
+    )}
+  </div>
+);
