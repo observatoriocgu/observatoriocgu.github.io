@@ -23,6 +23,7 @@ import {
 import {
   DetalheSaida,
   LinhaSerieMensal,
+  LogDeAlteracoes,
   PontoSerieMensal,
   RegistroAuditor,
   SaidaRecenteDou,
@@ -80,6 +81,150 @@ export const urlDoAto = (registro: RegistroAuditor): string => {
   return registro.ATO_SAIDA_URL;
 };
 
+/** `SITUACAO` correspondente a cada tipo de ato — o espelho de `dou.SITUACAO_POR_TIPO`. */
+const SITUACAO_POR_TIPO: Readonly<Record<string, string>> = {
+  vacancia: 'VACÂNCIA',
+  aposentadoria: 'APOSENTADO',
+  exoneracao: 'EXONERADO',
+  falecimento: 'FALECIDO',
+};
+
+/**
+ * Traz para dentro do painel as saídas que só o DOU conhece (D22).
+ *
+ * O ato já foi publicado; o Portal da Transparência é que ainda não entregou a
+ * competência que mostraria a ausência (~2 meses de atraso). A pessoa JÁ ESTÁ no
+ * `dados.csv` — ativa —, então aqui não se cria linha nova: sobrepõe-se a saída
+ * ao registro que já existe. É por isso que ela chega à tela com coorte, área e
+ * unidade, e responde aos filtros como qualquer outra.
+ *
+ * POR QUE ISTO ACONTECE NO NAVEGADOR, e não no `construir_painel.py`. Porque o
+ * `construir_painel.py` depende dos snapshots do Portal, que não estão no Git e
+ * portanto não existem no CI. Quem roda todo dia é a varredura do DOU, que
+ * atualiza o `atos_dou.json`. Se a mescla morasse só no Python, uma saída
+ * descoberta hoje esperaria a próxima execução local para aparecer — que é
+ * exatamente a defasagem que esta mescla existe para eliminar.
+ *
+ * TRÊS GUARDAS CONTRA CONTAR ERRADO, que era o motivo de estas saídas ficarem
+ * fora das contagens até 15/08/2026:
+ *
+ *   - sobrepõe-se por `ID_SERVIDOR_PORTAL`, casado no Python por nome MAIS
+ *     matrícula (D12 — nome não é chave). Ato sem id casado não entra;
+ *   - só se aplica a quem NÃO tem `MES_SAIDA`. Quem o SIAPE já mostrou saindo
+ *     fica com a versão do SIAPE, e uma pessoa com dois atos não vira duas
+ *     saídas;
+ *   - quem não está no `dados.csv` não entra de jeito nenhum — é o caso do ato
+ *     sobre servidor de outro cargo ou já fora do quadro.
+ */
+export const mesclarSaidasDoDou = (
+  registros: RegistroAuditor[],
+  saidasRecentes: SaidaRecenteDou[]
+): RegistroAuditor[] => {
+  const porId = new Map(saidasRecentes.filter((s) => s.idServidor).map((s) => [s.idServidor, s]));
+  if (porId.size === 0) return registros;
+
+  return registros.map((registro) => {
+    const saida = porId.get(registro.ID_SERVIDOR_PORTAL);
+    if (!saida) return registro;
+
+    // O SIAPE já mostrou esta pessoa sumindo, mas ninguém tinha achado o ato
+    // dela — ela aparecia como "saída sem ato identificado". O ato COMPLETA o
+    // motivo e não mexe na competência: quem sabe quando ela saiu é o cadastro,
+    // e o selo continua sendo SIAPE + DOU.
+    if (registro.MES_SAIDA) {
+      if (registro.MOTIVO_SAIDA || !saida.jaNoSiape) return registro;
+      return {
+        ...registro,
+        SITUACAO: SITUACAO_POR_TIPO[saida.tipo] ?? registro.SITUACAO,
+        MOTIVO_SAIDA: saida.rotulo,
+        FONTE_MOTIVO: 'DOU',
+        DATA_PUBLICACAO_SAIDA: saida.dataPublicacao,
+        ATO_SAIDA_TITULO: saida.titulo,
+        ATO_SAIDA_URL: saida.urlDou,
+        ATO_SAIDA_ARQUIVO: saida.arquivo ?? '',
+      };
+    }
+
+    return {
+      ...registro,
+      // A competência da PUBLICAÇÃO. Não é a data do fato — o ato costuma dizer
+      // "a contar de" alguns dias antes —, mas é a única que se tem antes de o
+      // SIAPE confirmar, e erra por dias, não por meses.
+      MES_SAIDA: saida.dataPublicacao.slice(0, 4) + saida.dataPublicacao.slice(5, 7),
+      SAIDA_NO_SIAPE: 'NÃO',
+      SITUACAO: SITUACAO_POR_TIPO[saida.tipo] ?? registro.SITUACAO,
+      MOTIVO_SAIDA: saida.rotulo,
+      FONTE_MOTIVO: 'DOU',
+      DATA_PUBLICACAO_SAIDA: saida.dataPublicacao,
+      ATO_SAIDA_TITULO: saida.titulo,
+      ATO_SAIDA_URL: saida.urlDou,
+      ATO_SAIDA_ARQUIVO: saida.arquivo ?? '',
+    };
+  });
+};
+
+/**
+ * Põe no histórico de alterações as saídas que só o DOU conhece (D22).
+ *
+ * O `alteracoes-registros.json` nasce do diff mês a mês do SIAPE, no
+ * `construir_painel.py`, e por isso vai só até a última competência do Portal.
+ * Quem saiu depois disso não aparecia em lugar nenhum desta página — nem como
+ * saída, nem como pendência. Aqui elas entram no bloco do mês correspondente,
+ * criando o mês se ele ainda não existir.
+ *
+ * Recebe os registros JÁ MESCLADOS por `mesclarSaidasDoDou`: é de lá que vêm
+ * `SAIDA_NO_SIAPE`, a situação e a unidade.
+ */
+export const acrescentarSaidasDoDou = (
+  log: LogDeAlteracoes,
+  registros: RegistroAuditor[]
+): LogDeAlteracoes => {
+  const soDoDou = registros.filter((r) => r.SAIDA_NO_SIAPE === 'NÃO' && r.MES_SAIDA);
+  if (soDoDou.length === 0) return log;
+
+  const porMes = new Map(log.history.map((mes) => [mes.mes, { ...mes, changes: [...mes.changes] }]));
+
+  for (const registro of soDoDou) {
+    const mes = porMes.get(registro.MES_SAIDA) ?? {
+      mes: registro.MES_SAIDA,
+      data: `${registro.MES_SAIDA.slice(0, 4)}-${registro.MES_SAIDA.slice(4)}-01`,
+      changeCount: 0,
+      changes: [],
+    };
+    // Uma pessoa só aparece uma vez no mês: se o SIAPE já a tivesse registrado
+    // saindo, ela não teria sido mesclada — mas a guarda é barata e o efeito de
+    // errar seria a mesma saída contada duas vezes na tela.
+    if (!mes.changes.some((mudanca) => mudanca.id === registro.ID_SERVIDOR_PORTAL)) {
+      mes.changes.push({
+        id: registro.ID_SERVIDOR_PORTAL,
+        nome: registro.NOME,
+        tipo: 'saida',
+        fromSituacao: SITUACAO_EM_EXERCICIO,
+        toSituacao: registro.SITUACAO,
+        orgaoDestino: registro.ORGAO_DESTINO,
+        unidade: registro.UNIDADE,
+        concurso: registro.CONCURSO,
+      });
+    }
+    porMes.set(mes.mes, mes);
+  }
+
+  // O JSON vem do mês mais novo para o mais antigo, e a página conta com isso.
+  const history = [...porMes.values()]
+    .map((mes) => ({ ...mes, changeCount: mes.changes.length }))
+    .sort((a, b) => b.mes.localeCompare(a.mes));
+
+  return {
+    ...log,
+    // O log deixou de ser só do SIAPE: dizer que a fonte é uma só passaria a ser
+    // falso justamente nas linhas mais recentes da página.
+    fonte: `${log.fonte}, e Diário Oficial da União para as saídas que o cadastro ainda não registrou`,
+    ultimoMes: history[0]?.mes ?? log.ultimoMes,
+    totalChangeCount: history.reduce((soma, mes) => soma + mes.changeCount, 0),
+    history,
+  };
+};
+
 /**
  * As fontes que atestam que a pessoa saiu (D20).
  *
@@ -88,9 +233,11 @@ export const urlDoAto = (registro: RegistroAuditor): string => {
  * cadastro depois de aparecer no anterior — é a definição da D13, não uma
  * inferência à parte. `DOU` entra quando há ato publicado.
  */
-const fontesDaSaida = (registro: RegistroAuditor): string[] => {
+export const fontesDaSaida = (registro: RegistroAuditor): string[] => {
   const fontes: string[] = [];
-  if (registro.MES_SAIDA) fontes.push('SIAPE');
+  // `SAIDA_NO_SIAPE = 'NÃO'` só existe nas linhas que `mesclarSaidasDoDou`
+  // sobrepôs: ali o ato saiu e o cadastro ainda não mostrou a ausência.
+  if (registro.MES_SAIDA && registro.SAIDA_NO_SIAPE !== 'NÃO') fontes.push('SIAPE');
   if (registro.FONTE_MOTIVO) fontes.push(registro.FONTE_MOTIVO);
   return [...new Set(fontes)];
 };
@@ -113,38 +260,7 @@ export const detalharSaida = (registro: RegistroAuditor): DetalheSaida => ({
   atoTitulo: registro.ATO_SAIDA_TITULO,
   atoUrl: urlDoAto(registro),
   provisoria: registro.SAIDA_PROVISORIA === 'SIM',
-  soNoDou: false,
-});
-
-/**
- * Uma saída que só o DOU conhece, no mesmo formato das outras.
- *
- * Os campos que dependem do SIAPE ficam vazios de propósito — coorte, área,
- * unidade e UF só existem depois que o Portal entrega a competência. Vazio aqui
- * quer dizer "ainda não se sabe", e é por isso que estas linhas não entram em
- * filtro nenhum: um recorte por especialidade não pode esconder uma saída
- * alegando que ela não tem a especialidade marcada.
- */
-export const detalharSaidaDoDou = (recente: SaidaRecenteDou): DetalheSaida => ({
-  id: recente.idServidor || `dou:${recente.urlDou}`,
-  nome: recente.nome,
-  concurso: '',
-  area: '',
-  unidade: '',
-  uf: '',
-  mesSaida: recente.dataPublicacao.slice(0, 4) + recente.dataPublicacao.slice(5, 7),
-  motivo: recente.rotulo,
-  fonteMotivo: 'DOU',
-  fontesSaida: ['DOU'],
-  destino: '',
-  fonteDestino: '',
-  dataPublicacao: recente.dataPublicacao,
-  atoTitulo: recente.titulo,
-  atoUrl: recente.arquivo
-    ? `${baseDoSite()}data/saidas_dou/${recente.arquivo}`
-    : recente.urlDou,
-  provisoria: false,
-  soNoDou: true,
+  soNoDou: registro.SAIDA_NO_SIAPE === 'NÃO',
 });
 
 /** Ordena saídas da mais recente para a mais antiga, desempatando por nome. */

@@ -85,6 +85,17 @@ export interface RegistroAuditor {
   FONTE_DESTINO: string;
   URL_DESTINO: string;
   OBSERVACAO: string;
+
+  /**
+   * `NÃO` quando a saída veio só do ato do DOU e o cadastro do SIAPE ainda não
+   * mostrou a ausência (D22).
+   *
+   * NÃO existe coluna com este nome no `dados.csv`: quem preenche é
+   * `mesclarSaidasDoDou`, em memória, ao juntar o `atos_dou.json` ao CSV. Nas
+   * linhas que vêm do CSV o campo é `undefined`, e ausência aqui significa
+   * "o SIAPE confirmou" — porque no CSV toda saída nasce do diff mensal (D13).
+   */
+  SAIDA_NO_SIAPE?: string;
 }
 
 export type ColunaRegistroAuditor = keyof RegistroAuditor;
@@ -224,6 +235,13 @@ export interface SaidaRecenteDou {
    * `dados.csv`. Vazio quando não dá — nome não é chave (D12).
    */
   idServidor: string;
+  /**
+   * `true` quando o SIAPE já mostrou a pessoa sair e o que falta é só o motivo.
+   * Acontece com a saída provisória, que `enriquecer_saidas.py` não consulta no
+   * DOU de propósito (D13). Nesse caso o ato completa o motivo e NÃO cria saída
+   * nova — a competência continua sendo a do cadastro.
+   */
+  jaNoSiape: boolean;
 }
 
 export interface SaidasDou {

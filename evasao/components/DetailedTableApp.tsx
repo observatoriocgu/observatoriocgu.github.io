@@ -8,9 +8,22 @@ import {
   SITUACAO_EM_EXERCICIO,
   rotuloDoConcurso,
 } from '../constants';
-import { RegistroAuditor } from '../types';
-import { carregarCsv, formatarCompetenciaLonga, formatarDataIsoParaBr } from '../lib/dados';
-import { areaDe, comoRegistros, motivoDe, saiuDaCgu, urlDoAto } from '../lib/painel';
+import { RegistroAuditor, SaidasDou } from '../types';
+import {
+  carregarCsv,
+  carregarJsonPublico,
+  formatarCompetenciaLonga,
+  formatarDataIsoParaBr,
+} from '../lib/dados';
+import {
+  areaDe,
+  comoRegistros,
+  fontesDaSaida,
+  mesclarSaidasDoDou,
+  motivoDe,
+  saiuDaCgu,
+  urlDoAto,
+} from '../lib/painel';
 import { SelosDaLinha } from './Selos';
 
 const TODOS = '';
@@ -66,8 +79,17 @@ const DetailedTableApp: React.FC = () => {
     let montado = true;
     (async () => {
       try {
-        const linhas = await carregarCsv('dados.csv');
-        if (montado) setRegistros(comoRegistros(linhas));
+        // O JSON do DOU é opcional: sem ele a tabela ainda se lê, só volta a
+        // parar na última competência do SIAPE. As saídas que só o DOU conhece
+        // são sobrepostas às linhas de quem ainda consta como em exercício
+        // (D22) — sem isto, quem saiu em agosto aparece aqui trabalhando.
+        const [linhas, dou] = await Promise.all([
+          carregarCsv('dados.csv'),
+          carregarJsonPublico<SaidasDou>('atos_dou.json').catch(() => null),
+        ]);
+        if (montado) {
+          setRegistros(mesclarSaidasDoDou(comoRegistros(linhas), dou?.saidasRecentes ?? []));
+        }
       } catch (falha) {
         if (montado) setErro(falha instanceof Error ? falha.message : 'Erro ao carregar dados.csv.');
       } finally {
@@ -299,14 +321,7 @@ const DetailedTableApp: React.FC = () => {
                       <Celula>{registro.ORGAO_DESTINO || '-'}</Celula>
                       <Celula>
                         {saiu ? (
-                          <SelosDaLinha
-                            fontes={[
-                              registro.MES_SAIDA ? 'SIAPE' : '',
-                              registro.FONTE_MOTIVO,
-                            ]}
-                            compacto
-                            tema="claro"
-                          />
+                          <SelosDaLinha fontes={fontesDaSaida(registro)} compacto tema="claro" />
                         ) : (
                           <span title="Quem está na CGU vem direto do SIAPE; não há o que conferir contra o DOU.">
                             SIAPE

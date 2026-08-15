@@ -100,17 +100,27 @@ Não é erro de nenhum dos dois. São dois relógios:
   que sai a lista de últimas saídas, o gráfico e todas as contagens.
 
 Enquanto o Portal não alcança, o nome de quem saiu é lido do **texto do próprio
-ato** (`dou.nome_do_ato`), e a saída aparece na lista com o selo `DOU` sozinho.
-Quando a competência chega, `enriquecer_saidas.py` casa o ato com a pessoa,
+ato** (`dou.nome_do_ato`) e a saída é **sobreposta ao registro da pessoa**, que
+já está no `dados.csv` — ativa. Por isso ela conta **em tudo** (**D22**): cards,
+gráficos, curva de permanência, destinos, tabela detalhada, histórico e
+relatório impresso, com coorte, área e unidade de verdade, respondendo aos
+filtros como qualquer outra. O que a distingue na tela é o selo: `DOU` sozinho
+até o cadastro alcançar o mês.
+
+Contar ato **como se fosse pessoa** é que seria errado duas vezes — uma pessoa
+pode ter dois atos, e um ato pode ser de quem já estava fora do quadro. Daí as
+três guardas: casa-se por `ID_SERVIDOR_PORTAL` (nome **mais** matrícula), só se
+aplica a quem ainda não tem competência de saída, e ato que não casa com
+ninguém do `dados.csv` não entra.
+
+Quando o Portal alcança, `enriquecer_saidas.py` casa o ato com a pessoa,
 preenche o `ID_SERVIDOR_PORTAL` e a linha ganha o selo `SIAPE` ao lado.
 
-Essas saídas **não entram em contagem nenhuma** — nem no card de total, nem no
-gráfico, nem na curva de permanência —, e não respondem a filtro: sem o SIAPE
-não há coorte, área nem unidade, e um recorte por especialidade não pode
-esconder uma saída alegando que ela não tem especialidade marcada.
-
-Contar ato como saída seria errado duas vezes: uma pessoa pode ter dois atos, e
-um ato pode ser de quem já estava fora do quadro.
+**Caso separado:** às vezes o SIAPE já mostrou a pessoa sumir mas ninguém achou
+o ato dela — acontece com a saída provisória, que o `enriquecer_saidas.py` não
+consulta no DOU de propósito. Aí o ato encontrado pela varredura por frase só
+**completa o motivo**: a competência continua sendo a do cadastro, e a saída não
+é contada de novo.
 
 ## Saídas provisórias
 

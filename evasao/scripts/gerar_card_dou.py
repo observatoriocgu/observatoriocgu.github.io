@@ -146,14 +146,26 @@ def main() -> int:
         por_nome.setdefault(dou.normalizar(pessoa["NOME"]), []).append(pessoa)
     ja_saiu = {p["ID_SERVIDOR_PORTAL"] for p in pessoas if p.get("MES_SAIDA")}
 
-    # Saída que só o DOU conhece: o ato existe e o SIAPE ainda não registrou a
-    # ausência da pessoa. Quem já está no `dados.csv` como saída fica de fora —
-    # senão a lista mostraria a mesma pessoa duas vezes, uma por fonte.
+    # Atos que o painel ainda não está usando, em dois casos distintos:
+    #
+    #   jaNoSiape = false — saída que SÓ o DOU conhece. O ato existe e o cadastro
+    #     ainda não mostrou a ausência. Vira saída nova no painel.
+    #
+    #   jaNoSiape = true  — o SIAPE já mostrou a pessoa sumir, mas ninguém achou
+    #     o ato dela, e ela aparece como "saída sem ato identificado". Acontece
+    #     com a saída PROVISÓRIA: `enriquecer_saidas.py` não a consulta no DOU de
+    #     propósito (pode ser uma ressurreição), e a varredura por frase acha o
+    #     ato assim mesmo. Aqui o ato só COMPLETA o motivo — a competência da
+    #     saída continua sendo a do SIAPE, e nada é contado duas vezes.
+    #
+    # Quem já tem motivo não entra: aquilo o `enriquecer_saidas.py` resolveu.
+    sem_motivo = {p["ID_SERVIDOR_PORTAL"] for p in pessoas if p.get("MES_SAIDA") and not p.get("MOTIVO_SAIDA")}
     corte = recuar_meses(mes_siape, MESES_DE_SAIDA_RECENTE)
     saidas_recentes = []
     for linha in atos.posteriores_a_competencia(indice, corte):
         identificador = casar_com_pessoa(linha, por_nome)
-        if identificador in ja_saiu:
+        ja_no_siape = identificador in ja_saiu
+        if ja_no_siape and identificador not in sem_motivo:
             continue
         saidas_recentes.append(
             {
@@ -165,6 +177,7 @@ def main() -> int:
                 "urlDou": linha["URL"],
                 "arquivo": linha["ARQUIVO"] or None,
                 "idServidor": identificador,
+                "jaNoSiape": ja_no_siape,
             }
         )
     saidas_recentes.sort(key=lambda s: s["dataPublicacao"], reverse=True)
@@ -205,11 +218,17 @@ def main() -> int:
     print(f"Mais recente: {mais_recente['ROTULO']} em {mais_recente['DATA_PUBLICACAO']}")
     if mes_siape:
         print(f"SIAPE até   : {mes_siape}")
-    print(f"Saídas que só o DOU conhece: {len(saidas_recentes)}")
-    for recente in saidas_recentes:
+    novas = [s for s in saidas_recentes if not s["jaNoSiape"]]
+    completam = [s for s in saidas_recentes if s["jaNoSiape"]]
+    print(f"Saídas que só o DOU conhece: {len(novas)}")
+    for recente in novas:
         alerta = "" if recente["nome"] else "   <- SEM NOME LEGÍVEL NO ATO"
         print(f"  {recente['dataPublicacao']} {recente['tipo'][:13]:<13} "
               f"{recente['nome'] or '(sem nome)'}{alerta}")
+    if completam:
+        print(f"Atos que completam o motivo de quem o SIAPE já mostrou sair: {len(completam)}")
+        for recente in completam:
+            print(f"  {recente['dataPublicacao']} {recente['tipo'][:13]:<13} {recente['nome']}")
 
     faltando = [t for t in TIPOS if t not in recentes]
     if faltando:

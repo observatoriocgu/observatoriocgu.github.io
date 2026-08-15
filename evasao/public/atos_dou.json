@@ -13,7 +13,8 @@
       "titulo": "PORTARIA Nº 2.099, DE 10 DE AGOSTO DE 2026",
       "urlDou": "https://www.in.gov.br/web/dou/-/portaria-n-2.099-de-10-de-agosto-de-2026-724489858",
       "arquivo": "2026-08-11_vacancia_portaria-n-2-099-de-10-de-agosto-de-2026-724489858.html",
-      "idServidor": "3733592"
+      "idServidor": "3733592",
+      "jaNoSiape": false
     },
     {
       "nome": "CIRO JÔNATAS DE SOUZA OLIVEIRA",
@@ -23,7 +24,8 @@
       "titulo": "PORTARIA Nº 2.100, DE 10 DE AGOSTO DE 2026",
       "urlDou": "https://www.in.gov.br/web/dou/-/portaria-n-2.100-de-10-de-agosto-de-2026-724497607",
       "arquivo": "2026-08-11_vacancia_portaria-n-2-100-de-10-de-agosto-de-2026-724497607.html",
-      "idServidor": "3185051"
+      "idServidor": "3185051",
+      "jaNoSiape": false
     },
     {
       "nome": "THIAGO GUEDES PAYSAN",
@@ -33,7 +35,8 @@
       "titulo": "PORTARIA Nº 2.062, DE 6 DE AGOSTO DE 2026",
       "urlDou": "https://www.in.gov.br/web/dou/-/portaria-n-2.062-de-6-de-agosto-de-2026-724074316",
       "arquivo": "2026-08-07_vacancia_portaria-n-2-062-de-6-de-agosto-de-2026-724074316.html",
-      "idServidor": "41722"
+      "idServidor": "41722",
+      "jaNoSiape": false
     },
     {
       "nome": "FRANCISCO HAMILTON SOARES DE CARVALHO",
@@ -43,7 +46,8 @@
       "titulo": "PORTARIA Nº 1.869, DE 23 DE JULHO DE 2026",
       "urlDou": "https://www.in.gov.br/web/dou/-/portaria-n-1.869-de-23-de-julho-de-2026-722781263",
       "arquivo": "2026-08-03_aposentadoria_portaria-n-1-869-de-23-de-julho-de-2026-722781263.html",
-      "idServidor": "2352385"
+      "idServidor": "2352385",
+      "jaNoSiape": false
     },
     {
       "nome": "DANIEL LIMA OLIVEIRA",
@@ -53,7 +57,8 @@
       "titulo": "PORTARIA Nº 1.940, DE 30 DE JULHO DE 2026",
       "urlDou": "https://www.in.gov.br/web/dou/-/portaria-n-1.940-de-30-de-julho-de-2026-722493873",
       "arquivo": "2026-07-31_vacancia_portaria-n-1-940-de-30-de-julho-de-2026-722493873.html",
-      "idServidor": "1286109"
+      "idServidor": "1286109",
+      "jaNoSiape": false
     },
     {
       "nome": "GABRIEL ISMAEL CARRAZZONE LACATIVA",
@@ -63,7 +68,8 @@
       "titulo": "PORTARIA Nº 1.872, DE 20 DE JULHO DE 2026",
       "urlDou": "https://www.in.gov.br/web/dou/-/portaria-n-1.872-de-20-de-julho-de-2026-720316047",
       "arquivo": "2026-07-21_vacancia_portaria-n-1-872-de-20-de-julho-de-2026-720316047.html",
-      "idServidor": "3100512"
+      "idServidor": "3100512",
+      "jaNoSiape": false
     },
     {
       "nome": "MATHEUS BARBOSA DE OLIVEIRA",
@@ -73,7 +79,8 @@
       "titulo": "PORTARIA N° 1.867, DE 16 DE JULHO DE 2026",
       "urlDou": "https://www.in.gov.br/web/dou/-/portaria-n-1.867-de-16-de-julho-de-2026-719848481",
       "arquivo": "2026-07-17_vacancia_portaria-n-1-867-de-16-de-julho-de-2026-719848481.html",
-      "idServidor": "3007680"
+      "idServidor": "3007680",
+      "jaNoSiape": false
     },
     {
       "nome": "SAULO JOSÉ GOMES",
@@ -83,7 +90,8 @@
       "titulo": "PORTARIA N° 1.692, DE 30 DE JUNHO DE 2026",
       "urlDou": "https://www.in.gov.br/web/dou/-/portaria-n-1.692-de-30-de-junho-de-2026-718755635",
       "arquivo": "2026-07-14_aposentadoria_portaria-n-1-692-de-30-de-junho-de-2026-718755635.html",
-      "idServidor": "2262905"
+      "idServidor": "2262905",
+      "jaNoSiape": false
     },
     {
       "nome": "ROBERTO FERNANDES DE SOUZA JUNIOR",
@@ -93,7 +101,8 @@
       "titulo": "PORTARIA Nº 1.693, DE 1º DE JULHO DE 2026",
       "urlDou": "https://www.in.gov.br/web/dou/-/portaria-n-1.693-de-1-de-julho-de-2026-716086952",
       "arquivo": "2026-07-02_vacancia_portaria-n-1-693-de-1-de-julho-de-2026-716086952.html",
-      "idServidor": "3147883"
+      "idServidor": "3147883",
+      "jaNoSiape": false
     },
     {
       "nome": "HIRAM FELIX MATOS GASPAR",
@@ -103,7 +112,8 @@
       "titulo": "PORTARIA Nº 1.588, DE 19 DE JUNHO DE 2026",
       "urlDou": "https://www.in.gov.br/web/dou/-/portaria-n-1.588-de-19-de-junho-de-2026-715769551",
       "arquivo": "2026-07-01_aposentadoria_portaria-n-1-588-de-19-de-junho-de-2026-715769551.html",
-      "idServidor": "2933808"
+      "idServidor": "2933808",
+      "jaNoSiape": false
     },
     {
       "nome": "MARIANA PEREIRA DA SILVA",
@@ -113,7 +123,30 @@
       "titulo": "PORTARIA Nº 1.680, DE 29 DE JUNHO DE 2026",
       "urlDou": "https://www.in.gov.br/web/dou/-/portaria-n-1.680-de-29-de-junho-de-2026-715448874",
       "arquivo": "2026-06-30_vacancia_portaria-n-1-680-de-29-de-junho-de-2026-715448874.html",
-      "idServidor": "277819"
+      "idServidor": "277819",
+      "jaNoSiape": false
+    },
+    {
+      "nome": "ISLANE RIBEIRO FEITOZA",
+      "tipo": "aposentadoria",
+      "rotulo": "Aposentadoria",
+      "dataPublicacao": "2026-06-15",
+      "titulo": "PORTARIA N° 1.560, DE 12 DE JUNHO DE 2026",
+      "urlDou": "https://www.in.gov.br/web/dou/-/portaria-n-1.560-de-12-de-junho-de-2026-712121111",
+      "arquivo": "2026-06-15_aposentadoria_portaria-n-1-560-de-12-de-junho-de-2026-712121111.html",
+      "idServidor": "1277172",
+      "jaNoSiape": true
+    },
+    {
+      "nome": "MARIA HELENA KERBER",
+      "tipo": "aposentadoria",
+      "rotulo": "Aposentadoria",
+      "dataPublicacao": "2026-06-12",
+      "titulo": "PORTARIA N° 1.521, DE 11 DE JUNHO DE 2026",
+      "urlDou": "https://www.in.gov.br/web/dou/-/portaria-n-1.521-de-11-de-junho-de-2026-711752489",
+      "arquivo": "2026-06-12_aposentadoria_portaria-n-1-521-de-11-de-junho-de-2026-711752489.html",
+      "idServidor": "3209603",
+      "jaNoSiape": true
     }
   ],
   "dataMaisRecente": "2026-08-11",

@@ -39,9 +39,9 @@ import {
   comoSerie,
   curvaDePermanencia,
   detalharSaida,
-  detalharSaidaDoDou,
   evasaoDaCoorte,
   filtrarSaidas,
+  mesclarSaidasDoDou,
   saidas,
   serieDeSaidasPorMotivo,
 } from './lib/painel';
@@ -56,7 +56,7 @@ const numero = (valor: number) => valor.toLocaleString('pt-BR');
 const percentual = (valor: number) => `${valor.toFixed(1).replace('.', ',')}%`;
 
 const App: React.FC = () => {
-  const [registros, setRegistros] = useState<RegistroAuditor[]>([]);
+  const [registrosDoCsv, setRegistrosDoCsv] = useState<RegistroAuditor[]>([]);
   const [serie, setSerie] = useState<PontoSerieMensal[]>([]);
   const [saidasDou, setSaidasDou] = useState<SaidasDou | null>(null);
 
@@ -74,7 +74,7 @@ const App: React.FC = () => {
           carregarCsv('serie_mensal.csv'),
         ]);
         if (!montado) return;
-        setRegistros(comoRegistros(linhasDados));
+        setRegistrosDoCsv(comoRegistros(linhasDados));
         setSerie(comoSerie(linhasSerie));
         setErroDados(null);
       } catch (erro) {
@@ -114,6 +114,15 @@ const App: React.FC = () => {
     };
   }, []);
 
+  // O painel inteiro — cards, gráficos, tabelas — trabalha sobre o CSV do SIAPE
+  // JÁ MESCLADO com as saídas que só o DOU conhece (D22). É uma linha só, e é o
+  // que faz o resto da tela chegar até hoje em vez de parar na última
+  // competência do Portal, dois meses atrás.
+  const registros = useMemo(
+    () => mesclarSaidasDoDou(registrosDoCsv, saidasDou?.saidasRecentes ?? []),
+    [registrosDoCsv, saidasDou]
+  );
+
   // === Recorte ===
   //
   // Os filtros valem para o gráfico de saídas mês a mês, e só para ele. A curva
@@ -143,11 +152,38 @@ const App: React.FC = () => {
 
   const ultimoMes = serie[serie.length - 1];
 
+  /**
+   * Até onde os gráficos vão.
+   *
+   * A série mensal para na última competência do SIAPE, mas as saídas mescladas
+   * do DOU são posteriores a ela. Sem esticar o eixo, os dois gráficos parariam
+   * em junho e a saída de agosto existiria no dado sem existir na tela —
+   * exatamente o sintoma que a mescla veio resolver.
+   */
+  const ultimaCompetencia = useMemo(() => {
+    const doDou = registros.reduce((maior, r) => (r.MES_SAIDA > maior ? r.MES_SAIDA : maior), '');
+    const doSiape = ultimoMes?.mes ?? '';
+    return doDou > doSiape ? doDou : doSiape;
+  }, [registros, ultimoMes]);
+
   const diasSemPerderAuditor = saidasDou ? diasDesde(saidasDou.dataMaisRecente) : null;
   const eventosDouPorTipo = useMemo(
     () => new Map((saidasDou?.eventos ?? []).map((evento) => [evento.tipo, evento])),
     [saidasDou]
   );
+  /**
+   * Até que dia o painel enxerga. É a data da varredura do DOU, não a última
+   * competência do SIAPE: com as saídas do DOU mescladas, o número dos cards
+   * está atualizado até o dia em que o crawler rodou — e é isso que o rótulo
+   * precisa dizer, senão "desde ago/2022" sugere um recorte que acaba em junho.
+   */
+  const atualizadoAte = saidasDou?.varreduraAte
+    ? formatarDataIsoParaBr(saidasDou.varreduraAte)
+    : '';
+
+  /** Quantas saídas o painel conhece só pelo ato — as que ainda não têm selo do SIAPE. */
+  const saidasSoDoDou = (saidasDou?.saidasRecentes ?? []).filter((s) => !s.jaNoSiape).length;
+
   const eventoMaisRecente = saidasDou
     ? (saidasDou.eventos ?? []).find((evento) => evento.dataPublicacao === saidasDou.dataMaisRecente)
     : undefined;
@@ -155,9 +191,9 @@ const App: React.FC = () => {
   // === Gráfico principal: saídas mês a mês ===
 
   const graficoSaidas = useMemo(() => {
-    if (!ultimoMes) return { rotulos: [], completos: [], series: [] as SerieGrafico[], vazio: true };
+    if (!ultimaCompetencia) return { rotulos: [], completos: [], series: [] as SerieGrafico[], vazio: true };
 
-    const meses = listarCompetencias(MES_INICIO_GRAFICO_SAIDAS, ultimoMes.mes);
+    const meses = listarCompetencias(MES_INICIO_GRAFICO_SAIDAS, ultimaCompetencia);
     const series = serieDeSaidasPorMotivo(saidasFiltradas, meses, motivos)
       // Um motivo marcado mas sem nenhuma saída no recorte só polui a legenda.
       .filter((linha) => linha.valores.some((valor) => valor > 0))
@@ -176,7 +212,7 @@ const App: React.FC = () => {
       series,
       vazio: series.length === 0,
     };
-  }, [saidasFiltradas, motivos, ultimoMes]);
+  }, [saidasFiltradas, motivos, ultimaCompetencia]);
 
   /** Quantas saídas o gráfico realmente desenha — o corte em ago/2022 deixa de fora as anteriores. */
   const noGrafico = useMemo(
@@ -188,7 +224,7 @@ const App: React.FC = () => {
   // === Curva de permanência ===
 
   const graficoPermanencia = useMemo(() => {
-    if (!ultimoMes) return { rotulos: [], completos: [], series: [] as SerieGrafico[], vazio: true };
+    if (!ultimaCompetencia) return { rotulos: [], completos: [], series: [] as SerieGrafico[], vazio: true };
 
     // NENHUM filtro se aplica aqui. A curva responde a uma pergunta só, sobre a
     // coorte inteira: de todos os Auditores que entraram pelo concurso de 2021,
@@ -198,7 +234,7 @@ const App: React.FC = () => {
     // esconder um tipo transformaria quem saiu por ele em alguém que ficou, e a
     // curva mentiria para cima. O de coorte já não valia — o gráfico é, por
     // definição, só de quem entrou depois de jun/2022.
-    const meses = listarCompetencias(MES_INICIO_GRAFICO_SAIDAS, ultimoMes.mes);
+    const meses = listarCompetencias(MES_INICIO_GRAFICO_SAIDAS, ultimaCompetencia);
     const pontos = curvaDePermanencia(registros, ID_CONCURSO_2021, meses);
     if (pontos.every((ponto) => ponto.percentual === null)) {
       return { rotulos: [], completos: [], series: [] as SerieGrafico[], vazio: true };
@@ -222,7 +258,7 @@ const App: React.FC = () => {
       ],
       vazio: false,
     };
-  }, [registros, ultimoMes]);
+  }, [registros, ultimaCompetencia]);
 
   // === Tabela de destinos e últimas saídas ===
   //
@@ -245,31 +281,19 @@ const App: React.FC = () => {
     [todasAsSaidas]
   );
 
-  // "Últimas saídas" é a única lista que mistura as duas fontes, e é de propósito
-  // (D21): ela existe para mostrar o que ACABOU de acontecer, e o SIAPE chega
-  // com ~2 meses de atraso. Esperar o Portal para exibir uma saída que o DOU já
-  // publicou seria esconder a notícia mais recente por formalidade.
-  //
-  // O que vem do DOU não tem coorte, área nem unidade — o SIAPE é que traz isso.
-  // Aparece com o selo DOU sozinho, e ganha o SIAPE ao lado quando a competência
-  // chegar. Nenhuma delas entra em contagem de evasão: quem conta é o SIAPE, e
-  // contar ato dobraria quem tem dois (D11, D13).
-  const ultimasSaidas = useMemo(() => {
-    const doSiape = todasAsSaidas.map(detalharSaida);
-    const idsDoSiape = new Set(doSiape.map((saida) => saida.id));
-    const doDou = (saidasDou?.saidasRecentes ?? [])
-      .map(detalharSaidaDoDou)
-      .filter((saida) => !idsDoSiape.has(saida.id));
-
-    return [...doDou, ...doSiape]
-      .sort(
-        (a, b) =>
-          b.mesSaida.localeCompare(a.mesSaida) ||
-          b.dataPublicacao.localeCompare(a.dataPublicacao) ||
-          a.nome.localeCompare(b.nome, 'pt-BR')
-      )
-      .slice(0, 6);
-  }, [todasAsSaidas, saidasDou]);
+  const ultimasSaidas = useMemo(
+    () =>
+      todasAsSaidas
+        .map(detalharSaida)
+        .sort(
+          (a, b) =>
+            b.mesSaida.localeCompare(a.mesSaida) ||
+            b.dataPublicacao.localeCompare(a.dataPublicacao) ||
+            a.nome.localeCompare(b.nome, 'pt-BR')
+        )
+        .slice(0, 6),
+    [todasAsSaidas]
+  );
 
   const base = baseDoSite();
 
@@ -333,16 +357,17 @@ const App: React.FC = () => {
                           <b>{formatarDataIsoParaBr(eventoMaisRecente.dataPublicacao)}</b>
                         </div>
                       )}
-                      {/* O DOU sai no dia; o SIAPE, com ~2 meses de atraso. Estas
-                          saídas já estão na lista abaixo, com o selo DOU sozinho —
-                          o que falta é o Portal confirmar, não o ato existir. */}
-                      {saidasDou && saidasDou.saidasRecentes.length > 0 && (
+                      {/* O DOU sai no dia; o SIAPE, com ~2 meses de atraso. Desde a
+                          D22 estas saídas contam em tudo — o que falta nelas é a
+                          confirmação do cadastro, não a existência do ato. */}
+                      {saidasSoDoDou > 0 && (
                         <div className="text-gray-500">
-                          {saidasDou.saidasRecentes.length} saída
-                          {saidasDou.saidasRecentes.length === 1 ? '' : 's'} publicada
-                          {saidasDou.saidasRecentes.length === 1 ? '' : 's'} depois de{' '}
-                          {formatarCompetenciaLonga(saidasDou.ultimaCompetenciaSiape)}, última competência
-                          do SIAPE. Entram nas contagens quando o Portal da Transparência as confirmar.
+                          {saidasSoDoDou} saída
+                          {saidasSoDoDou === 1 ? '' : 's'} já{' '}
+                          {saidasSoDoDou === 1 ? 'contabilizada' : 'contabilizadas'} aqui só pelo ato do
+                          DOU, publicad{saidasSoDoDou === 1 ? 'o' : 'os'} depois de{' '}
+                          {saidasDou ? formatarCompetenciaLonga(saidasDou.ultimaCompetenciaSiape) : ''}, última
+                          competência do SIAPE. Elas ganham o selo do cadastro quando o Portal alcançar o mês.
                         </div>
                       )}
                       <div className="flex flex-wrap justify-center gap-2 pt-1">
@@ -389,7 +414,10 @@ const App: React.FC = () => {
               icon={icone(faUserMinus)}
               footer={
                 <div className="space-y-2">
-                  <div>Desde {formatarCompetenciaLonga(MES_INICIO_GRAFICO_SAIDAS)}.</div>
+                  <div>
+                    Desde {formatarCompetenciaLonga(MES_INICIO_GRAFICO_SAIDAS)}
+                    {atualizadoAte ? ` até ${atualizadoAte}` : ''}.
+                  </div>
                   <div className="flex flex-wrap justify-center gap-x-3 gap-y-1 border-t border-gray-700 pt-2">
                     {motivosDoTotal.map((grupo) => (
                       <span key={grupo.rotulo} className="text-xs text-gray-400">
@@ -410,7 +438,8 @@ const App: React.FC = () => {
                 <div className="space-y-1">
                   <div>
                     <span className="font-medium text-amber-400">{numero(coorte2021.saiu)}</span> de{' '}
-                    {numero(coorte2021.total)} da coorte {rotuloDoConcurso(ID_CONCURSO_2021)}.
+                    {numero(coorte2021.total)} da coorte {rotuloDoConcurso(ID_CONCURSO_2021)}
+                    {atualizadoAte ? ` até ${atualizadoAte}` : ''}.
                   </div>
                 </div>
               }
@@ -481,7 +510,8 @@ const App: React.FC = () => {
               semDados('Sem base suficiente para traçar a curva.')
             )}
             <p className="mt-2 text-xs text-gray-500">
-              Eixo horizontal: competências do calendário, de ago/2022 até a última do SIAPE.
+              Eixo horizontal: competências do calendário, de ago/2022 até a competência mais recente com
+              movimentação — do SIAPE ou do DOU, o que estiver mais à frente.
             </p>
           </section>
 
@@ -563,7 +593,8 @@ const App: React.FC = () => {
             <h2 className="mb-4 text-2xl font-bold text-red-300">Destinos da evasão</h2>
             <p className="mb-6 text-gray-400">
               Para onde foram os Auditores que deixaram a CGU. O destino só aparece quando há ato do DOU ou registro do
-              SIAPE que o diga: cada linha traz de onde veio a informação e se alguém a conferiu. São{' '}
+              SIAPE que o diga, e cada linha traz de onde veio a informação. Quem saiu há pouco costuma aparecer sem
+              destino: a busca do órgão de chegada parte de quem o SIAPE já mostrou saindo, então ela vem depois. São{' '}
               <span className="font-bold text-orange-400">{numero(todasAsSaidas.length)}</span> saída
               {todasAsSaidas.length === 1 ? '' : 's'} em toda a série, coorte de 2021 e veteranos juntos.{' '}
               <span className="text-gray-300">Esta tabela não acompanha os filtros acima</span> — para recortar por

@@ -2,9 +2,14 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 
 import { MOTIVOS_SAIDA, rotuloDoConcurso } from './constants';
-import { RegistroAuditor } from './types';
-import { carregarCsv, formatarCompetenciaLonga, formatarDataIsoParaBr } from './lib/dados';
-import { comoRegistros, motivoDe, saidas } from './lib/painel';
+import { RegistroAuditor, SaidasDou } from './types';
+import {
+  carregarCsv,
+  carregarJsonPublico,
+  formatarCompetenciaLonga,
+  formatarDataIsoParaBr,
+} from './lib/dados';
+import { comoRegistros, fontesDaSaida, mesclarSaidasDoDou, motivoDe, saidas } from './lib/painel';
 
 const TODAS = 'TODAS';
 
@@ -24,8 +29,16 @@ const RelatorioImpressao: React.FC = () => {
   const [carregando, setCarregando] = useState(true);
 
   useEffect(() => {
-    carregarCsv('dados.csv')
-      .then((linhas) => setRegistros(comoRegistros(linhas)))
+    // O relatório impresso lê as mesmas duas fontes que o painel (D22): sem o
+    // JSON do DOU ele voltaria a terminar na última competência do SIAPE, e a
+    // folha impressa contradiria a tela.
+    Promise.all([
+      carregarCsv('dados.csv'),
+      carregarJsonPublico<SaidasDou>('atos_dou.json').catch(() => null),
+    ])
+      .then(([linhas, dou]) =>
+        setRegistros(mesclarSaidasDoDou(comoRegistros(linhas), dou?.saidasRecentes ?? []))
+      )
       .catch((falha) => setErro(falha instanceof Error ? falha.message : 'Erro ao carregar os dados.'))
       .finally(() => setCarregando(false));
   }, []);
@@ -143,9 +156,7 @@ const RelatorioImpressao: React.FC = () => {
                       {/* Os selos de fonte em texto, porque a folha impressa é
                           preto e branco e a cor do selo não sobrevive a ela. */}
                       <td className="whitespace-nowrap border border-slate-300 px-3 py-2">
-                        {[registro.MES_SAIDA ? 'SIAPE' : '', registro.FONTE_MOTIVO]
-                          .filter(Boolean)
-                          .join(' · ') || 'sem fonte'}
+                        {fontesDaSaida(registro).join(' · ') || 'sem fonte'}
                       </td>
                     </tr>
                   ))}

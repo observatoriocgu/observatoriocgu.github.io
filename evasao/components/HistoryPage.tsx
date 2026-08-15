@@ -1,9 +1,23 @@
 import React, { useEffect, useMemo, useState } from 'react';
 
 import { rotuloDoConcurso } from '../constants';
-import { AlteracaoRegistro, LogDeAlteracoes, MesDeAlteracoes, RegistroAuditor } from '../types';
+import {
+  AlteracaoRegistro,
+  LogDeAlteracoes,
+  MesDeAlteracoes,
+  RegistroAuditor,
+  SaidasDou,
+} from '../types';
 import { carregarCsv, carregarJsonPublico, formatarCompetenciaLonga, formatarDataIsoParaBr } from '../lib/dados';
-import { areaDe, comoRegistros, motivoDe, urlDoAto } from '../lib/painel';
+import {
+  acrescentarSaidasDoDou,
+  areaDe,
+  comoRegistros,
+  fontesDaSaida,
+  mesclarSaidasDoDou,
+  motivoDe,
+  urlDoAto,
+} from '../lib/painel';
 import CardDeFiltros, { resumirGrupo, useFiltrosEncadeados } from './CardDeFiltros';
 import FiltroMultiplo, { OpcaoFiltro } from './FiltroMultiplo';
 import { SelosDaLinha } from './Selos';
@@ -47,13 +61,18 @@ const HistoryPage: React.FC = () => {
       try {
         // O CSV é opcional: sem ele o histórico ainda se lê, só perde o motivo e
         // o link do ato. O JSON, não — sem ele não há o que mostrar.
-        const [logCarregado, linhas] = await Promise.all([
+        const [logCarregado, linhas, dou] = await Promise.all([
           carregarJsonPublico<LogDeAlteracoes>('alteracoes-registros.json'),
           carregarCsv('dados.csv').catch(() => []),
+          carregarJsonPublico<SaidasDou>('atos_dou.json').catch(() => null),
         ]);
         if (!montado) return;
-        setLog(logCarregado);
-        setRegistros(comoRegistros(linhas));
+        // O log do SIAPE para na última competência do Portal. As saídas que só
+        // o DOU conhece entram aqui (D22) — sem isto, quem saiu em agosto não
+        // aparece em bloco nenhum desta página.
+        const mesclados = mesclarSaidasDoDou(comoRegistros(linhas), dou?.saidasRecentes ?? []);
+        setRegistros(mesclados);
+        setLog(acrescentarSaidasDoDou(logCarregado, mesclados));
       } catch (falha) {
         if (montado) setErro(falha instanceof Error ? falha.message : 'Erro ao carregar o histórico.');
       } finally {
@@ -262,13 +281,7 @@ const HistoryPage: React.FC = () => {
                       </span>
                       <span className="text-gray-300">{descrever(mudanca)}</span>
                       {mudanca.tipo === 'saida' && registro && (
-                        <SelosDaLinha
-                          fontes={[
-                            registro.MES_SAIDA ? 'SIAPE' : '',
-                            registro.FONTE_MOTIVO,
-                          ]}
-                          compacto
-                        />
+                        <SelosDaLinha fontes={fontesDaSaida(registro)} compacto />
                       )}
                       {ato && (
                         <a

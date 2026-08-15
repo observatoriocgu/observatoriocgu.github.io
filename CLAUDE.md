@@ -110,12 +110,27 @@ Edital CGU nº 5 de 13/06/2022, publicado no DOU (D17).
   snapshot do Portal, determinístico. É por isso que o workflow diário
   consegue rodá-lo — `construir_painel.py` não roda no CI, depende dos
   snapshots, que estão fora do Git
-- Linha do índice sem ID_SERVIDOR_PORTAL não é falha: é saída que o DOU já
-  anunciou e o SIAPE ainda não confirmou. Ela NÃO entra em contagem de evasão
-  (quem conta é o SIAPE, D11/D13), mas ENTRA na lista "últimas saídas" do
-  painel, com nome e selo DOU sozinho (D21). Coorte, área e unidade ficam
-  vazias — só o SIAPE traz isso —, e por isso essas linhas não respondem a
-  filtro nenhum
+- Saída que o DOU já anunciou e o SIAPE ainda não confirmou CONTA EM TUDO
+  (D22, revoga o recorte da D21): cards, gráficos, curva, destinos, tabela
+  detalhada, histórico e relatório impresso. Ela não é linha nova — é
+  SOBREPOSTA ao registro da pessoa, que já está no dados.csv como ativa, e por
+  isso chega à tela com coorte, área e unidade e responde aos filtros
+- Quem faz a sobreposição é `mesclarSaidasDoDou` (lib/painel.ts), NO NAVEGADOR,
+  e não o construir_painel.py. Não é preferência: o construir_painel depende dos
+  snapshots do Portal, que estão fora do Git e não existem no CI. Quem roda todo
+  dia é a varredura do DOU. Se a mescla morasse no Python, uma saída descoberta
+  hoje esperaria a próxima execução local — a defasagem que ela existe para
+  eliminar. Toda página que lê dados.csv TEM de passar por ela
+- Três guardas contra contar errado, e nenhuma pode sair: casa por
+  ID_SERVIDOR_PORTAL (nome + matrícula, no Python, D12); só se aplica a quem
+  NÃO tem MES_SAIDA, senão quem tem dois atos vira duas saídas; quem não está no
+  dados.csv não entra de jeito nenhum
+- Ato de quem o SIAPE JÁ mostrou sair, mas sem motivo (caso da saída
+  provisória, que o enriquecer_saidas pula de propósito) só COMPLETA o motivo:
+  a competência continua sendo a do cadastro, e nada é contado duas vezes
+- Selo de fonte se calcula com `fontesDaSaida`, e só com ela. Três componentes
+  já duplicaram a regra `MES_SAIDA ? 'SIAPE' : ''` e passaram a creditar o
+  SIAPE por saída que só o DOU conhecia
 - O nome de quem saiu é lido do TEXTO do ato (dou.nome_do_ato), com fórmulas
   ancoradas e terminador explícito. Isso publica nome de pessoa real a partir de
   leitura de máquina: se nenhuma fórmula casar, a resposta é VAZIO — a lista
