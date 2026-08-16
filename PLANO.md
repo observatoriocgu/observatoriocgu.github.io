@@ -64,6 +64,8 @@ Todas as decisões abaixo estão **fechadas**. As fases podem ser executadas sem
 | D24 | Destino pelo Ranking dos Concursos | Fase 2 (v2) | **um crawler por PESSOA**, `rankingdosconcursos.com.br`, que só é consultado para quem **já saiu** (SIAPE ou DOU) e está sem `ORGAO_DESTINO`. Publica **só quando sobra um órgão candidato**; ambíguo vira pauta humana. O nome do órgão vem de um **catálogo explícito**, nunca do rótulo do site. `FONTE_DESTINO = RANKING` — que é o que a **D14** sempre reservou para esta fonte. Mescla no **navegador**, como a D22, e só sobre destino vazio |
 | D26 | A marca azul desempata | Fase 2 (v2) | **revê a D24 na parte do desempate.** A marca "Nomeado" do ranking passa a decidir (`UNICO_NOMEADO`), porque ela **afirma um fato** — a pessoa foi nomeada naquele concurso — e não é heurística como colocação ou ano. Mas a **ausência** de marca não afirma nada: o site não anota nomeação de todo concurso (**TCU: 0 marca azul em 38 linhas; CGU: 0 em 84**), então a guarda `ORGAOS_CEGOS_A_TAG` impede que a marca decida contra TCU, Senado ou Câmara não marcados. **Duas marcas não se desempatam.** Some a **janela de anos para trás**, que apagava a resposta certa de quem passou em concurso antigo e foi nomeado anos depois. Passa-se a ler a coluna **"Fez tb:"**, que traz marca que a linha própria perde e cita concurso que a tabela não lista. Medido contra os 123 destinos que o DOU conhece: **53 publicados, 50 certos (94,3%)**, contra 48 e 46 (95,8%) da regra antiga — 1,5 ponto de precisão pelo **dobro** da cobertura (9 → 18 saídas resolvidas) |
 
+| D27 | O ato em diário municipal | Fase 2 (v2) | **terceira** tentativa de destino, depois do DOU e do ranking: a API pública do **Querido Diário** (Open Knowledge Brasil), busca por frase exata, sem chave. O órgão **não é lido do texto** — vem do **território** do diário, o que dispensa extrair nome de órgão de texto livre e portanto dispensa IA. Publica quando **um** município tem ato de entrada da pessoa; dois viram pauta. Fica de fora o **DF** (o DODF serve a muitos órgãos) e o ato de **Câmara Municipal** (sai no diário da Prefeitura). `FONTE_DESTINO = DIARIO`. **Não cobre diário estadual**, que é onde está a maior parte do que falta. Medido: zero falso positivo nos 123 destinos que o DOU conhece; resolve 1 das 20 pendências de hoje |
+
 **Efeito das decisões novas sobre as antigas:**
 
 - **D9 sobrevive parcialmente.** `CONCURSO` continua coluna própria, separada de `AREA`, com `VETERANO` como valor. Muda a **origem**: o concurso passa a ser derivado da primeira aparição na série mensal, não da lista da FGV. A parte da D9 sobre chave de identidade é revogada pela **D12**.
@@ -1244,6 +1246,63 @@ não desempata este caso, e por isso ele é de gente.
 Casos do usuário resolvidos automaticamente: ROSICLEIDE (TCM SP, pela marca do "Fez tb:"), BRUNO
 (SEFAZ SP), ANDRE LUIZ (SEFAZ RS, pela janela removida), MATHEUS KLOTZ — este último **não**, por
 ter duas marcas; ficou na pauta com as duas à vista.
+
+### 2.6.2 O ato em diário municipal ✅ *(16/08/2026, D27)*
+
+**O pedido:** quando nem o DOU nem o ranking respondem, procurar o ato de nomeação numa busca
+web ou numa API agregadora de diários, e cruzar o resultado com os candidatos do ranking. *"Tenta
+fazer sem IA uma coisa que funciona primeiro."*
+
+#### A busca web foi testada e não serve — não repetir
+
+| motor | resultado |
+|---|---|
+| Google, Bing, Mojeek, Startpage | bloqueiam requisição sem chave (403 / captcha / zero links) |
+| DuckDuckGo lite | responde, 3 a 8 resultados, **sem diário oficial no índice** (são PDFs) |
+
+Testado contra seis casos de resposta conhecida: achou o órgão certo em **um** (ROSICLEIDE, por uma
+página institucional do TCM-SP, não por diário) e nada nos outros cinco. A variante que o usuário
+sugeriu — *"cruzar o resultado contra as possibilidades do ranking"* — foi medida nos 16 casos da
+pauta e falha pelo motivo oposto ao esperado: para **MATHEUS KLOTZ BUSCH** ela confirma **quatro
+candidatos ao mesmo tempo**, porque os resultados incluem páginas que listam todas as aprovações da
+pessoa. Em 13 dos 16 não confirma nenhum. E o DDG seria bloqueado no CI de qualquer forma, por ser
+IP de datacenter.
+
+#### O Querido Diário serve, e por duas razões precisas
+
+1. **O órgão vem do território, não do texto.** A API devolve `territory_name` e `state_code` de
+   cada diário. Era essa a parte que o usuário temia precisar de IA — *"catar o nome do órgão a
+   partir de um resultado que você não sabe como vai vir"* —, e ela desaparece.
+2. **O que se acha é ATO.** "O PREFEITO MUNICIPAL DE SANTOS [...] nomeia, após concurso público,
+   CARLOS MOACYR FERREIRA NETO, para exercer o cargo de Procurador" é da mesma natureza do que o
+   `dou.py` lê, e não indício.
+
+#### Três armadilhas, todas com caso real
+
+- **O veto não pode ser do trecho inteiro.** O ato de Santos traz, 60 caracteres depois do nome,
+  "em vaga decorrente da **aposentadoria** de" outra pessoa — que é como se descreve a vaga
+  preenchida. Vetar por presença descartava o ato. Vence **a palavra mais próxima do nome**.
+- **Cruzar com o ranking publicaria o município errado.** Santos **não** está na ficha do CARLOS
+  MOACYR; São Paulo está, e é lá que aparecem uma licença médica e um despacho de posse dele. O
+  cruzamento é registrado, e não é porteiro. (Ele tem ato nos dois: vai para a pauta.)
+- **Lista de aprovados cola nomes.** "LUANA CAMILA PINHEIRO JUCA" contém "CAMILA PINHEIRO";
+  "SILVIO LUCIO PEREIRA CARDOSO" contém "LUCIO PEREIRA CARDOSO". `ocorrencias_isoladas` exige que a
+  palavra vizinha não seja outro pedaço de nome, e derruba caso legítimo quando o nome anterior
+  encosta — o lado certo para errar.
+
+#### Resultado, e o limite
+
+| | |
+|---|---|
+| Destino identificado (vai à tela) | 18 → **19** |
+| ...destes, por ato em diário | **1** (LEONARDO TOIOMOTO → Prefeitura de Paulínia) |
+| Falso positivo nos 123 destinos que o DOU conhece | **0** (havia diário para 36; nenhuma afirmação) |
+| `testar_diarios.py` | **26 invariantes**, sem rede |
+
+**O limite é a cobertura, e ele é grande:** o Querido Diário é **municipal**. Das 20 pessoas na
+pauta, **11 não têm um único diário**, e são as de SEFAZ RN, AM, PE, CE e MG. Fechar essa lacuna
+exige diário **estadual**, que não tem agregador aberto — ou 27 raspadores, ou API paga. **IA não
+resolveria isso**: o gargalo é de acesso ao documento, não de compreensão do texto.
 
 ---
 

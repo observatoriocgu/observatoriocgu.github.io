@@ -274,8 +274,15 @@ export interface DestinoDoRanking {
    * `SEM_CATALOGO` ou `FALHA_NA_CONSULTA`.
    */
   decisao: string;
-  /** Vazio em tudo que não seja `UNICO` ou `UNICO_NOMEADO`. */
+  /** Vazio quando nem o ranking nem o diário municipal responderam. */
   orgaoDestino: string;
+  /**
+   * Qual das duas fontes do arquivo respondeu: `RANKING` (aprovação em concurso
+   * mais a marca "Nomeado") ou `DIARIO` (ato de nomeação em diário municipal,
+   * D27). Vem do CSV — a mescla não pode fixá-la, ou o ranking levaria crédito
+   * por ato publicado.
+   */
+  fonteDestino: string;
   /** A consulta que qualquer pessoa pode repetir no navegador. */
   urlDestino: string;
   /** Os órgãos possíveis, quando há mais de um. Só para a pauta de curadoria. */

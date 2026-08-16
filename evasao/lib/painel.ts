@@ -39,13 +39,21 @@ import { LinhaCsv, baseDoSite } from './dados';
 export const comoRegistros = (linhas: LinhaCsv[]): RegistroAuditor[] =>
   linhas as unknown as RegistroAuditor[];
 
-/** `destinos_ranking.csv` como o navegador o consome (D24). */
+/**
+ * `destinos_ranking.csv` como o navegador o consome (D24, ampliado pela D27).
+ *
+ * O arquivo carrega DUAS fontes desde a D27 — o ranking dos concursos e o ato em
+ * diário municipal —, e por isso `fonteDestino` vem do próprio CSV em vez de ser
+ * fixado aqui. Fixá-lo era o que existia antes, e creditaria ao ranking um
+ * destino lido de um ato publicado.
+ */
 export const comoDestinosDoRanking = (linhas: LinhaCsv[]): DestinoDoRanking[] =>
   linhas.map((linha) => ({
     idServidor: linha.ID_SERVIDOR_PORTAL,
     nome: linha.NOME,
     decisao: linha.DECISAO,
     orgaoDestino: linha.ORGAO_DESTINO,
+    fonteDestino: linha.FONTE_DESTINO,
     urlDestino: linha.URL_DESTINO,
     candidatos: linha.CANDIDATOS ? linha.CANDIDATOS.split(' | ') : [],
   }));
@@ -249,7 +257,9 @@ export const mesclarDestinosDoRanking = (
     return {
       ...registro,
       ORGAO_DESTINO: destino.orgaoDestino,
-      FONTE_DESTINO: 'RANKING',
+      // Vem do CSV: `RANKING` ou `DIARIO` (D27). Escrever a fonte aqui à mão
+      // creditaria ao ranking o que foi lido de um ato publicado em diário.
+      FONTE_DESTINO: destino.fonteDestino || 'RANKING',
       URL_DESTINO: destino.urlDestino,
     };
   });

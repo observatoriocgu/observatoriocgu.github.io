@@ -159,6 +159,10 @@ Edital CGU nº 5 de 13/06/2022, publicado no DOU (D17).
 - filtrar_affc.py      reduz o CSV bruto do Portal aos AFFC
 - ranking.py           biblioteca: rankingdosconcursos, catálogo de órgãos e a
                        regra de decisão do destino (D24)
+- diarios.py           biblioteca: ato de nomeação em diário MUNICIPAL, pelo
+                       Querido Diário. Terceira tentativa de destino (D27)
+- testar_diarios.py    regressão dos padrões de nomeação e da leitura do
+                       território, sem rede. RODAR SEMPRE que mexer em diarios.py
 - enriquecer_destinos_ranking.py  destino de quem já saiu e o DOU não disse para
                        onde. `--conferir` mede a regra contra o gabarito do DOU
 - testar_dou.py        regressão da classificação, sem rede. RODAR SEMPRE que
@@ -317,6 +321,53 @@ Edital CGU nº 5 de 13/06/2022, publicado no DOU (D17).
   ROCHA (saída 05/2025, única aprovação SEFAZ RS **18**) e de ROSICLEIDE (saída
   05/2024, azul no TCM SP **20**). A janela PARA A FRENTE fica: edição posterior
   à saída não pode tê-la motivado
+
+## O ato em diário MUNICIPAL (D27, 16/08/2026)
+- TERCEIRA tentativa de destino, depois do DOU e do ranking, e só para quem os
+  dois não responderam. Fonte: API pública do Querido Diário (Open Knowledge
+  Brasil), sem chave, busca por FRASE EXATA — as aspas na `querystring` são o
+  que faz isso; sem elas a consulta vira OU e devolve 10.000 diários
+- O ÓRGÃO NÃO É LIDO DO TEXTO. Vem do TERRITÓRIO do diário, que a API entrega.
+  É o que dispensa qualquer extração de nome de órgão a partir de texto livre —
+  e portanto qualquer IA. `orgao_do_territorio` prefere SEMPRE o nome que o
+  catálogo do `ranking.py` já usa (é "Prefeitura DO Rio de Janeiro" e
+  "Prefeitura DE São Paulo"), e só constrói o molde para município novo
+- O DF FICA DE FORA. O DODF é um diário só para GDF, TCDF, Câmara Legislativa,
+  Defensoria e Polícia Civil — o território não identifica órgão. É onde estão
+  os casos mais tentadores (ANA CAROLINA GOMES MELLAO HADAD aparece nomeada
+  Defensora Pública do DF em 05/2024, e vai para a pauta)
+- ATO DA CÂMARA MUNICIPAL sai no diário DA PREFEITURA. Quando o trecho fala de
+  Legislativo, o território deixa de identificar o órgão e o caso vai à pauta —
+  senão quem virou Procurador Legislativo da Câmara de Maceió seria publicado
+  como "Prefeitura de Maceió"
+- A PALAVRA MAIS PRÓXIMA DO NOME VENCE, e isso não é detalhe: o ato que nomeia
+  CARLOS MOACYR FERREIRA NETO em Santos diz, logo adiante, "em vaga decorrente
+  da APOSENTADORIA de" outra pessoa. Vetar por presença descartava o ato inteiro.
+  `parece_nomeacao` compara a distância da fórmula de entrada e a do veto até
+  AQUELE nome, dentro de ±200 caracteres
+- NÃO se exige que o órgão esteja entre os candidatos do ranking, e há um caso
+  que prova por quê: o mesmo CARLOS MOACYR foi nomeado em SANTOS (ato explícito),
+  e Santos NÃO está na ficha dele; São Paulo está, e é onde aparecem uma licença
+  médica e um despacho de posse. Exigir o cruzamento publicaria o município errado
+- Dois municípios com ato da mesma pessoa é PAUTA (`VARIOS_DIARIOS`), não
+  desempate. É o caso do CARLOS MOACYR, que tem ato em Santos e em São Paulo
+- Lista de aprovados em ordem alfabética cola nomes uns nos outros, e é metade
+  do que a busca devolve. `ocorrencias_isoladas` exige que a palavra vizinha não
+  seja outro pedaço de nome — casos reais: "LUANA CAMILA PINHEIRO JUCA" contém
+  "CAMILA PINHEIRO", "SILVIO LUCIO PEREIRA CARDOSO" contém "LUCIO PEREIRA
+  CARDOSO". A regra derruba caso legítimo quando o nome anterior encosta no da
+  pessoa, e esse é o lado certo para errar
+- NÃO COBRE DIÁRIO ESTADUAL, e isso é o limite principal: das 20 pessoas que
+  estavam na pauta em 16/08/2026, 11 não têm um único diário, e são justamente
+  as de SEFAZ RN, AM, PE, CE e MG. Medido no gabarito de 123 destinos que o DOU
+  conhece: ZERO falso positivo (havia diário para 36 delas e a fonte não afirmou
+  nada em nenhuma)
+- BUSCA WEB GENÉRICA NÃO FUNCIONA, e já foi testada — não repetir. Google, Bing,
+  Mojeek e Startpage bloqueiam requisição sem chave; só o DuckDuckGo lite
+  responde, com 3 a 8 resultados e sem diário oficial no índice (são PDFs). Pior:
+  "o candidato do ranking aparece nos resultados" confirma VÁRIOS candidatos ao
+  mesmo tempo, porque os resultados incluem páginas que listam todas as
+  aprovações da pessoa. E o DDG seria bloqueado no CI de qualquer forma
 
 ## Ferramentas
 - Scripts Python são STDLIB ONLY: o CI não roda pip install, e requests/bs4/

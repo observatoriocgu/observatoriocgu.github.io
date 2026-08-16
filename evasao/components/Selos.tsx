@@ -32,6 +32,7 @@ const CORES_POR_FONTE: Record<TemaSelo, Record<string, string>> = {
     DOU: 'border-amber-500/50 text-amber-300 bg-amber-500/10',
     SIAPE: 'border-sky-500/50 text-sky-300 bg-sky-500/10',
     RANKING: 'border-violet-500/50 text-violet-300 bg-violet-500/10',
+    DIARIO: 'border-teal-500/50 text-teal-300 bg-teal-500/10',
     BUSCA: 'border-gray-600 text-gray-400 bg-gray-800/40',
     MANUAL: 'border-emerald-500/50 text-emerald-300 bg-emerald-500/10',
   },
@@ -39,6 +40,7 @@ const CORES_POR_FONTE: Record<TemaSelo, Record<string, string>> = {
     DOU: 'border-amber-600 text-amber-900 bg-amber-100',
     SIAPE: 'border-sky-600 text-sky-900 bg-sky-100',
     RANKING: 'border-violet-600 text-violet-900 bg-violet-100',
+    DIARIO: 'border-teal-600 text-teal-900 bg-teal-100',
     BUSCA: 'border-gray-400 text-gray-700 bg-gray-100',
     MANUAL: 'border-emerald-600 text-emerald-900 bg-emerald-100',
   },
@@ -82,11 +84,13 @@ const CORES_DE_LINK: Record<TemaSelo, Record<string, string>> = {
   escuro: {
     DOU: 'border-amber-500/40 text-amber-400 hover:border-amber-400 hover:bg-amber-500/10',
     RANKING: 'border-violet-500/40 text-violet-300 hover:border-violet-400 hover:bg-violet-500/10',
+    DIARIO: 'border-teal-500/40 text-teal-300 hover:border-teal-400 hover:bg-teal-500/10',
     MANUAL: 'border-emerald-500/40 text-emerald-300 hover:border-emerald-400 hover:bg-emerald-500/10',
   },
   claro: {
     DOU: 'border-amber-600 text-amber-800 hover:bg-amber-100',
     RANKING: 'border-violet-600 text-violet-800 hover:bg-violet-100',
+    DIARIO: 'border-teal-600 text-teal-800 hover:bg-teal-100',
     MANUAL: 'border-emerald-600 text-emerald-800 hover:bg-emerald-100',
   },
 };
@@ -160,14 +164,23 @@ export const SelosDaLinha: React.FC<{
  */
 export const rotuloDoLinkDeDestino = (fonteDestino: string, dataDestino: string): string => {
   if (fonteDestino === 'RANKING') return 'ficha no ranking';
+  // O diário municipal é ato, como o DOU, mas o link abre a BUSCA que o
+  // encontrou, e não uma página de ato: o Querido Diário indexa o diário
+  // inteiro, e a data que temos é a da edição, não a de uma peça dentro dela.
+  if (fonteDestino === 'DIARIO') return 'ato em diário municipal';
   const data = formatarDataIsoParaBr(dataDestino);
   return data ? `ato de ${data}` : 'ato de nomeação';
 };
 
-export const tituloDoLinkDeDestino = (fonteDestino: string, nome: string, destino: string): string =>
-  fonteDestino === 'RANKING'
-    ? `Aprovações de ${nome} no rankingdosconcursos. É indício com fonte, não ato publicado.`
-    : `Ato de nomeação em ${destino}, publicado no DOU`;
+export const tituloDoLinkDeDestino = (fonteDestino: string, nome: string, destino: string): string => {
+  if (fonteDestino === 'RANKING') {
+    return `Aprovações de ${nome} no rankingdosconcursos. É indício com fonte, não ato publicado.`;
+  }
+  if (fonteDestino === 'DIARIO') {
+    return `Ato de nomeação de ${nome} em ${destino}, publicado no diário oficial do município`;
+  }
+  return `Ato de nomeação em ${destino}, publicado no DOU`;
+};
 
 /**
  * O rótulo à esquerda de cada linha de procedência.
