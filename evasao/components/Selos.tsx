@@ -152,17 +152,22 @@ export const SelosDaLinha: React.FC<{
  * não é a da saída, e costuma vir ANTES dela: a posse no novo órgão se publica
  * enquanto a vacância na CGU ainda tramita. No ranking é a ficha de aprovações
  * da pessoa, que não tem data de posse nenhuma para mostrar.
+ *
+ * Recebe os campos soltos, e não o `DetalheSaida`, porque a tabela detalhada
+ * mostra o mesmo link a partir do `RegistroAuditor` cru. A regra "ranking abre
+ * ficha, DOU abre ato" tem de ficar num lugar só: copiada na tabela, ela chamaria
+ * de "ato" a página de aprovações no primeiro destino vindo do ranking.
  */
-const rotuloDoDestino = (saida: DetalheSaida): string => {
-  if (saida.fonteDestino === 'RANKING') return 'ficha no ranking';
-  const data = formatarDataIsoParaBr(saida.dataDestino);
+export const rotuloDoLinkDeDestino = (fonteDestino: string, dataDestino: string): string => {
+  if (fonteDestino === 'RANKING') return 'ficha no ranking';
+  const data = formatarDataIsoParaBr(dataDestino);
   return data ? `ato de ${data}` : 'ato de nomeação';
 };
 
-const tituloDoDestino = (saida: DetalheSaida): string =>
-  saida.fonteDestino === 'RANKING'
-    ? `Aprovações de ${saida.nome} no rankingdosconcursos. É indício com fonte, não ato publicado.`
-    : `Ato de nomeação em ${saida.destino}, publicado no DOU`;
+export const tituloDoLinkDeDestino = (fonteDestino: string, nome: string, destino: string): string =>
+  fonteDestino === 'RANKING'
+    ? `Aprovações de ${nome} no rankingdosconcursos. É indício com fonte, não ato publicado.`
+    : `Ato de nomeação em ${destino}, publicado no DOU`;
 
 /**
  * O rótulo à esquerda de cada linha de procedência.
@@ -236,8 +241,8 @@ export const LinhasDeProcedencia: React.FC<{ saida: DetalheSaida; tema?: TemaSel
             <LinkDaFonte
               fonte={saida.fonteDestino}
               href={saida.urlDestino}
-              rotulo={rotuloDoDestino(saida)}
-              titulo={tituloDoDestino(saida)}
+              rotulo={rotuloDoLinkDeDestino(saida.fonteDestino, saida.dataDestino)}
+              titulo={tituloDoLinkDeDestino(saida.fonteDestino, saida.nome, saida.destino)}
               compacto
               tema={tema}
             />

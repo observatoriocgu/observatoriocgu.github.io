@@ -25,11 +25,16 @@ import {
   saiuDaCgu,
   urlDoAto,
 } from '../lib/painel';
-import { SeloFonte, SelosDaLinha } from './Selos';
+import {
+  SeloFonte,
+  SelosDaLinha,
+  rotuloDoLinkDeDestino,
+  tituloDoLinkDeDestino,
+} from './Selos';
 
 const TODOS = '';
 
-/** Quantas linhas renderizar de uma vez. 2.009 células vezes 13 colunas trava o navegador. */
+/** Quantas linhas renderizar de uma vez. 2.009 células vezes 14 colunas trava o navegador. */
 const PAGINA = 300;
 
 const normalizar = (valor: string) =>
@@ -53,12 +58,16 @@ const CORES_POR_SITUACAO: Record<string, string> = {
   'SAÍDA SEM ATO IDENTIFICADO': 'bg-yellow-100',
 };
 
-const Celula: React.FC<{ children?: React.ReactNode; alinhamento?: string; className?: string }> = ({
-  children,
-  alinhamento = 'text-center',
-  className = '',
-}) => (
-  <td className={`border border-black px-1 py-0.5 text-[10px] text-gray-700 ${alinhamento} ${className}`}>
+const Celula: React.FC<{
+  children?: React.ReactNode;
+  alinhamento?: string;
+  className?: string;
+  titulo?: string;
+}> = ({ children, alinhamento = 'text-center', className = '', titulo }) => (
+  <td
+    title={titulo}
+    className={`border border-black px-1 py-0.5 text-[10px] text-gray-700 ${alinhamento} ${className}`}
+  >
     {children}
   </td>
 );
@@ -251,6 +260,16 @@ const DetailedTableApp: React.FC = () => {
             <table className="w-full border-collapse border border-black text-[10px]">
               <thead className="sticky top-0 z-50 bg-white text-[10px] uppercase text-gray-700 shadow-sm">
                 <tr>
+                  {/* Duas afirmações, quatro colunas, e a ordem é a da leitura:
+                      a pessoa SAIU (quando, quem atesta, qual ato) e só então
+                      FOI para algum lugar (para onde, quem atesta, qual
+                      documento). Enquanto a procedência da saída ficava entre o
+                      órgão de destino e o ato, o selo `SIAPE` da saída parecia
+                      responder pelo destino — e o destino, que pode vir do
+                      ranking, parecia ter ato publicado. O motivo saiu de coluna
+                      própria porque a situação já o diz: `VACÂNCIA` ao lado de
+                      "Vacância (posse em outro cargo)" gastava uma coluna para
+                      repetir a mesma palavra. */}
                   {[
                     'Nome',
                     'Concurso',
@@ -260,11 +279,12 @@ const DetailedTableApp: React.FC = () => {
                     'Unidade',
                     'UF',
                     'Situação',
-                    'Motivo da saída',
-                    'Saída',
+                    'Data de saída',
+                    'Selo da saída',
+                    'Ato da saída',
                     'Órgão de destino',
-                    'Procedência',
-                    'Ato no DOU',
+                    'Selo do destino',
+                    'Ato do destino',
                   ].map((titulo) => (
                     <th key={titulo} className="border border-black bg-white px-1 py-1 text-center font-semibold">
                       {titulo}
@@ -275,21 +295,21 @@ const DetailedTableApp: React.FC = () => {
               <tbody className="divide-y divide-black">
                 {carregando && (
                   <tr>
-                    <td colSpan={13} className="border border-black px-4 py-6 text-center text-orange-600">
+                    <td colSpan={14} className="border border-black px-4 py-6 text-center text-orange-600">
                       Carregando dados...
                     </td>
                   </tr>
                 )}
                 {erro && (
                   <tr>
-                    <td colSpan={13} className="border border-black px-4 py-6 text-center text-red-700">
+                    <td colSpan={14} className="border border-black px-4 py-6 text-center text-red-700">
                       {erro}
                     </td>
                   </tr>
                 )}
                 {!carregando && !erro && visiveis.length === 0 && (
                   <tr>
-                    <td colSpan={13} className="border border-black px-4 py-6 text-center text-gray-500">
+                    <td colSpan={14} className="border border-black px-4 py-6 text-center text-gray-500">
                       Nenhum Auditor encontrado com estes filtros.
                     </td>
                   </tr>
@@ -311,7 +331,15 @@ const DetailedTableApp: React.FC = () => {
                       <Celula>{registro.MODALIDADE || '-'}</Celula>
                       <Celula>{registro.UNIDADE || '-'}</Celula>
                       <Celula>{registro.UF || '-'}</Celula>
-                      <Celula className="whitespace-nowrap">
+                      {/* A situação é o motivo dito em uma palavra — `VACÂNCIA` é
+                          "Vacância (posse em outro cargo)". O que a palavra deixa de
+                          fora vai no `title`, inclusive a demissão: esta é a única
+                          página com licença para nomeá-la (D18), e a coluna já
+                          mostrava `DEMITIDO`. */}
+                      <Celula
+                        className="whitespace-nowrap"
+                        titulo={saiu ? motivoDetalhado(registro) : undefined}
+                      >
                         {registro.SITUACAO || '-'}
                         {registro.SAIDA_PROVISORIA === 'SIM' && (
                           <span
@@ -322,38 +350,15 @@ const DetailedTableApp: React.FC = () => {
                           </span>
                         )}
                       </Celula>
-                      <Celula>{saiu ? motivoDetalhado(registro) : '-'}</Celula>
                       <Celula className="whitespace-nowrap">
                         {registro.MES_SAIDA ? formatarCompetenciaLonga(registro.MES_SAIDA) : '-'}
                       </Celula>
-                      {/* O destino tem procedência PRÓPRIA, e ela não é a da saída: a
-                          coluna "Procedência" ao lado atesta que a pessoa saiu, não para
-                          onde foi. Enquanto o destino só vinha do DOU dava para deduzir;
-                          desde a D24 ele pode vir do Ranking dos Concursos, que é indício
-                          e não ato — e Selos.tsx é explícito em que nenhuma afirmação
-                          sobre pessoa nomeada vai à tela sem dizer de onde veio. */}
-                      <Celula className="whitespace-nowrap">
-                        {registro.ORGAO_DESTINO ? (
-                          <>
-                            {registro.ORGAO_DESTINO}
-                            {registro.FONTE_DESTINO && (
-                              <span className="ml-1">
-                                <SeloFonte fonte={registro.FONTE_DESTINO} compacto tema="claro" />
-                              </span>
-                            )}
-                          </>
-                        ) : (
-                          '-'
-                        )}
-                      </Celula>
+                      {/* Quem atesta que a pessoa SAIU — e nada mais. Quem está na CGU
+                          não tem saída para sustentar, e por isso a célula fica vazia:
+                          um `SIAPE` aqui diria que existe uma saída atestada pelo
+                          cadastro onde não existe saída nenhuma. */}
                       <Celula>
-                        {saiu ? (
-                          <SelosDaLinha fontes={fontesDaSaida(registro)} compacto tema="claro" />
-                        ) : (
-                          <span title="Quem está na CGU vem direto do SIAPE; não há o que conferir contra o DOU.">
-                            SIAPE
-                          </span>
-                        )}
+                        {saiu ? <SelosDaLinha fontes={fontesDaSaida(registro)} compacto tema="claro" /> : '-'}
                       </Celula>
                       <Celula>
                         {ato ? (
@@ -365,6 +370,43 @@ const DetailedTableApp: React.FC = () => {
                             className="text-blue-700 underline hover:text-blue-900"
                           >
                             {formatarDataIsoParaBr(registro.DATA_PUBLICACAO_SAIDA) || 'ver ato'}
+                          </a>
+                        ) : (
+                          '-'
+                        )}
+                      </Celula>
+                      {/* O destino tem procedência PRÓPRIA, e ela não é a da saída: os
+                          selos da esquerda atestam que a pessoa saiu, não para onde foi.
+                          Enquanto o destino só vinha do DOU dava para deduzir; desde a
+                          D24 ele pode vir do Ranking dos Concursos, que é indício e não
+                          ato — e é por isso que o selo dele ganhou coluna própria, em vez
+                          de continuar colado ao nome do órgão. */}
+                      <Celula className="whitespace-nowrap">{registro.ORGAO_DESTINO || '-'}</Celula>
+                      <Celula>
+                        {registro.ORGAO_DESTINO && registro.FONTE_DESTINO ? (
+                          <SeloFonte fonte={registro.FONTE_DESTINO} compacto tema="claro" />
+                        ) : (
+                          '-'
+                        )}
+                      </Celula>
+                      {/* Nem todo destino tem ATO: o do ranking é a ficha de aprovações
+                          da pessoa, uma consulta que qualquer um repete no navegador. O
+                          rótulo sai de `Selos.tsx`, para que a tabela não chame de "ato"
+                          o que não é. */}
+                      <Celula>
+                        {registro.ORGAO_DESTINO && registro.URL_DESTINO ? (
+                          <a
+                            href={registro.URL_DESTINO}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            title={tituloDoLinkDeDestino(
+                              registro.FONTE_DESTINO,
+                              registro.NOME,
+                              registro.ORGAO_DESTINO
+                            )}
+                            className="text-blue-700 underline hover:text-blue-900"
+                          >
+                            {rotuloDoLinkDeDestino(registro.FONTE_DESTINO, registro.DATA_DESTINO)}
                           </a>
                         ) : (
                           '-'
@@ -393,11 +435,19 @@ const DetailedTableApp: React.FC = () => {
 
         <p className="mt-4 text-center text-xs text-gray-500">
           A especialidade vem do Edital CGU nº 5, de 13/06/2022, publicado no DOU; veteranos não têm edital de onde
-          tirá-la. O motivo e o destino vêm do ato do DOU, e a coluna &ldquo;Procedência&rdquo; diz, para cada linha,
-          quais fontes atestam a saída: <span className="font-medium">SIAPE</span> quando o cadastro mostra a pessoa
-          presente num mês e ausente no seguinte, <span className="font-medium">DOU</span> quando existe ato publicado.
-          As duas juntas são duas fontes independentes dizendo o mesmo; uma sozinha diz exatamente o que se sabe até
-          agora.
+          tirá-la. A situação resume o motivo da saída, como o ato do DOU o diz — passe o cursor sobre ela para ler o
+          motivo por extenso.
+        </p>
+        <p className="mx-auto mt-2 max-w-4xl text-center text-xs text-gray-500">
+          <span className="font-medium">Que a pessoa saiu</span> e{' '}
+          <span className="font-medium">para onde ela foi</span> são duas afirmações, e cada uma tem o seu selo e o seu
+          documento. O selo da saída é <span className="font-medium">SIAPE</span> quando o cadastro mostra a pessoa
+          presente num mês e ausente no seguinte, e <span className="font-medium">DOU</span> quando existe ato
+          publicado; os dois juntos são duas fontes independentes dizendo o mesmo, e um sozinho diz exatamente o que se
+          sabe até agora. O selo do destino é <span className="font-medium">DOU</span> quando existe ato de nomeação no
+          órgão de chegada, e <span className="font-medium">Ranking</span> quando o destino foi deduzido da única
+          aprovação em concurso que a pessoa tinha — aí o link abre a ficha de aprovações, e não um ato: é indício com
+          fonte, não fato publicado.
         </p>
 
         <footer className="mt-8 text-center text-sm text-gray-500">
