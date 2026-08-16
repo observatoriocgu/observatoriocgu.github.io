@@ -1,0 +1,18 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/*
+ * A fonte da página.
+ *
+ * Estava repetida num `<style>` dentro de cada um dos três HTML. Vem para cá
+ * junto com o Tailwind, porque agora existe uma folha de estilo de verdade e um
+ * lugar só para escrevê-la. O `<link>` do Google Fonts continua no HTML: ele é
+ * quem baixa a Inter, e precisa começar antes do JavaScript.
+ *
+ * Fica DEPOIS do `@tailwind base` de propósito. O Preflight declara a família no
+ * `html`; esta regra declara no `body`, que é mais perto de quem herda.
+ */
+body {
+  font-family: 'Inter', sans-serif;
+}

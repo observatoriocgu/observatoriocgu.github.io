@@ -161,8 +161,11 @@ const App: React.FC = () => {
   // === Recorte ===
   //
   // Os filtros valem para o gráfico de saídas mês a mês, e só para ele. A curva
-  // de permanência, as últimas saídas e os destinos respondem por toda a série
-  // — cada um explica isso no seu próprio texto.
+  // de permanência, as últimas saídas, os destinos e o top 10 respondem por toda
+  // a série. Quem diz isso agora é a DIAGRAMAÇÃO — o card dos filtros mora
+  // dentro da seção do gráfico —, e não quatro parágrafos de ressalva. Se algum
+  // dia estes filtros voltarem a ficar soltos entre seções, os quatro voltam a
+  // ser necessários: é a posição que os dispensa.
 
   const todasAsSaidas = useMemo(() => saidas(registros), [registros]);
 
@@ -511,7 +514,12 @@ const App: React.FC = () => {
             />
           </section>
 
-          <section className="mb-8">
+          {/* O gráfico e os filtros dentro da MESMA borda, porque é só ele que
+              eles recortam. Enquanto o card ficava solto entre seções, parecia
+              governar a página inteira, e cada uma das quatro seções seguintes
+              precisava de um parágrafo dizendo "não acompanha os filtros
+              acima". Os quatro sumiram junto com a ambiguidade que os criou. */}
+          <section className="mb-8 rounded-xl border border-gray-800 p-4">
             <h2 className="mb-1 text-lg font-semibold text-red-300">Saídas mês a mês</h2>
             <p className="mb-3 text-sm text-gray-400">
               Quantos Auditores deixaram a CGU em cada competência, no recorte escolhido abaixo. A série começa em
@@ -534,17 +542,18 @@ const App: React.FC = () => {
                 altura={340}
                 empilhar
                 maximoRotulosX={14}
+                descricao="Saídas mês a mês, por tipo de saída, no recorte escolhido"
               />
             ) : (
               semDados('Nenhuma saída neste recorte. Abra "Filtros", logo abaixo, e marque mais alguma caixinha.')
             )}
-          </section>
 
-          {/* Os filtros ficam DEPOIS do gráfico: quem chega vê primeiro o quadro
-              inteiro, e só então o recorta. Fechados por padrão, porque o recorte
-              que abre o painel já é o que interessa à maioria. Eles valem para o
-              gráfico acima, e só para ele. */}
-          <CardDeFiltros filtros={filtros} />
+            {/* Os filtros ficam DEPOIS do gráfico: quem chega vê primeiro o
+                quadro inteiro, e só então o recorta. Fechados por padrão,
+                porque o recorte que abre o painel já é o que interessa à
+                maioria. */}
+            <CardDeFiltros filtros={filtros} embutido />
+          </section>
 
           <section className="mb-8">
             <h2 className="mb-1 text-lg font-semibold text-red-300">Curva de permanência</h2>
@@ -554,10 +563,9 @@ const App: React.FC = () => {
               </span>{' '}
               Em cada competência do eixo, a conta é (entradas até aquele mês &minus; saídas até aquele mês) dividido
               pelas entradas até aquele mês — as duas pontas contadas por pessoa. O denominador cresce ao longo do
-              eixo, conforme novas turmas tomam posse.{' '}
-              <span className="text-gray-300">Esta curva não acompanha os filtros acima</span>: é sempre o concurso de
-              2021 inteiro. Recortá-la por tipo de saída transformaria quem saiu em alguém que ficou, e ela mentiria
-              para cima.
+              eixo, conforme novas turmas tomam posse. É sempre o{' '}
+              <span className="text-gray-300">concurso de 2021 inteiro</span>: recortá-la por tipo de saída
+              transformaria quem saiu em alguém que ficou, e ela mentiria para cima.
             </p>
             {!graficoPermanencia.vazio ? (
               <EvasionChart
@@ -569,6 +577,7 @@ const App: React.FC = () => {
                 maximoEixoEsquerda={100}
                 tituloEixoEsquerda="% ainda na CGU"
                 maximoRotulosX={14}
+                descricao="Curva de permanência: percentual do concurso de 2021 ainda na CGU, mês a mês"
               />
             ) : (
               semDados('Sem base suficiente para traçar a curva.')
@@ -582,10 +591,8 @@ const App: React.FC = () => {
           <section className="mb-8 rounded-xl border border-gray-800 bg-gray-900 p-4">
             <h2 className="mb-1 text-2xl font-bold text-amber-400">Últimas saídas registradas</h2>
             <p className="mb-3 text-sm text-gray-400">
-              As seis mais recentes de toda a série, concurso de 2021 e veteranos juntos.{' '}
-              <span className="text-gray-300">Não acompanha os filtros acima</span>: é o que acabou de acontecer, e
-              esconder uma saída porque a especialidade dela está desmarcada omitiria a notícia mais recente sem dizer
-              que omitiu.
+              As seis mais recentes de <span className="text-gray-300">toda a série</span>, concurso de 2021 e
+              veteranos juntos.
             </p>
             <p className="mb-3 text-sm text-gray-500">
               Os selos dizem quem atesta cada saída.{' '}
@@ -647,9 +654,8 @@ const App: React.FC = () => {
               sobra um concurso possível. Quem saiu há pouco costuma aparecer sem destino: a busca do órgão de chegada
               parte de quem o SIAPE já mostrou saindo, então ela vem depois. São{' '}
               <span className="font-bold text-orange-400">{numero(todasAsSaidas.length)}</span> saída
-              {todasAsSaidas.length === 1 ? '' : 's'} em toda a série, concurso de 2021 e veteranos juntos.{' '}
-              <span className="text-gray-300">Esta tabela não acompanha os filtros acima</span> — para recortar por
-              concurso ou por especialidade, use o{' '}
+              {todasAsSaidas.length === 1 ? '' : 's'} em <span className="text-gray-300">toda a série</span>, concurso
+              de 2021 e veteranos juntos — para recortar por concurso ou por especialidade, use o{' '}
               <a href="./historico_alteracoes.html" className="text-amber-400 hover:text-amber-300">
                 histórico de alterações
               </a>
@@ -680,8 +686,8 @@ const App: React.FC = () => {
                   .{' '}
                 </>
               ) : null}
-              <span className="text-gray-300">Esta tabela não acompanha os filtros acima</span> — ela é sempre o
-              concurso de 2021 inteiro, porque a pergunta que ela responde é se a evasão poupa quem passou na frente.
+              É sempre o <span className="text-gray-300">concurso de 2021 inteiro</span>, porque a pergunta que ela
+              responde é se a evasão poupa quem passou na frente.
             </p>
             {aprovados.length === 0 ? (
               <div className="text-sm text-gray-400">

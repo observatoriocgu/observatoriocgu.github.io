@@ -167,6 +167,15 @@ interface CardDeFiltrosProps {
   children?: React.ReactNode;
   /** O que acrescentar ao resumo do card fechado por causa do quarto grupo. */
   resumoExtra?: string;
+  /**
+   * Dentro da seção que os filtros governam, e não solto entre seções.
+   *
+   * Muda só o espaçamento: embutido, o card se encosta no que está ACIMA dele
+   * (o gráfico que ele recorta) em vez de se afastar do que vem DEPOIS. É o que
+   * o dashboard usa; o histórico, onde o filtro é a ferramenta principal da
+   * página e não o ajuste de um gráfico, continua solto.
+   */
+  embutido?: boolean;
 }
 
 /**
@@ -176,10 +185,19 @@ interface CardDeFiltrosProps {
  * nosso. O resumo ao lado do título existe para que fechado não vire opaco —
  * dá para saber o que está aplicado sem abrir.
  */
-const CardDeFiltros: React.FC<CardDeFiltrosProps> = ({ filtros, aberto = false, children, resumoExtra }) => {
+const CardDeFiltros: React.FC<CardDeFiltrosProps> = ({
+  filtros,
+  aberto = false,
+  children,
+  resumoExtra,
+  embutido = false,
+}) => {
   const resumo = [filtros.resumo, resumoExtra].filter(Boolean).join(' · ');
   return (
-    <details open={aberto} className="group mb-8 rounded-xl border border-gray-800 bg-gray-900/60">
+    <details
+      open={aberto}
+      className={`group rounded-xl border border-gray-800 bg-gray-900/60 ${embutido ? 'mt-4' : 'mb-8'}`}
+    >
       <summary className="flex cursor-pointer list-none items-center gap-2 p-5 text-sm font-semibold text-gray-200 [&::-webkit-details-marker]:hidden">
         <svg
           aria-hidden="true"

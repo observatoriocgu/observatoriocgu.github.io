@@ -62,7 +62,66 @@ interface EvasionChartProps {
   maximoEixoEsquerda?: number;
   /** Quantos rótulos de x mostrar no máximo; o resto o Chart.js pula. */
   maximoRotulosX?: number;
+  /**
+   * Como o gráfico se chama, para a tabela que o acompanha. Ver `TabelaDaSerie`.
+   */
+  descricao?: string;
 }
+
+/**
+ * A mesma série, em tabela, visível só para quem lê por leitor de tela.
+ *
+ * O gráfico é um `<canvas>`: para quem não o enxerga ele é um retângulo, e os
+ * números só existiam dentro do tooltip, que exige apontar o mouse para uma
+ * barra. A tabela é a mesma informação por outro caminho — e não custa dado
+ * nenhum a mais, porque a série já está montada em `series[].valores`.
+ *
+ * O `<canvas>` fica `aria-hidden`, senão o leitor anuncia as duas coisas.
+ */
+const TabelaDaSerie: React.FC<{
+  rotulos: string[];
+  rotulosCompletos?: string[];
+  series: SerieGrafico[];
+  descricao?: string;
+}> = ({ rotulos, rotulosCompletos, series, descricao }) => (
+  // O `sr-only` vai na DIV, e não na tabela. Ele esconde encolhendo a caixa para
+  // 1x1 e recortando o resto, e `<table>` trata `height` como MÍNIMO: a tabela
+  // cresce até caber o conteúdo, ignora o recorte e, mesmo invisível, estica a
+  // área rolável da página — 1.324 px de vão embaixo de cada gráfico. Numa `div`
+  // a altura vale, e o que passa dela fica escondido.
+  <div className="sr-only">
+    <table>
+      <caption>{descricao ?? 'Os números do gráfico acima'}</caption>
+      <thead>
+        <tr>
+          <th scope="col">Competência</th>
+          {series.map((serie) => (
+            <th key={serie.rotulo} scope="col">
+              {serie.rotulo}
+            </th>
+          ))}
+        </tr>
+      </thead>
+      <tbody>
+        {rotulos.map((rotulo, indice) => (
+          <tr key={rotulo}>
+            <th scope="row">{rotulosCompletos?.[indice] ?? rotulo}</th>
+            {series.map((serie) => {
+              const valor = serie.valores[indice];
+              // `null` é buraco na série, e não zero: dizer "0" aqui afirmaria
+              // que ninguém saiu num mês que o gráfico deixa em branco de propósito.
+              return (
+                <td key={serie.rotulo}>
+                  {valor === null || valor === undefined ? 'sem dado' : `${valor}${serie.sufixo ?? ''}`}
+                </td>
+              );
+            })}
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  </div>
+);
 
 /** Quantas linhas de detalhe cabem num tooltip antes de virar parede de texto. */
 const LIMITE_DETALHES = 10;
@@ -77,6 +136,7 @@ const EvasionChart: React.FC<EvasionChartProps> = ({
   eixoEsquerdaComZero = true,
   maximoEixoEsquerda,
   maximoRotulosX,
+  descricao,
 }) => {
   const datasets = series.map((serie) => {
     const ehLinha = serie.tipo === 'linha';
@@ -172,9 +232,21 @@ const EvasionChart: React.FC<EvasionChartProps> = ({
   };
 
   return (
-    <div style={{ width: '100%', height: altura }} className="bg-gray-900/50 rounded border border-gray-800 p-2">
-      <Chart type="bar" data={{ labels: rotulos, datasets }} options={opcoes} />
-    </div>
+    <>
+      <div
+        style={{ width: '100%', height: altura }}
+        className="bg-gray-900/50 rounded border border-gray-800 p-2"
+        aria-hidden="true"
+      >
+        <Chart type="bar" data={{ labels: rotulos, datasets }} options={opcoes} />
+      </div>
+      <TabelaDaSerie
+        rotulos={rotulos}
+        rotulosCompletos={rotulosCompletos}
+        series={series}
+        descricao={descricao}
+      />
+    </>
   );
 };
 

@@ -289,6 +289,18 @@ Edital CGU nº 5 de 13/06/2022, publicado no DOU (D17).
 - Scripts Python são STDLIB ONLY: o CI não roda pip install, e requests/bs4/
   pandas não estão instalados. Usar urllib + fallback curl, como os crawlers
   atuais já fazem
+- O CSS do Tailwind SAI DO BUILD (v3, `tailwind.config.js` + `estilos.css`), e
+  não mais do Play CDN `cdn.tailwindcss.com`, que compilava as classes no
+  navegador a cada visita. A consequência é que quem varre o código agora é o
+  build: classe que o `content` não alcança NÃO GANHA REGRA e some da tela sem
+  erro nenhum. Ao criar pasta nova com componente, acrescentá-la ao `content`.
+  Nome de classe NUNCA pode ser montado por interpolação (`bg-${cor}-100`): o
+  varredor lê o texto cru do arquivo, não o AST — interpolar strings de classe
+  INTEIRAS continua valendo. A versão é a 3 de propósito: a 4 muda padrões que a
+  tela usa sem declarar (cor de borda, largura do `ring`, nome do `shadow-sm`)
+- `sr-only` não funciona aplicado a `<table>`: ele esconde encolhendo a caixa
+  para 1x1, e tabela trata `height` como MÍNIMO — cresce até caber o conteúdo e,
+  mesmo invisível, estica a área rolável da página. Vai numa `div` em volta
 - A matrícula do Portal vem mascarada em 7 posições COM zero à esquerda
   ("014****"); o DOU escreve o SIAPE SEM ele ("149262"). Comparar sempre com
   zfill(7), senão o ato certo é descartado como se fosse de homônimo

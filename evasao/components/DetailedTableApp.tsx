@@ -63,6 +63,193 @@ const Celula: React.FC<{ children?: React.ReactNode; alinhamento?: string; class
   </td>
 );
 
+interface Coluna {
+  chave: string;
+  titulo: string;
+  /**
+   * O conteúdo da coluna como TEXTO. É o que ordena, é o que vai para o CSV e,
+   * quando não há `celula`, é o que aparece na tela. Devolve vazio — e não "-" —
+   * quando não há dado: o traço é decoração da tela, e ordenar por ele poria as
+   * lacunas no meio da lista, em vez de no fim.
+   */
+  valor: (registro: RegistroAuditor) => string;
+  /** Ordena como número, e não como texto ("10" antes de "9"). */
+  numerica?: boolean;
+  /** O que a tela mostra, quando é mais que o texto de `valor`. */
+  celula?: (registro: RegistroAuditor) => React.ReactNode;
+  /** O que o CSV leva, quando é mais útil que o texto de `valor`. */
+  exportar?: (registro: RegistroAuditor) => string;
+  alinhamento?: string;
+  classe?: string;
+}
+
+/**
+ * As colunas, em UMA definição.
+ *
+ * Cabeçalho, célula, ordenação e exportação saem todos daqui. Havia antes uma
+ * lista de títulos no `<thead>` e outra de células no `<tbody>`, e foi assim que
+ * a Especialidade passou a mentir: a célula lia `registro.AREA` cru enquanto o
+ * filtro do topo usava `areaDe`, então filtrar por "Veterano" devolvia um punhado
+ * de linhas cuja coluna Especialidade dizia "-". Com uma definição só, a coluna e
+ * o filtro não têm como divergir de novo.
+ */
+const COLUNAS: readonly Coluna[] = [
+  {
+    chave: 'nome',
+    titulo: 'Nome',
+    valor: (r) => r.NOME,
+    alinhamento: 'text-left',
+    classe: 'font-medium text-gray-900',
+  },
+  { chave: 'concurso', titulo: 'Concurso', valor: (r) => rotuloDoConcurso(r.CONCURSO) },
+  // `areaDe`, e não `r.AREA`: é o mesmo que o filtro de Especialidade usa, e é
+  // ele que sabe que quem não tem área no edital é veterano, não é lacuna.
+  { chave: 'area', titulo: 'Especialidade', valor: areaDe },
+  { chave: 'posicao', titulo: 'Class.', valor: (r) => r.POSICAO_CONCURSO, numerica: true },
+  { chave: 'modalidade', titulo: 'Modalidade', valor: (r) => r.MODALIDADE },
+  { chave: 'unidade', titulo: 'Unidade', valor: (r) => r.UNIDADE },
+  { chave: 'uf', titulo: 'UF', valor: (r) => r.UF },
+  {
+    chave: 'situacao',
+    titulo: 'Situação',
+    valor: (r) => r.SITUACAO,
+    classe: 'whitespace-nowrap',
+    celula: (r) => (
+      <>
+        {r.SITUACAO || '-'}
+        {r.SAIDA_PROVISORIA === 'SIM' && (
+          <span
+            title="Ausência observada uma única vez. Só vira saída quando o mês seguinte confirmar."
+            className="ml-1 rounded border border-orange-500 bg-orange-100 px-1 text-[9px] text-orange-800"
+          >
+            provisória
+          </span>
+        )}
+      </>
+    ),
+  },
+  {
+    chave: 'motivo',
+    titulo: 'Motivo da saída',
+    // `motivoDetalhado`, e não `motivoDe`: esta é a única página que nomeia o
+    // motivo da D18, e a coluna tem de casar com o filtro do topo.
+    valor: (r) => (saiuDaCgu(r) ? motivoDetalhado(r) : ''),
+  },
+  {
+    chave: 'saida',
+    titulo: 'Saída',
+    // Ordena pela competência crua (`AAAAMM`), que é comparável como texto; a
+    // tela é que a escreve por extenso.
+    valor: (r) => r.MES_SAIDA,
+    classe: 'whitespace-nowrap',
+    celula: (r) => (r.MES_SAIDA ? formatarCompetenciaLonga(r.MES_SAIDA) : '-'),
+    exportar: (r) => (r.MES_SAIDA ? formatarCompetenciaLonga(r.MES_SAIDA) : ''),
+  },
+  {
+    chave: 'destino',
+    titulo: 'Órgão de destino',
+    valor: (r) => r.ORGAO_DESTINO,
+    classe: 'whitespace-nowrap',
+    /* O destino tem procedência PRÓPRIA, e ela não é a da saída: a coluna
+       "Procedência" ao lado atesta que a pessoa saiu, não para onde foi.
+       Enquanto o destino só vinha do DOU dava para deduzir; desde a D24 ele pode
+       vir do Ranking dos Concursos, que é indício e não ato — e Selos.tsx é
+       explícito em que nenhuma afirmação sobre pessoa nomeada vai à tela sem
+       dizer de onde veio. */
+    celula: (r) =>
+      r.ORGAO_DESTINO ? (
+        <>
+          {r.ORGAO_DESTINO}
+          {r.FONTE_DESTINO && (
+            <span className="ml-1">
+              <SeloFonte fonte={r.FONTE_DESTINO} compacto tema="claro" />
+            </span>
+          )}
+        </>
+      ) : (
+        '-'
+      ),
+    // No CSV o selo não cabe, mas a fonte não pode sumir: destino sem
+    // procedência é justamente o que este observatório não publica.
+    exportar: (r) => (r.ORGAO_DESTINO ? `${r.ORGAO_DESTINO}${r.FONTE_DESTINO ? ` (${r.FONTE_DESTINO})` : ''}` : ''),
+  },
+  {
+    chave: 'procedencia',
+    titulo: 'Procedência',
+    valor: (r) => (saiuDaCgu(r) ? fontesDaSaida(r).join(' + ') : 'SIAPE'),
+    celula: (r) =>
+      saiuDaCgu(r) ? (
+        <SelosDaLinha fontes={fontesDaSaida(r)} compacto tema="claro" />
+      ) : (
+        <span title="Quem está na CGU vem direto do SIAPE; não há o que conferir contra o DOU.">SIAPE</span>
+      ),
+  },
+  {
+    chave: 'ato',
+    titulo: 'Ato no DOU',
+    // Ordena pela data ISO, que é comparável como texto — a tela mostra a data
+    // no formato brasileiro, que não é.
+    valor: (r) => r.DATA_PUBLICACAO_SAIDA,
+    celula: (r) => {
+      const ato = urlDoAto(r);
+      return ato ? (
+        <a
+          href={ato}
+          target="_blank"
+          rel="noopener noreferrer"
+          title={r.ATO_SAIDA_TITULO}
+          className="text-blue-700 underline hover:text-blue-900"
+        >
+          {formatarDataIsoParaBr(r.DATA_PUBLICACAO_SAIDA) || 'ver ato'}
+        </a>
+      ) : (
+        '-'
+      );
+    },
+    // No CSV vai o ENDEREÇO, não a data: a data se lê na coluna "Saída" ao lado,
+    // e o link é a única coisa da tabela que não dá para reconstruir de fora.
+    //
+    // ABSOLUTO, e não o que a tela usa. `urlDoAto` prefere a cópia arquivada em
+    // `data/saidas_dou/`, e a devolve como caminho RELATIVO — o que na página
+    // resolve sozinho e, numa planilha aberta fora do navegador, não leva a lugar
+    // nenhum. `new URL(..., location.href)` completa o relativo e deixa o
+    // absoluto (o `in.gov.br` de quem não tem cópia local) como está.
+    exportar: (r) => {
+      const ato = urlDoAto(r);
+      return ato ? new URL(ato, location.href).href : '';
+    },
+  },
+];
+
+/**
+ * O byte-order mark que abre o CSV exportado.
+ *
+ * Vai por código, e não como o caractere em si: ele não tem desenho nenhum, e um
+ * caractere invisível no meio de uma string é o tipo de coisa que o próximo
+ * editor apaga sem perceber — e aí o acento quebra só para quem abrir no Excel.
+ */
+const MARCA_DE_ORDEM = String.fromCharCode(0xfeff);
+
+type Direcao = 'asc' | 'desc';
+
+/**
+ * Comparador de uma coluna.
+ *
+ * Vazio vai SEMPRE para o fim, nos dois sentidos. Ele não é "o menor valor": é
+ * ausência de valor, e inverter a ordem só para chegar à primeira linha
+ * preenchida seria gastar dois cliques com o que a coluna nem tem.
+ */
+const compararPor = (coluna: Coluna, direcao: Direcao) => (a: RegistroAuditor, b: RegistroAuditor) => {
+  const valorA = coluna.valor(a);
+  const valorB = coluna.valor(b);
+  if (!valorA && !valorB) return 0;
+  if (!valorA) return 1;
+  if (!valorB) return -1;
+  const sinal = direcao === 'asc' ? 1 : -1;
+  if (coluna.numerica) return sinal * (Number(valorA) - Number(valorB));
+  return sinal * valorA.localeCompare(valorB, 'pt-BR');
+};
+
 const DetailedTableApp: React.FC = () => {
   const [registros, setRegistros] = useState<RegistroAuditor[]>([]);
   const [carregando, setCarregando] = useState(true);
@@ -75,6 +262,8 @@ const DetailedTableApp: React.FC = () => {
   const [motivo, setMotivo] = useState<string>(TODOS);
   const [situacao, setSituacao] = useState<string>(TODOS);
   const [limite, setLimite] = useState(PAGINA);
+  /** `null` é a ordem padrão da página — quem saiu por último no topo. */
+  const [ordem, setOrdem] = useState<{ chave: string; direcao: Direcao } | null>(null);
 
   useEffect(() => {
     let montado = true;
@@ -163,9 +352,27 @@ const DetailedTableApp: React.FC = () => {
       });
   }, [registros, busca, concurso, area, unidade, situacao, motivo]);
 
+  /**
+   * O recorte na ordem escolhida.
+   *
+   * Ordena o RECORTE INTEIRO, e não as linhas à vista: a tabela renderiza 300 por
+   * vez, e ordenar depois de cortar só reorganizaria a primeira página — quem
+   * clicasse em "Class." veria o primeiro colocado das 300, não do recorte.
+   *
+   * O `sort` do JavaScript é estável, então o desempate herda a ordem padrão:
+   * ordenar por Unidade agrupa por unidade e, dentro de cada uma, mantém quem
+   * saiu por último no topo.
+   */
+  const ordenados = useMemo(() => {
+    if (!ordem) return filtrados;
+    const coluna = COLUNAS.find((c) => c.chave === ordem.chave);
+    if (!coluna) return filtrados;
+    return [...filtrados].sort(compararPor(coluna, ordem.direcao));
+  }, [filtrados, ordem]);
+
   useEffect(() => setLimite(PAGINA), [busca, concurso, area, unidade, situacao, motivo]);
 
-  const visiveis = filtrados.slice(0, limite);
+  const visiveis = ordenados.slice(0, limite);
   // Saída atestada pelas DUAS fontes: o cadastro mostra a ausência e existe ato
   // publicado dizendo por quê. É o número que responde "quanto disto está
   // documentado em dobro" — que era o que o antigo "conferido" tentava dizer, e
@@ -173,6 +380,40 @@ const DetailedTableApp: React.FC = () => {
   const comDuasFontes = filtrados.filter(
     (registro) => saiuDaCgu(registro) && registro.FONTE_MOTIVO
   ).length;
+
+  /** Primeiro clique ordena crescente; o segundo inverte; o terceiro devolve a ordem padrão. */
+  const alternarOrdem = (chave: string) =>
+    setOrdem((atual) => {
+      if (atual?.chave !== chave) return { chave, direcao: 'asc' };
+      return atual.direcao === 'asc' ? { chave, direcao: 'desc' } : null;
+    });
+
+  /**
+   * Baixa o recorte inteiro em CSV.
+   *
+   * Sai `ordenados`, e não `visiveis`: o arquivo tem de ser o recorte que os
+   * filtros descrevem, e não o pedaço que o botão "Mostrar mais" já carregou.
+   *
+   * Separador `;` e BOM no começo por causa do Excel em português: com vírgula
+   * ele joga a linha toda numa célula, e sem o BOM lê o arquivo como Latin-1 e
+   * escreve "VACÂNCIA" errado. O Google Sheets detecta os dois sozinho.
+   */
+  const baixarCsv = () => {
+    const escapar = (valor: string) => `"${String(valor ?? '').replaceAll('"', '""')}"`;
+    const linhas = [
+      COLUNAS.map((coluna) => escapar(coluna.titulo)).join(';'),
+      ...ordenados.map((registro) =>
+        COLUNAS.map((coluna) => escapar((coluna.exportar ?? coluna.valor)(registro))).join(';')
+      ),
+    ];
+    const blob = new Blob([MARCA_DE_ORDEM + linhas.join('\r\n')], { type: 'text/csv;charset=utf-8' });
+    const endereco = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = endereco;
+    link.download = `auditores-cgu-${new Date().toISOString().slice(0, 10)}.csv`;
+    link.click();
+    URL.revokeObjectURL(endereco);
+  };
 
   const seletor = (
     rotulo: string,
@@ -235,6 +476,17 @@ const DetailedTableApp: React.FC = () => {
           {seletor('Situação', situacao, setSituacao, situacoes, 'Todas')}
           {seletor('Motivo da saída', motivo, setMotivo, motivos, 'Todos')}
 
+          {/* O número no rótulo é o do recorte inteiro, e não o das linhas à
+              vista: é o que o arquivo vai conter, e dizê-lo aqui evita a dúvida
+              de quem ainda não clicou em "Mostrar mais". */}
+          <button
+            type="button"
+            onClick={baixarCsv}
+            disabled={ordenados.length === 0}
+            className="rounded border border-gray-300 bg-white px-3 py-1 text-xs font-medium text-gray-700 shadow-sm transition-colors hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            Baixar este recorte em CSV ({ordenados.length.toLocaleString('pt-BR')})
+          </button>
         </div>
 
         {!carregando && !erro && (
@@ -242,7 +494,7 @@ const DetailedTableApp: React.FC = () => {
             {filtrados.length.toLocaleString('pt-BR')} Auditor(es) neste recorte ·{' '}
             {filtrados.filter(saiuDaCgu).length.toLocaleString('pt-BR')} já saíram ·{' '}
             {comDuasFontes.toLocaleString('pt-BR')} com saída atestada pelo SIAPE e pelo DOU
-            {visiveis.length < filtrados.length && ` · mostrando ${visiveis.length.toLocaleString('pt-BR')}`}
+            {visiveis.length < ordenados.length && ` · mostrando ${visiveis.length.toLocaleString('pt-BR')}`}
           </div>
         )}
 
@@ -251,153 +503,95 @@ const DetailedTableApp: React.FC = () => {
             <table className="w-full border-collapse border border-black text-[10px]">
               <thead className="sticky top-0 z-50 bg-white text-[10px] uppercase text-gray-700 shadow-sm">
                 <tr>
-                  {[
-                    'Nome',
-                    'Concurso',
-                    'Especialidade',
-                    'Class.',
-                    'Modalidade',
-                    'Unidade',
-                    'UF',
-                    'Situação',
-                    'Motivo da saída',
-                    'Saída',
-                    'Órgão de destino',
-                    'Procedência',
-                    'Ato no DOU',
-                  ].map((titulo) => (
-                    <th key={titulo} className="border border-black bg-white px-1 py-1 text-center font-semibold">
-                      {titulo}
-                    </th>
-                  ))}
+                  {COLUNAS.map((coluna) => {
+                    const ativa = ordem?.chave === coluna.chave;
+                    return (
+                      <th
+                        key={coluna.chave}
+                        scope="col"
+                        aria-sort={ativa ? (ordem.direcao === 'asc' ? 'ascending' : 'descending') : 'none'}
+                        className="border border-black bg-white p-0 text-center font-semibold"
+                      >
+                        <button
+                          type="button"
+                          onClick={() => alternarOrdem(coluna.chave)}
+                          title={
+                            ativa && ordem.direcao === 'desc'
+                              ? `Voltar à ordem padrão (saída mais recente primeiro)`
+                              : `Ordenar por ${coluna.titulo}`
+                          }
+                          className="flex w-full items-center justify-center gap-1 px-1 py-1 uppercase hover:bg-gray-100 focus:outline-none focus:ring-1 focus:ring-inset focus:ring-red-400"
+                        >
+                          {coluna.titulo}
+                          <span aria-hidden="true" className={ativa ? 'text-red-600' : 'text-gray-300'}>
+                            {ativa ? (ordem.direcao === 'asc' ? '▲' : '▼') : '↕'}
+                          </span>
+                        </button>
+                      </th>
+                    );
+                  })}
                 </tr>
               </thead>
               <tbody className="divide-y divide-black">
                 {carregando && (
                   <tr>
-                    <td colSpan={13} className="border border-black px-4 py-6 text-center text-orange-600">
+                    <td colSpan={COLUNAS.length} className="border border-black px-4 py-6 text-center text-orange-600">
                       Carregando dados...
                     </td>
                   </tr>
                 )}
                 {erro && (
                   <tr>
-                    <td colSpan={13} className="border border-black px-4 py-6 text-center text-red-700">
+                    <td colSpan={COLUNAS.length} className="border border-black px-4 py-6 text-center text-red-700">
                       {erro}
                     </td>
                   </tr>
                 )}
                 {!carregando && !erro && visiveis.length === 0 && (
                   <tr>
-                    <td colSpan={13} className="border border-black px-4 py-6 text-center text-gray-500">
+                    <td colSpan={COLUNAS.length} className="border border-black px-4 py-6 text-center text-gray-500">
                       Nenhum Auditor encontrado com estes filtros.
                     </td>
                   </tr>
                 )}
-                {visiveis.map((registro) => {
-                  const saiu = saiuDaCgu(registro);
-                  const ato = urlDoAto(registro);
-                  return (
-                    <tr
-                      key={registro.ID_SERVIDOR_PORTAL}
-                      className={`${CORES_POR_SITUACAO[registro.SITUACAO] ?? 'bg-white'} transition-all duration-150 hover:brightness-95`}
-                    >
-                      <Celula alinhamento="text-left" className="font-medium text-gray-900">
-                        {registro.NOME || '-'}
+                {visiveis.map((registro) => (
+                  <tr
+                    key={registro.ID_SERVIDOR_PORTAL}
+                    className={`${CORES_POR_SITUACAO[registro.SITUACAO] ?? 'bg-white'} transition-all duration-150 hover:brightness-95`}
+                  >
+                    {COLUNAS.map((coluna) => (
+                      <Celula key={coluna.chave} alinhamento={coluna.alinhamento} className={coluna.classe}>
+                        {coluna.celula ? coluna.celula(registro) : coluna.valor(registro) || '-'}
                       </Celula>
-                      <Celula>{rotuloDoConcurso(registro.CONCURSO)}</Celula>
-                      <Celula>{registro.AREA || '-'}</Celula>
-                      <Celula>{registro.POSICAO_CONCURSO || '-'}</Celula>
-                      <Celula>{registro.MODALIDADE || '-'}</Celula>
-                      <Celula>{registro.UNIDADE || '-'}</Celula>
-                      <Celula>{registro.UF || '-'}</Celula>
-                      <Celula className="whitespace-nowrap">
-                        {registro.SITUACAO || '-'}
-                        {registro.SAIDA_PROVISORIA === 'SIM' && (
-                          <span
-                            title="Ausência observada uma única vez. Só vira saída quando o mês seguinte confirmar."
-                            className="ml-1 rounded border border-orange-500 bg-orange-100 px-1 text-[9px] text-orange-800"
-                          >
-                            provisória
-                          </span>
-                        )}
-                      </Celula>
-                      <Celula>{saiu ? motivoDetalhado(registro) : '-'}</Celula>
-                      <Celula className="whitespace-nowrap">
-                        {registro.MES_SAIDA ? formatarCompetenciaLonga(registro.MES_SAIDA) : '-'}
-                      </Celula>
-                      {/* O destino tem procedência PRÓPRIA, e ela não é a da saída: a
-                          coluna "Procedência" ao lado atesta que a pessoa saiu, não para
-                          onde foi. Enquanto o destino só vinha do DOU dava para deduzir;
-                          desde a D24 ele pode vir do Ranking dos Concursos, que é indício
-                          e não ato — e Selos.tsx é explícito em que nenhuma afirmação
-                          sobre pessoa nomeada vai à tela sem dizer de onde veio. */}
-                      <Celula className="whitespace-nowrap">
-                        {registro.ORGAO_DESTINO ? (
-                          <>
-                            {registro.ORGAO_DESTINO}
-                            {registro.FONTE_DESTINO && (
-                              <span className="ml-1">
-                                <SeloFonte fonte={registro.FONTE_DESTINO} compacto tema="claro" />
-                              </span>
-                            )}
-                          </>
-                        ) : (
-                          '-'
-                        )}
-                      </Celula>
-                      <Celula>
-                        {saiu ? (
-                          <SelosDaLinha fontes={fontesDaSaida(registro)} compacto tema="claro" />
-                        ) : (
-                          <span title="Quem está na CGU vem direto do SIAPE; não há o que conferir contra o DOU.">
-                            SIAPE
-                          </span>
-                        )}
-                      </Celula>
-                      <Celula>
-                        {ato ? (
-                          <a
-                            href={ato}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            title={registro.ATO_SAIDA_TITULO}
-                            className="text-blue-700 underline hover:text-blue-900"
-                          >
-                            {formatarDataIsoParaBr(registro.DATA_PUBLICACAO_SAIDA) || 'ver ato'}
-                          </a>
-                        ) : (
-                          '-'
-                        )}
-                      </Celula>
-                    </tr>
-                  );
-                })}
+                    ))}
+                  </tr>
+                ))}
               </tbody>
             </table>
           </div>
         </div>
 
-        {visiveis.length < filtrados.length && (
+        {visiveis.length < ordenados.length && (
           <div className="mt-3 text-center">
             <button
               type="button"
               onClick={() => setLimite((atual) => atual + PAGINA)}
               className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-100"
             >
-              Mostrar mais {Math.min(PAGINA, filtrados.length - visiveis.length)} de{' '}
-              {(filtrados.length - visiveis.length).toLocaleString('pt-BR')} restantes
+              Mostrar mais {Math.min(PAGINA, ordenados.length - visiveis.length)} de{' '}
+              {(ordenados.length - visiveis.length).toLocaleString('pt-BR')} restantes
             </button>
           </div>
         )}
 
         <p className="mt-4 text-center text-xs text-gray-500">
-          A especialidade vem do Edital CGU nº 5, de 13/06/2022, publicado no DOU; veteranos não têm edital de onde
-          tirá-la. O motivo e o destino vêm do ato do DOU, e a coluna &ldquo;Procedência&rdquo; diz, para cada linha,
-          quais fontes atestam a saída: <span className="font-medium">SIAPE</span> quando o cadastro mostra a pessoa
-          presente num mês e ausente no seguinte, <span className="font-medium">DOU</span> quando existe ato publicado.
-          As duas juntas são duas fontes independentes dizendo o mesmo; uma sozinha diz exatamente o que se sabe até
-          agora.
+          Clicar no título de uma coluna ordena o recorte inteiro, e não só as linhas já carregadas; clicar de novo
+          inverte, e a terceira vez devolve a ordem padrão. A especialidade vem do Edital CGU nº 5, de 13/06/2022,
+          publicado no DOU; veteranos não têm edital de onde tirá-la. O motivo e o destino vêm do ato do DOU, e a
+          coluna &ldquo;Procedência&rdquo; diz, para cada linha, quais fontes atestam a saída:{' '}
+          <span className="font-medium">SIAPE</span> quando o cadastro mostra a pessoa presente num mês e ausente no
+          seguinte, <span className="font-medium">DOU</span> quando existe ato publicado. As duas juntas são duas
+          fontes independentes dizendo o mesmo; uma sozinha diz exatamente o que se sabe até agora.
         </p>
 
         <footer className="mt-8 text-center text-sm text-gray-500">

@@ -60,7 +60,7 @@ const CollaborationForm: React.FC = () => {
             name="message"
             required
             rows={4}
-            className="w-full px-3 py-2 rounded-lg border border-gray-700 bg-gray-800 text-gray-100 placeholder-gray-500 focus:ring-2 focus:ring-red-500 focus:border-red-500 transition-colors resize-vertical caret-red-500"
+            className="w-full px-3 py-2 rounded-lg border border-gray-700 bg-gray-800 text-gray-100 placeholder-gray-500 focus:ring-2 focus:ring-red-500 focus:border-red-500 transition-colors resize-y caret-red-500"
             placeholder="Descreva as informações que deseja compartilhar ou a mensagem que deseja enviar..."
           />
         </div>
