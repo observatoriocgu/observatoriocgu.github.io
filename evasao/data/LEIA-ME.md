@@ -8,7 +8,7 @@
 | Arquivo | Como nasce | Editar à mão? |
 |---|---|---|
 | `historico_transparencia_cgu/` | download do Portal + `filtrar_affc.py` | não (fora do git) |
-| `historico_mensal.csv` | `construir_painel.py` — 88.421 linhas, base consolidada (D16) | **não** |
+| `historico_transparencia_cgu/historico_mensal.csv` | `construir_painel.py` — os snapshots empilhados, 88.421 linhas | não (fora do git) |
 | `dados.csv` | `construir_painel.py` — uma linha por Auditor | **não** |
 | `serie_mensal.csv` | `construir_painel.py` — uma linha por competência | **não** |
 | `concurso_2021.csv` | `concurso.py` — resultado final do DOU (D17) + os sub judice | **não** |
@@ -23,6 +23,14 @@
 
 Precedência no merge: **curadoria > DOU > ranking > concurso > SIAPE**. Qualquer
 campo preenchido no `curadoria.csv` vence.
+
+O `historico_mensal.csv` mora **junto dos snapshots**, e não aqui, porque é deles
+que ele é feito — os 49 empilhados, uma linha por (competência × pessoa). Ele não
+é lido por ninguém: o `construir_painel.py` o escreve, mas `dados.csv` e
+`serie_mensal.csv` saem dos snapshots, não dele, e nenhuma tela o carrega. Serve
+para auditar a série à mão, e é regenerável a qualquer momento com
+`python scripts/construir_painel.py`. Versionado, custava 20,7 MB reescritos a
+cada competência e ainda subia para o site publicado.
 
 O `destinos_ranking.csv` é o único destes que **não** entra no `dados.csv`: ele é
 lido direto pelo navegador, como o `atos_dou.json`, e pelo mesmo motivo (o
@@ -156,10 +164,10 @@ Não é erro de nenhum dos dois. São dois relógios:
 Enquanto o Portal não alcança, o nome de quem saiu é lido do **texto do próprio
 ato** (`dou.nome_do_ato`) e a saída é **sobreposta ao registro da pessoa**, que
 já está no `dados.csv` — ativa. Por isso ela conta **em tudo** (**D22**): cards,
-gráficos, curva de permanência, destinos, tabela detalhada, histórico e
-relatório impresso, com concurso, área e unidade de verdade, respondendo aos
-filtros como qualquer outra. O que a distingue na tela é o selo: `DOU` sozinho
-até o cadastro alcançar o mês.
+gráficos, curva de permanência, destinos, tabela detalhada e histórico, com
+concurso, área e unidade de verdade, respondendo aos filtros como qualquer
+outra. O que a distingue na tela é o selo: `DOU` sozinho até o cadastro alcançar
+o mês.
 
 Contar ato **como se fosse pessoa** é que seria errado duas vezes — uma pessoa
 pode ter dois atos, e um ato pode ser de quem já estava fora do quadro. Daí as

@@ -7,7 +7,8 @@ Saída   : data/atos_dou.csv       — o índice único dos atos (ver `atos.py`)
           data/saidas_dou/*.html  — cópia arquivada de cada ato
           data/varredura_dou.txt  — até que dia esta varredura já cobriu
 
-É o sucessor do `dou_saidas_affc.py`, e a diferença está em duas linhas do
+É o sucessor do `dou_saidas_affc.py` — que a D19 removeu em 15/08/2026, então não
+procure o arquivo —, e a diferença está em duas linhas do
 antigo cabeçalho dele: *"para de varrer assim que acha o ato mais recente de
 cada tipo, então nunca soube quantas saídas houve no total"*. Essa parada
 precoce fazia sentido quando o único cliente era o card. Agora não: o mesmo

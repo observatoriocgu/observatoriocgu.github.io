@@ -93,13 +93,6 @@ jobs:
             cp evasao/data/saidas_dou/*.html _site/evasao/data/saidas_dou/ 2>/dev/null || true
           fi
 
-          # Conteúdo herdado do projeto original. A Fase 5 do PLANO.md decide
-          # removê-lo; até lá, é copiado para não sumir do ar sem aviso.
-          if [ -d ranking ]; then
-            mkdir -p _site/ranking
-            cp -r ranking/. _site/ranking/
-          fi
-
           echo "--- conteúdo publicado ---"
           find _site -maxdepth 2 -mindepth 1 | sort
 

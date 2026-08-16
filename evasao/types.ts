@@ -50,7 +50,12 @@ export interface RegistroAuditor {
   /** UF da vaga disputada no concurso — não é onde a pessoa está hoje. */
   UF_VAGA: string;
 
-  /** Ver `SITUACOES` em `constants.ts`. */
+  /**
+   * `EM EXERCÍCIO`, `EXONERADO`, `VACÂNCIA`, `APOSENTADO`, `FALECIDO`,
+   * `DEMITIDO`, `CEDIDO`, `MUDOU DE ÓRGÃO NA CARREIRA` ou
+   * `SAÍDA SEM ATO IDENTIFICADO`. Quem grava é `painel.py` (o primeiro e os
+   * dois últimos) e `dou.py` (o resto).
+   */
   SITUACAO: string;
   /** `Sede/DF`, `CGU-Regional/UF` ou o rótulo da sub-unidade. Contada pelo código, não pelo nome. */
   UNIDADE: string;
@@ -98,8 +103,6 @@ export interface RegistroAuditor {
   SAIDA_NO_SIAPE?: string;
 }
 
-export type ColunaRegistroAuditor = keyof RegistroAuditor;
-
 /**
  * Uma linha do `evasao/data/serie_mensal.csv`: o retrato de uma competência.
  *
@@ -142,12 +145,6 @@ export interface Concurso {
   dataHomologacao: Date | null;
   /** Áreas/especialidades daquele concurso. Vazia quando não há edital que as diga. */
   areas: readonly string[];
-}
-
-/** Uma barra da tabela de destinos. */
-export interface DadosDestinoEvasao {
-  destino: string;
-  count: number;
 }
 
 /**

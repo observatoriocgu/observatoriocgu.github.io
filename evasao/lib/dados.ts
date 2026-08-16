@@ -70,15 +70,6 @@ export const analisarCsv = (texto: string): LinhaCsv[] => {
   });
 };
 
-/** `DD/MM/AAAA` → `Date` no fuso local. Qualquer outra coisa → `null`. */
-export const analisarDataBr = (valor: string | null | undefined): Date | null => {
-  const texto = String(valor ?? '').trim();
-  const achado = texto.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
-  if (!achado) return null;
-  const data = new Date(Number(achado[3]), Number(achado[2]) - 1, Number(achado[1]));
-  return Number.isNaN(data.getTime()) ? null : data;
-};
-
 /**
  * `AAAA-MM-DD` → `Date` ao meio-dia UTC.
  *

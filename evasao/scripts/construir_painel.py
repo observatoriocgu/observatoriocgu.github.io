@@ -38,7 +38,14 @@ from painel import normalizar
 RAIZ = Path(__file__).resolve().parent.parent
 DIR_DADOS = RAIZ / "data"
 
-ARQ_HISTORICO = DIR_DADOS / "historico_mensal.csv"
+# Fica JUNTO DOS SNAPSHOTS, e não em `data/`, porque é deles que ele é feito: os
+# 49 snapshots empilhados, uma linha por (competência x pessoa). A pasta é
+# ignorada pelo Git, e é aí que está o ponto — este arquivo não é lido por
+# ninguém. O `construir_painel` o escreve; `dados.csv` e `serie_mensal.csv` saem
+# dos snapshots, não dele, e nenhuma tela o carrega. Versionado, ele custava
+# 20,7 MB reescritos a cada competência nova e ia junto para o site publicado.
+# Continua sendo gerado, e continua servindo para auditar a série à mão.
+ARQ_HISTORICO = painel.PASTA_SNAPSHOTS / "historico_mensal.csv"
 ARQ_DADOS = DIR_DADOS / "dados.csv"
 ARQ_SERIE = DIR_DADOS / "serie_mensal.csv"
 ARQ_CONCURSO = DIR_DADOS / "concurso_2021.csv"

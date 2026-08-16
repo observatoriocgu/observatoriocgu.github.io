@@ -393,8 +393,11 @@ const DetailedTableApp: React.FC = () => {
 
         <p className="mt-4 text-center text-xs text-gray-500">
           A especialidade vem do Edital CGU nº 5, de 13/06/2022, publicado no DOU; veteranos não têm edital de onde
-          tirá-la. O motivo e o destino vêm do ato do DOU, e a coluna &ldquo;Procedência&rdquo; diz, para cada linha, de
-          onde veio a informação e se uma pessoa já a conferiu.
+          tirá-la. O motivo e o destino vêm do ato do DOU, e a coluna &ldquo;Procedência&rdquo; diz, para cada linha,
+          quais fontes atestam a saída: <span className="font-medium">SIAPE</span> quando o cadastro mostra a pessoa
+          presente num mês e ausente no seguinte, <span className="font-medium">DOU</span> quando existe ato publicado.
+          As duas juntas são duas fontes independentes dizendo o mesmo; uma sozinha diz exatamente o que se sabe até
+          agora.
         </p>
 
         <footer className="mt-8 text-center text-sm text-gray-500">

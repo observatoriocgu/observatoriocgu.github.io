@@ -12,7 +12,6 @@
 import {
   AREA_DESCONHECIDA,
   AREA_VETERANO,
-  ID_CONCURSO_2021,
   ID_CONCURSO_VETERANO,
   MOTIVO_APOSENTADORIA,
   MOTIVO_CESSAO,
@@ -66,9 +65,6 @@ export const saiuDaCgu = (registro: RegistroAuditor): boolean => registro.MES_SA
 
 export const saidas = (registros: RegistroAuditor[]): RegistroAuditor[] =>
   registros.filter(saiuDaCgu);
-
-export const emExercicio = (registros: RegistroAuditor[]): RegistroAuditor[] =>
-  registros.filter((registro) => registro.SITUACAO === SITUACAO_EM_EXERCICIO);
 
 /**
  * O motivo como o `dados.csv` o gravou.
@@ -653,17 +649,6 @@ export const curvaDePermanencia = (
   });
 };
 
-/** Saídas por competência, para cruzar com a série mensal. */
-export const saidasPorMes = (registros: RegistroAuditor[]): Map<string, RegistroAuditor[]> => {
-  const mapa = new Map<string, RegistroAuditor[]>();
-  for (const registro of saidas(registros)) {
-    const grupo = mapa.get(registro.MES_SAIDA);
-    if (grupo) grupo.push(registro);
-    else mapa.set(registro.MES_SAIDA, [registro]);
-  }
-  return mapa;
-};
-
 /** Taxa de evasão de um concurso: quantos saíram sobre quantos passaram por ele. */
 export const evasaoDoConcurso = (registros: RegistroAuditor[], idConcurso: string) => {
   const doConcurso = registros.filter((registro) => registro.CONCURSO === idConcurso);
@@ -818,6 +803,3 @@ export const evasaoDosPrimeirosColocados = (
     return { area, aprovados, empatadosNoCorte };
   });
 };
-
-/** Concursos conhecidos, na ordem em que a interface os mostra. */
-export const CONCURSOS: readonly string[] = [ID_CONCURSO_2021, ID_CONCURSO_VETERANO];

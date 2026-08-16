@@ -25,10 +25,15 @@ como era até 15/08/2026, quando o card e a lista de saídas do painel podiam
 discordar sem que nenhum dos dois estivesse errado.
 
 ROTINA MENSAL
-    1. baixar o ZIP do mês em portaldatransparencia.gov.br/download-de-dados/servidores
-    2. descompactar o `AAAAMM_Cadastro.csv` em evasao/data/historico_transparencia_cgu/
-    3. python atualizar.py
-    4. conferir os avisos, revisar `curadoria_sugestoes.csv`, commitar
+    1. python baixar_transparencia.py   # baixa e descompacta o que faltar
+    2. python atualizar.py
+    3. conferir os avisos, revisar `curadoria_sugestoes.csv`, commitar
+
+  O passo 1 substitui o que antes era manual — pegar o ZIP do mês em
+  portaldatransparencia.gov.br/download-de-dados/servidores e descompactar o
+  `AAAAMM_Cadastro.csv` em evasao/data/historico_transparencia_cgu/. Ele NÃO é
+  chamado daqui de propósito: baixa ~4 GB no backfill, e um pipeline que dispara
+  isso sozinho surpreende quem só queria reconstruir o painel.
 
 Uso:
     python atualizar.py                 # ciclo completo
@@ -47,7 +52,11 @@ from pathlib import Path
 AQUI = Path(__file__).resolve().parent
 
 
-def rodar(descricao: str, argumentos: list[str]) -> bool:
+def rodar(descricao: str, argumentos: list[str], passo: list[int] | None = None) -> bool:
+    """Roda um script do pipeline. `passo` é o contador mutável [atual, total]."""
+    if passo is not None:
+        passo[0] += 1
+        descricao = f"{passo[0]}/{passo[1]} {descricao}"
     print()
     print("=" * 72)
     print(f"  {descricao}")
@@ -74,48 +83,53 @@ def main() -> int:
     if args.diagnostico:
         return 0 if rodar("Conferência", ["construir_painel.py", "--diagnostico"]) else 1
 
+    # O total é CALCULADO, não escrito à mão: as duas bandeiras mudam quantos
+    # passos existem, e o rótulo fixo "1/7" mentia sempre que `--concurso` ou
+    # `--sem-dou` entravam. `passo` é [atual, total], e quem incrementa é `rodar`.
+    passo = [0, (3 if args.sem_dou else 7) + (1 if args.concurso else 0)]
+
     # Sem `--manter-original` os CSVs brutos são apagados depois de filtrados —
     # é o comportamento padrão do script, e o que impede a pasta de crescer para
     # dezenas de GB. Nada a perder: o Portal republica.
-    if not rodar("1/7 Filtrando os snapshots do Portal", ["filtrar_affc.py"]):
+    if not rodar("Filtrando os snapshots do Portal", ["filtrar_affc.py"], passo):
         return 1
 
-    if args.concurso and not rodar("Resultado final do concurso (DOU)", ["concurso.py"]):
+    if args.concurso and not rodar("Resultado final do concurso (DOU)", ["concurso.py"], passo):
         return 1
 
-    if not rodar("2/7 Construindo o painel", ["construir_painel.py"]):
+    if not rodar("Construindo o painel", ["construir_painel.py"], passo):
         return 1
 
     if args.sem_dou:
         # O card ainda é regerado: `gerar_card_dou.py` não tem rede, só relê o
         # índice. Sem isto, `--sem-dou` deixaria o JSON apontando para um índice
         # que pode ter mudado por outro caminho.
-        rodar("3/3 Regerando o card a partir do índice", ["gerar_card_dou.py"])
+        rodar("Regerando o card a partir do índice", ["gerar_card_dou.py"], passo)
         print("\n--sem-dou: motivo e destino das saídas não foram atualizados.")
         return 0
 
     enriquecer = ["enriquecer_saidas.py"]
     if args.limite:
         enriquecer += ["--limite", str(args.limite)]
-    if not rodar("3/7 Buscando motivo e destino no DOU, por nome", enriquecer):
+    if not rodar("Buscando motivo e destino no DOU, por nome", enriquecer, passo):
         return 1
 
-    if not rodar("4/7 Varrendo o DOU por frase (o que o SIAPE ainda não mostra)",
-                 ["varrer_dou.py"]):
+    if not rodar("Varrendo o DOU por frase (o que o SIAPE ainda não mostra)",
+                 ["varrer_dou.py"], passo):
         return 1
 
-    if not rodar("5/7 Reconstruindo o painel com o que o DOU achou", ["construir_painel.py"]):
+    if not rodar("Reconstruindo o painel com o que o DOU achou", ["construir_painel.py"], passo):
         return 1
 
-    if not rodar("6/7 Gerando o card a partir do índice de atos", ["gerar_card_dou.py"]):
+    if not rodar("Gerando o card a partir do índice de atos", ["gerar_card_dou.py"], passo):
         return 1
 
     # Por último, e depois do card: este crawler lê o `atos_dou.json` que o
     # passo anterior acabou de gerar — é de lá que saem as saídas que só o DOU
     # conhece. Uma falha aqui não invalida nada do que veio antes: o painel
     # apenas segue com menos destino identificado.
-    if not rodar("7/7 Procurando destino de quem saiu, no Ranking dos Concursos",
-                 ["enriquecer_destinos_ranking.py"]):
+    if not rodar("Procurando destino de quem saiu, no Ranking dos Concursos",
+                 ["enriquecer_destinos_ranking.py"], passo):
         print("! o painel continua válido; só o destino do ranking não foi atualizado.",
               file=sys.stderr)
 

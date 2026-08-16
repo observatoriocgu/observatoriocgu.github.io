@@ -2,19 +2,16 @@ import React, { useEffect, useMemo, useState } from 'react';
 
 import {
   AREAS_SEM_ESPECIALIDADE,
+  CONCURSOS,
   COR_POR_CONCURSO,
   COR_POR_MOTIVO,
   ID_CONCURSO_2021,
-  ID_CONCURSO_VETERANO,
   MOTIVOS_PADRAO,
   MOTIVOS_SAIDA,
-  rotuloDoConcurso,
 } from '../constants';
 import { RegistroAuditor } from '../types';
 import { areaDe, motivoDe, saidas } from '../lib/painel';
 import FiltroMultiplo, { OpcaoFiltro } from './FiltroMultiplo';
-
-export const CONCURSOS = [ID_CONCURSO_2021, ID_CONCURSO_VETERANO];
 
 export interface FiltrosEncadeados {
   concursos: string[];
@@ -53,16 +50,20 @@ export const useFiltrosEncadeados = (registros: RegistroAuditor[]): FiltrosEncad
 
   const todasAsSaidas = useMemo(() => saidas(registros), [registros]);
 
+  // A lista e a ORDEM saem do catálogo de `constants.ts`, que é o único lugar
+  // onde um concurso novo se cadastra. Havia aqui uma segunda lista com os
+  // mesmos dois ids: ela funcionava, e ia parar de funcionar no dia em que o
+  // CGU-2026 entrasse no catálogo e não aparecesse na caixinha.
   const opcoesConcurso = useMemo((): OpcaoFiltro[] => {
     const totais = new Map<string, number>();
     for (const registro of todasAsSaidas) {
       totais.set(registro.CONCURSO, (totais.get(registro.CONCURSO) ?? 0) + 1);
     }
-    return CONCURSOS.map((id) => ({
-      valor: id,
-      rotulo: rotuloDoConcurso(id),
-      cor: COR_POR_CONCURSO[id],
-      total: totais.get(id) ?? 0,
+    return CONCURSOS.map((concurso) => ({
+      valor: concurso.id,
+      rotulo: concurso.rotulo,
+      cor: COR_POR_CONCURSO[concurso.id],
+      total: totais.get(concurso.id) ?? 0,
     }));
   }, [todasAsSaidas]);
 

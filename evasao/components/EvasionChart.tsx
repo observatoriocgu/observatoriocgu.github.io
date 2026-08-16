@@ -41,9 +41,6 @@ export interface SerieGrafico {
   cor: string;
   valores: (number | null)[];
   tipo?: 'barra' | 'linha';
-  eixo?: 'esquerda' | 'direita';
-  /** Séries de fundo/contexto ficam fora da legenda sem sair do gráfico. */
-  ocultaDaLegenda?: boolean;
   /** Linhas de texto por categoria, exibidas no tooltip abaixo do valor. */
   detalhes?: string[][];
   /** Sufixo do valor no tooltip, ex.: `%`. */
@@ -56,11 +53,9 @@ interface EvasionChartProps {
   altura?: number;
   /** Empilha as barras. Linhas nunca empilham. */
   empilhar?: boolean;
-  rotacionarRotulos?: boolean;
   /** Rótulo por extenso de cada categoria, quando `rotulos` veio abreviado. */
   rotulosCompletos?: string[];
   tituloEixoEsquerda?: string;
-  tituloEixoDireita?: string;
   /** `false` deixa o eixo esquerdo se ajustar aos dados — o efetivo vive entre 1.500 e 1.800. */
   eixoEsquerdaComZero?: boolean;
   /** Teto do eixo esquerdo, para curvas em pontos percentuais. */
@@ -77,16 +72,12 @@ const EvasionChart: React.FC<EvasionChartProps> = ({
   series,
   altura = 260,
   empilhar = false,
-  rotacionarRotulos = false,
   rotulosCompletos,
   tituloEixoEsquerda,
-  tituloEixoDireita,
   eixoEsquerdaComZero = true,
   maximoEixoEsquerda,
   maximoRotulosX,
 }) => {
-  const usaEixoDireita = series.some((serie) => serie.eixo === 'direita');
-
   const datasets = series.map((serie) => {
     const ehLinha = serie.tipo === 'linha';
     return {
@@ -103,13 +94,10 @@ const EvasionChart: React.FC<EvasionChartProps> = ({
       fill: false,
       barPercentage: 0.95,
       categoryPercentage: 0.9,
-      yAxisID: serie.eixo === 'direita' ? 'y2' : 'y',
       stack: empilhar && !ehLinha ? 'principal' : undefined,
       spanGaps: false,
     };
   });
-
-  const ocultas = new Set(series.filter((serie) => serie.ocultaDaLegenda).map((serie) => serie.rotulo));
 
   const opcoes: any = {
     responsive: true,
@@ -124,7 +112,6 @@ const EvasionChart: React.FC<EvasionChartProps> = ({
           font: { size: 12 },
           padding: 14,
           usePointStyle: true,
-          filter: (item: any) => !ocultas.has(item.text),
         },
       },
       title: { display: false },
@@ -164,8 +151,8 @@ const EvasionChart: React.FC<EvasionChartProps> = ({
         stacked: empilhar,
         ticks: {
           color: '#d1d5db',
-          maxRotation: rotacionarRotulos ? 90 : 0,
-          minRotation: rotacionarRotulos ? 90 : 0,
+          maxRotation: 0,
+          minRotation: 0,
           autoSkip: true,
           maxTicksLimit: maximoRotulosX,
         },
@@ -181,19 +168,6 @@ const EvasionChart: React.FC<EvasionChartProps> = ({
           ? { display: true, text: tituloEixoEsquerda, color: '#9ca3af' }
           : undefined,
       },
-      ...(usaEixoDireita
-        ? {
-            y2: {
-              position: 'right',
-              beginAtZero: true,
-              ticks: { color: '#9ca3af' },
-              grid: { display: false },
-              title: tituloEixoDireita
-                ? { display: true, text: tituloEixoDireita, color: '#9ca3af' }
-                : undefined,
-            },
-          }
-        : {}),
     },
   };
 

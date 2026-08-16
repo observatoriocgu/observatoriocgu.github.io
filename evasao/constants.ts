@@ -1,18 +1,4 @@
-import { Concurso, DadosDestinoEvasao } from './types';
-
-// Custo estimado por Auditor que deixa o cargo após a posse.
-// D5 do PLANO.md: fica `null` — e o card de custo fica oculto — enquanto não
-// houver uma estimativa com fonte citável. Não chutar valor.
-export const CUSTO_POR_AUDITOR: number | null = null;
-
-// Data em que o observatório começa a contar: homologação do concurso CGU 2021
-// (FGV), que é também a competência do primeiro snapshot do SIAPE (202206).
-// O horário é 10:00Z de propósito: com 00:00Z, `toLocaleDateString('pt-BR')`
-// exibiria o dia anterior no fuso do Brasil (UTC-3).
-export const DATA_INICIO_OBSERVACAO = new Date('2022-06-14T10:00:00Z');
-
-/** Primeira competência da série. Tudo que existe aqui já existia antes do observatório. */
-export const MES_INICIO_OBSERVACAO = '202206';
+import { Concurso } from './types';
 
 /**
  * Onde o gráfico de saídas mês a mês começa.
@@ -75,11 +61,6 @@ export const CONCURSO_POR_ID: ReadonlyMap<string, Concurso> = new Map(
 /** Rótulo de exibição de um concurso; devolve o próprio id se for desconhecido. */
 export const rotuloDoConcurso = (id: string): string => CONCURSO_POR_ID.get(id)?.rotulo ?? id;
 
-/** Concursos de verdade, sem o pseudo-concurso `VETERANO`. */
-export const CONCURSOS_REAIS: readonly Concurso[] = CONCURSOS.filter(
-  (concurso) => concurso.id !== ID_CONCURSO_VETERANO
-);
-
 /**
  * Áreas oferecidas por um concurso. Sem argumento, devolve a união das áreas de
  * todos os concursos — que é o vocabulário a usar quando o filtro está em "Todas".
@@ -110,34 +91,22 @@ export const AREA_DESCONHECIDA = 'Sem área identificada';
 export const AREAS_SEM_ESPECIALIDADE: readonly string[] = [AREA_VETERANO, AREA_DESCONHECIDA];
 
 /**
- * Vocabulário da coluna `SITUACAO`.
+ * Os dois valores de `SITUACAO` que o código precisa nomear.
  *
- * `EM EXERCÍCIO` e as duas últimas vêm do próprio SIAPE (`painel.py`); as cinco
- * do meio vêm da classificação do ato no DOU (`dou.py`). Nada aqui é herdado de
- * MG: `DESISTENTE`, `CADASTRO DE RESERVA`, `INAPTO ADMISSIONAL` e
- * `AFASTAMENTO PRELIMINAR À APOSENTADORIA` não existem no universo da D11 —
- * o observatório só vê quem já estava lotado na CGU.
+ * O vocabulário completo da coluna é `EM EXERCÍCIO`, `EXONERADO`, `VACÂNCIA`,
+ * `APOSENTADO`, `FALECIDO`, `DEMITIDO`, `CEDIDO`, `MUDOU DE ÓRGÃO NA CARREIRA`
+ * e `SAÍDA SEM ATO IDENTIFICADO` — o primeiro e os dois últimos vêm do SIAPE
+ * (`painel.py`), os do meio da classificação do ato no DOU (`dou.py`). A lista
+ * inteira NÃO mora aqui: a tela lê a situação de cada linha e o filtro monta as
+ * opções a partir do dado, então uma cópia em código só teria como envelhecer.
+ * Só ganham constante os dois que o código compara por igualdade.
+ *
+ * Nada aqui é herdado de MG: `DESISTENTE`, `CADASTRO DE RESERVA`,
+ * `INAPTO ADMISSIONAL` e `AFASTAMENTO PRELIMINAR À APOSENTADORIA` não existem
+ * no universo da D11 — o observatório só vê quem já estava lotado na CGU.
  */
 export const SITUACAO_EM_EXERCICIO = 'EM EXERCÍCIO';
-export const SITUACAO_SEM_ATO = 'SAÍDA SEM ATO IDENTIFICADO';
 export const SITUACAO_MUDOU_ORGAO = 'MUDOU DE ÓRGÃO NA CARREIRA';
-
-export const SITUACOES: readonly string[] = [
-  SITUACAO_EM_EXERCICIO,
-  'EXONERADO',
-  'VACÂNCIA',
-  'APOSENTADO',
-  'FALECIDO',
-  'DEMITIDO',
-  'CEDIDO',
-  SITUACAO_MUDOU_ORGAO,
-  SITUACAO_SEM_ATO,
-];
-
-/** Situações que significam que a pessoa não está mais na CGU. */
-export const SITUACOES_DE_SAIDA: readonly string[] = SITUACOES.filter(
-  (situacao) => situacao !== SITUACAO_EM_EXERCICIO
-);
 
 /**
  * Motivos de saída, na ordem em que aparecem nos gráficos.
@@ -265,6 +234,3 @@ export const DESCRICAO_POR_FONTE: Readonly<Record<string, string>> = {
   BUSCA: 'Busca por nome no DOU',
   MANUAL: 'Correção humana registrada em data/curadoria.csv',
 };
-
-// Tipagem auxiliar exportada para quem quiser reusar a forma de DadosDestinoEvasao.
-export type { DadosDestinoEvasao };

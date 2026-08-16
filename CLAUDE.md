@@ -45,9 +45,14 @@ Edital CGU nº 5 de 13/06/2022, publicado no DOU (D17).
 - "Saiu da CGU" = ausência a partir da ÚLTIMA PRESENÇA na série (D13), nunca
   diff par a par: há 6 pessoas que somem por 1-6 meses e voltam, e o diff par
   a par publicaria 6 saídas falsas
-- historico_mensal.csv é a base consolidada (D16): os 49 snapshots empilhados,
-  uma linha por (competência x pessoa), 88.421 linhas, 17 das 43 colunas, mais
-  MES, CONCURSO e AREA. dados.csv e serie_mensal.csv derivam DELA
+- historico_mensal.csv são os 49 snapshots empilhados: uma linha por
+  (competência x pessoa), 88.421 linhas, 17 das 43 colunas, mais MES, CONCURSO e
+  AREA. Mora em data/historico_transparencia_cgu/, JUNTO DOS SNAPSHOTS de que é
+  feito, e portanto fora do Git. NÃO é a base de nada: quem o escreve é o
+  construir_painel.py, e dados.csv e serie_mensal.csv saem dos SNAPSHOTS, não
+  dele — nenhum código o lê. Serve para auditar a série à mão. A D16 dizia que
+  dados.csv e serie_mensal.csv derivavam dele; nunca derivaram, e versionar o
+  arquivo custava 20,7 MB reescritos por competência, publicados no site
 - historico_mensal.csv e dados.csv são DERIVADOS. Nunca editar à mão. Correção
   humana vai em data/curadoria.csv, que vence sobre DOU e SIAPE no merge
 - Unidade se conta pelo CÓDIGO (COD_UORG_LOTACAO), nunca pelo nome: o nome
@@ -86,9 +91,9 @@ Edital CGU nº 5 de 13/06/2022, publicado no DOU (D17).
   NÃO repetir a regra em componente: mascarar caso a caso vaza no primeiro
   componente novo. NÃO confundir MOTIVO_OUTRO com MOTIVO_OUTROS ("Outros"), que
   é o balde-resumo de quatro motivos do card de saídas
-- A pessoa CONTINUA CONTADA EM TUDO: card, gráfico, curva, destinos, histórico e
-  relatório impresso, com balde próprio e o mesmo total. O que não vai à tela é
-  a palavra, não a pessoa
+- A pessoa CONTINUA CONTADA EM TUDO: card, gráfico, curva, destinos, tabela
+  detalhada e histórico, com balde próprio e o mesmo total. O que não vai à tela
+  é a palavra, não a pessoa
 - Padrões de regex do DOU já vêm normalizados: NÃO passar por normalizar(),
   senão .upper() transforma \s em \S e o padrão nunca casa (bug real da
   Fase 2.5)
@@ -140,6 +145,9 @@ Edital CGU nº 5 de 13/06/2022, publicado no DOU (D17).
 
 ## Pipeline de dados (evasao/scripts/)
 - atualizar.py         comando único: filtra -> constrói -> DOU -> reconstrói
+- baixar_transparencia.py  baixa do Portal os snapshots que faltam e chama o
+                       filtro. NÃO é chamado pelo atualizar.py — roda à parte,
+                       antes dele, no lugar dos passos 1-2 da rotina mensal
 - dou.py               biblioteca: rede, busca, cache, classificação de atos
 - atos.py              biblioteca: o índice único dos atos (data/atos_dou.csv)
 - painel.py            biblioteca: derivação dos snapshots (sem rede)
@@ -182,7 +190,7 @@ Edital CGU nº 5 de 13/06/2022, publicado no DOU (D17).
   snapshots, que estão fora do Git
 - Saída que o DOU já anunciou e o SIAPE ainda não confirmou CONTA EM TUDO
   (D22, revoga o recorte da D21): cards, gráficos, curva, destinos, tabela
-  detalhada, histórico e relatório impresso. Ela não é linha nova — é
+  detalhada e histórico. Ela não é linha nova — é
   SOBREPOSTA ao registro da pessoa, que já está no dados.csv como ativa, e por
   isso chega à tela com concurso, área e unidade e responde aos filtros
 - Quem faz a sobreposição é `mesclarSaidasDoDou` (lib/painel.ts), NO NAVEGADOR,

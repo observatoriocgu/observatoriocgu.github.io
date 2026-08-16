@@ -2,13 +2,15 @@
 """
 Camada de acesso ao Diário Oficial da União, compartilhada pelos crawlers.
 
-Este módulo NÃO é executável: é a biblioteca que `dou_saidas_affc.py` (card
-"dias sem perder um Auditor", Fase 2.5), `enriquecer_saidas.py` (motivo e destino
-de cada saída, Fase 2) e `concurso.py` (resultado final do concurso, D17) usam.
+Este módulo NÃO é executável: é a biblioteca que `varrer_dou.py` (varredura por
+FRASE), `enriquecer_saidas.py` (motivo e destino de cada saída, por NOME),
+`atos.py` (o índice único) e `concurso.py` (resultado final do concurso, D17)
+usam.
 
-Quase tudo aqui foi extraído do `dou_saidas_affc.py`, onde já tinha sido validado
-ato a ato em 13/08/2026. Duas coisas são novas, e as duas resolvem defeitos reais
-daquele script:
+Quase tudo aqui foi extraído do `dou_saidas_affc.py` — o crawler do card, que a
+D19 aposentou em 15/08/2026 e cujo sucessor é o `varrer_dou.py` —, onde já tinha
+sido validado ato a ato em 13/08/2026. Duas coisas são novas, e as duas resolvem
+defeitos reais daquele script:
 
   - PAUSA entre requisições. O crawler original não tinha nenhuma: batia no
     in.gov.br o mais rápido que a rede deixasse. Com 268 nomes para varrer isso
