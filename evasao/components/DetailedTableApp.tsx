@@ -25,11 +25,16 @@ import {
   saiuDaCgu,
   urlDoAto,
 } from '../lib/painel';
-import { SeloFonte, SelosDaLinha } from './Selos';
+import {
+  SeloFonte,
+  SelosDaLinha,
+  rotuloDoLinkDeDestino,
+  tituloDoLinkDeDestino,
+} from './Selos';
 
 const TODOS = '';
 
-/** Quantas linhas renderizar de uma vez. 2.009 células vezes 13 colunas trava o navegador. */
+/** Quantas linhas renderizar de uma vez. 2.009 células vezes 14 colunas trava o navegador. */
 const PAGINA = 300;
 
 const normalizar = (valor: string) =>
@@ -53,12 +58,16 @@ const CORES_POR_SITUACAO: Record<string, string> = {
   'SAÍDA SEM ATO IDENTIFICADO': 'bg-yellow-100',
 };
 
-const Celula: React.FC<{ children?: React.ReactNode; alinhamento?: string; className?: string }> = ({
-  children,
-  alinhamento = 'text-center',
-  className = '',
-}) => (
-  <td className={`border border-black px-1 py-0.5 text-[10px] text-gray-700 ${alinhamento} ${className}`}>
+const Celula: React.FC<{
+  children?: React.ReactNode;
+  alinhamento?: string;
+  className?: string;
+  titulo?: string;
+}> = ({ children, alinhamento = 'text-center', className = '', titulo }) => (
+  <td
+    title={titulo}
+    className={`border border-black px-1 py-0.5 text-[10px] text-gray-700 ${alinhamento} ${className}`}
+  >
     {children}
   </td>
 );
@@ -79,6 +88,8 @@ interface Coluna {
   celula?: (registro: RegistroAuditor) => React.ReactNode;
   /** O que o CSV leva, quando é mais útil que o texto de `valor`. */
   exportar?: (registro: RegistroAuditor) => string;
+  /** O `title` da célula, para o que não cabe escrito. */
+  titulo_da_celula?: (registro: RegistroAuditor) => string | undefined;
   alinhamento?: string;
   classe?: string;
 }
@@ -92,6 +103,15 @@ interface Coluna {
  * filtro do topo usava `areaDe`, então filtrar por "Veterano" devolvia um punhado
  * de linhas cuja coluna Especialidade dizia "-". Com uma definição só, a coluna e
  * o filtro não têm como divergir de novo.
+ *
+ * A ORDEM é a da leitura, e as quatro últimas colunas são duas afirmações
+ * separadas: a pessoa SAIU (quando, quem atesta, qual ato) e só então FOI para
+ * algum lugar (para onde, quem atesta, qual documento). Enquanto a procedência
+ * da saída ficava entre o órgão de destino e o ato, o selo `SIAPE` da saída
+ * parecia responder pelo destino — e o destino, que pode vir do ranking, parecia
+ * ter ato publicado. O motivo não tem coluna própria porque a situação já o diz:
+ * `VACÂNCIA` ao lado de "Vacância (posse em outro cargo)" gastava uma coluna
+ * para repetir a mesma palavra.
  */
 const COLUNAS: readonly Coluna[] = [
   {
@@ -114,6 +134,11 @@ const COLUNAS: readonly Coluna[] = [
     titulo: 'Situação',
     valor: (r) => r.SITUACAO,
     classe: 'whitespace-nowrap',
+    // A situação é o motivo dito em uma palavra — `VACÂNCIA` é "Vacância (posse
+    // em outro cargo)". O que a palavra deixa de fora vai no `title`, inclusive a
+    // demissão: esta é a única página com licença para nomeá-la (D18), e a coluna
+    // já mostrava `DEMITIDO`.
+    titulo_da_celula: (r) => (saiuDaCgu(r) ? motivoDetalhado(r) : undefined),
     celula: (r) => (
       <>
         {r.SITUACAO || '-'}
@@ -129,15 +154,8 @@ const COLUNAS: readonly Coluna[] = [
     ),
   },
   {
-    chave: 'motivo',
-    titulo: 'Motivo da saída',
-    // `motivoDetalhado`, e não `motivoDe`: esta é a única página que nomeia o
-    // motivo da D18, e a coluna tem de casar com o filtro do topo.
-    valor: (r) => (saiuDaCgu(r) ? motivoDetalhado(r) : ''),
-  },
-  {
     chave: 'saida',
-    titulo: 'Saída',
+    titulo: 'Data de saída',
     // Ordena pela competência crua (`AAAAMM`), que é comparável como texto; a
     // tela é que a escreve por extenso.
     valor: (r) => r.MES_SAIDA,
@@ -146,49 +164,19 @@ const COLUNAS: readonly Coluna[] = [
     exportar: (r) => (r.MES_SAIDA ? formatarCompetenciaLonga(r.MES_SAIDA) : ''),
   },
   {
-    chave: 'destino',
-    titulo: 'Órgão de destino',
-    valor: (r) => r.ORGAO_DESTINO,
-    classe: 'whitespace-nowrap',
-    /* O destino tem procedência PRÓPRIA, e ela não é a da saída: a coluna
-       "Procedência" ao lado atesta que a pessoa saiu, não para onde foi.
-       Enquanto o destino só vinha do DOU dava para deduzir; desde a D24 ele pode
-       vir do Ranking dos Concursos, que é indício e não ato — e Selos.tsx é
-       explícito em que nenhuma afirmação sobre pessoa nomeada vai à tela sem
-       dizer de onde veio. */
-    celula: (r) =>
-      r.ORGAO_DESTINO ? (
-        <>
-          {r.ORGAO_DESTINO}
-          {r.FONTE_DESTINO && (
-            <span className="ml-1">
-              <SeloFonte fonte={r.FONTE_DESTINO} compacto tema="claro" />
-            </span>
-          )}
-        </>
-      ) : (
-        '-'
-      ),
-    // No CSV o selo não cabe, mas a fonte não pode sumir: destino sem
-    // procedência é justamente o que este observatório não publica.
-    exportar: (r) => (r.ORGAO_DESTINO ? `${r.ORGAO_DESTINO}${r.FONTE_DESTINO ? ` (${r.FONTE_DESTINO})` : ''}` : ''),
+    chave: 'selo_saida',
+    titulo: 'Selo da saída',
+    // Quem atesta que a pessoa SAIU — e nada mais. Quem está na CGU não tem saída
+    // para sustentar, e por isso fica vazio: um `SIAPE` aqui diria que existe uma
+    // saída atestada pelo cadastro onde não existe saída nenhuma.
+    valor: (r) => (saiuDaCgu(r) ? fontesDaSaida(r).join(' + ') : ''),
+    celula: (r) => (saiuDaCgu(r) ? <SelosDaLinha fontes={fontesDaSaida(r)} compacto tema="claro" /> : '-'),
   },
   {
-    chave: 'procedencia',
-    titulo: 'Procedência',
-    valor: (r) => (saiuDaCgu(r) ? fontesDaSaida(r).join(' + ') : 'SIAPE'),
-    celula: (r) =>
-      saiuDaCgu(r) ? (
-        <SelosDaLinha fontes={fontesDaSaida(r)} compacto tema="claro" />
-      ) : (
-        <span title="Quem está na CGU vem direto do SIAPE; não há o que conferir contra o DOU.">SIAPE</span>
-      ),
-  },
-  {
-    chave: 'ato',
-    titulo: 'Ato no DOU',
-    // Ordena pela data ISO, que é comparável como texto — a tela mostra a data
-    // no formato brasileiro, que não é.
+    chave: 'ato_saida',
+    titulo: 'Ato da saída',
+    // Ordena pela data ISO, que é comparável como texto — a tela mostra a data no
+    // formato brasileiro, que não é.
     valor: (r) => r.DATA_PUBLICACAO_SAIDA,
     celula: (r) => {
       const ato = urlDoAto(r);
@@ -206,7 +194,7 @@ const COLUNAS: readonly Coluna[] = [
         '-'
       );
     },
-    // No CSV vai o ENDEREÇO, não a data: a data se lê na coluna "Saída" ao lado,
+    // No CSV vai o ENDEREÇO, não a data: a data se lê na coluna "Data de saída",
     // e o link é a única coisa da tabela que não dá para reconstruir de fora.
     //
     // ABSOLUTO, e não o que a tela usa. `urlDoAto` prefere a cópia arquivada em
@@ -218,6 +206,49 @@ const COLUNAS: readonly Coluna[] = [
       const ato = urlDoAto(r);
       return ato ? new URL(ato, location.href).href : '';
     },
+  },
+  {
+    chave: 'destino',
+    titulo: 'Órgão de destino',
+    // O destino tem procedência PRÓPRIA, e ela não é a da saída: os selos da
+    // esquerda atestam que a pessoa saiu, não para onde foi. Enquanto o destino só
+    // vinha do DOU dava para deduzir; desde a D24 ele pode vir do Ranking dos
+    // Concursos, que é indício e não ato — e é por isso que o selo dele tem coluna
+    // própria, em vez de ficar colado ao nome do órgão.
+    valor: (r) => r.ORGAO_DESTINO,
+    classe: 'whitespace-nowrap',
+  },
+  {
+    chave: 'selo_destino',
+    titulo: 'Selo do destino',
+    valor: (r) => (r.ORGAO_DESTINO && r.FONTE_DESTINO ? r.FONTE_DESTINO : ''),
+    celula: (r) =>
+      r.ORGAO_DESTINO && r.FONTE_DESTINO ? <SeloFonte fonte={r.FONTE_DESTINO} compacto tema="claro" /> : '-',
+  },
+  {
+    chave: 'ato_destino',
+    titulo: 'Ato do destino',
+    // Nem todo destino tem ATO: o do ranking é a ficha de aprovações da pessoa,
+    // uma consulta que qualquer um repete no navegador. O rótulo sai de
+    // `Selos.tsx`, para que a tabela não chame de "ato" o que não é.
+    valor: (r) => (r.ORGAO_DESTINO && r.URL_DESTINO ? r.DATA_DESTINO : ''),
+    celula: (r) =>
+      r.ORGAO_DESTINO && r.URL_DESTINO ? (
+        <a
+          href={r.URL_DESTINO}
+          target="_blank"
+          rel="noopener noreferrer"
+          title={tituloDoLinkDeDestino(r.FONTE_DESTINO, r.NOME, r.ORGAO_DESTINO)}
+          className="text-blue-700 underline hover:text-blue-900"
+        >
+          {rotuloDoLinkDeDestino(r.FONTE_DESTINO, r.DATA_DESTINO)}
+        </a>
+      ) : (
+        '-'
+      ),
+    // Aqui o endereço já é absoluto: é do órgão de chegada ou do ranking, e não
+    // deste site.
+    exportar: (r) => (r.ORGAO_DESTINO ? r.URL_DESTINO : ''),
   },
 ];
 
@@ -503,6 +534,8 @@ const DetailedTableApp: React.FC = () => {
             <table className="w-full border-collapse border border-black text-[10px]">
               <thead className="sticky top-0 z-50 bg-white text-[10px] uppercase text-gray-700 shadow-sm">
                 <tr>
+                  {/* Os títulos saem de `COLUNAS` — ver a nota lá sobre a ordem
+                      das quatro últimas. */}
                   {COLUNAS.map((coluna) => {
                     const ativa = ordem?.chave === coluna.chave;
                     return (
@@ -517,7 +550,7 @@ const DetailedTableApp: React.FC = () => {
                           onClick={() => alternarOrdem(coluna.chave)}
                           title={
                             ativa && ordem.direcao === 'desc'
-                              ? `Voltar à ordem padrão (saída mais recente primeiro)`
+                              ? 'Voltar à ordem padrão (saída mais recente primeiro)'
                               : `Ordenar por ${coluna.titulo}`
                           }
                           className="flex w-full items-center justify-center gap-1 px-1 py-1 uppercase hover:bg-gray-100 focus:outline-none focus:ring-1 focus:ring-inset focus:ring-red-400"
@@ -560,7 +593,12 @@ const DetailedTableApp: React.FC = () => {
                     className={`${CORES_POR_SITUACAO[registro.SITUACAO] ?? 'bg-white'} transition-all duration-150 hover:brightness-95`}
                   >
                     {COLUNAS.map((coluna) => (
-                      <Celula key={coluna.chave} alinhamento={coluna.alinhamento} className={coluna.classe}>
+                      <Celula
+                        key={coluna.chave}
+                        alinhamento={coluna.alinhamento}
+                        className={coluna.classe}
+                        titulo={coluna.titulo_da_celula?.(registro)}
+                      >
                         {coluna.celula ? coluna.celula(registro) : coluna.valor(registro) || '-'}
                       </Celula>
                     ))}
@@ -587,11 +625,19 @@ const DetailedTableApp: React.FC = () => {
         <p className="mt-4 text-center text-xs text-gray-500">
           Clicar no título de uma coluna ordena o recorte inteiro, e não só as linhas já carregadas; clicar de novo
           inverte, e a terceira vez devolve a ordem padrão. A especialidade vem do Edital CGU nº 5, de 13/06/2022,
-          publicado no DOU; veteranos não têm edital de onde tirá-la. O motivo e o destino vêm do ato do DOU, e a
-          coluna &ldquo;Procedência&rdquo; diz, para cada linha, quais fontes atestam a saída:{' '}
-          <span className="font-medium">SIAPE</span> quando o cadastro mostra a pessoa presente num mês e ausente no
-          seguinte, <span className="font-medium">DOU</span> quando existe ato publicado. As duas juntas são duas
-          fontes independentes dizendo o mesmo; uma sozinha diz exatamente o que se sabe até agora.
+          publicado no DOU; veteranos não têm edital de onde tirá-la. A situação resume o motivo da saída, como o ato
+          do DOU o diz — passe o cursor sobre ela para ler o motivo por extenso.
+        </p>
+        <p className="mx-auto mt-2 max-w-4xl text-center text-xs text-gray-500">
+          <span className="font-medium">Que a pessoa saiu</span> e{' '}
+          <span className="font-medium">para onde ela foi</span> são duas afirmações, e cada uma tem o seu selo e o seu
+          documento. O selo da saída é <span className="font-medium">SIAPE</span> quando o cadastro mostra a pessoa
+          presente num mês e ausente no seguinte, e <span className="font-medium">DOU</span> quando existe ato
+          publicado; os dois juntos são duas fontes independentes dizendo o mesmo, e um sozinho diz exatamente o que se
+          sabe até agora. O selo do destino é <span className="font-medium">DOU</span> quando existe ato de nomeação no
+          órgão de chegada, e <span className="font-medium">Ranking</span> quando o destino foi deduzido da única
+          aprovação em concurso que a pessoa tinha — aí o link abre a ficha de aprovações, e não um ato: é indício com
+          fonte, não fato publicado.
         </p>
 
         <footer className="mt-8 text-center text-sm text-gray-500">

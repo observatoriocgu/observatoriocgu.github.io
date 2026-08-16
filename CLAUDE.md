@@ -159,6 +159,15 @@ Edital CGU nº 5 de 13/06/2022, publicado no DOU (D17).
 - filtrar_affc.py      reduz o CSV bruto do Portal aos AFFC
 - ranking.py           biblioteca: rankingdosconcursos, catálogo de órgãos e a
                        regra de decisão do destino (D24)
+- diarios.py           biblioteca: ato de nomeação em diário MUNICIPAL, pelo
+                       Querido Diário. Terceira tentativa de destino (D27)
+- buscaweb.py          biblioteca: ato de posse no sítio do próprio órgão de
+                       chegada, por busca web com chave. Quarta e última (D28)
+- segredos.py          lê chave de API do ambiente ou do .env. Tudo opcional
+- testar_diarios.py    regressão dos padrões de nomeação e da leitura do
+                       território, sem rede. RODAR SEMPRE que mexer em diarios.py
+- testar_buscaweb.py   regressão do catálogo de domínios e dos padrões de posse,
+                       sem rede e SEM CHAVE. RODAR SEMPRE que mexer em buscaweb.py
 - enriquecer_destinos_ranking.py  destino de quem já saiu e o DOU não disse para
                        onde. `--conferir` mede a regra contra o gabarito do DOU
 - testar_dou.py        regressão da classificação, sem rede. RODAR SEMPRE que
@@ -230,13 +239,12 @@ Edital CGU nº 5 de 13/06/2022, publicado no DOU (D17).
   seis aprovações que continua na casa, e ele não pode aparecer em lugar nenhum
   do `destinos_ranking.csv`. Só quem tem saída registrada é consultado
 - O ranking sabe o CONJUNTO de concursos em que a pessoa passou; NÃO sabe qual
-  ela foi exercer. Por isso só se publica quando sobra UM órgão candidato.
-  Ambíguo vai para pauta humana, com a lista e o link — nunca para a tela
-- NÃO INVENTAR DESEMPATE. Todos foram medidos contra os 118 destinos que o DOU
-  já conhece e todos reprovaram: marca "Nomeado" 6 de 18 (33,3%), melhor
-  colocação 24 de 62 (38,7%), colocação até 100º 26,7%. Nos 62 ambíguos o
-  destino certo estava entre os candidatos nos 62 — o que falta não é dado, é o
-  critério, e ele não existe
+  ela foi exercer. Publica-se quando sobra UM órgão candidato, ou quando a marca
+  azul aponta um só (D26). Ambíguo vai para pauta humana, com a lista e o link
+- NÃO INVENTAR DESEMPATE além da marca azul. Os outros foram medidos contra os
+  destinos que o DOU já conhece e reprovaram: melhor colocação 24 de 62 (38,7%),
+  colocação até 100º 26,7%. Nos 62 ambíguos o destino certo estava entre os
+  candidatos nos 62 — o que falta não é dado, é o critério
 - A ÂNCORA: só se publica se a ficha do site tiver também a linha do concurso da
   própria CGU. É a prova de que aquela ficha é desta pessoa, e não de um
   homônimo perfeito, e sinal de que a lista de concursos dela ali está completa.
@@ -249,16 +257,8 @@ Edital CGU nº 5 de 13/06/2022, publicado no DOU (D17).
   uma aprovação única no TCU ficava fora do painel só por isso. Medido:
   CGU-2021 com âncora 43 de 45 (95,6%); CGU-2021 SEM âncora 0 de 2; VETERANO
   (sempre sem âncora) 2 de 2. A regra final publica 47 e acerta 45 (95,7%)
-- A TAG AZUL "Nomeado" NÃO DESEMPATA, e a tentação de usá-la é forte porque
-  parece a resposta. Ela NÃO TEM DATA: marca quem foi nomeado naquele concurso
-  em algum momento da vida, inclusive ANTES de entrar na CGU. Medido: 6 de 18
-  (33,3%). Os 12 erros são quase todos tag em SEFAZ/ISS/TCE estadual de alguém
-  que foi para Câmara, Senado ou TCU. Dois casos com a MESMA tag `ISS Aracaju`
-  foram, na verdade, para TCU e para o Senado. A tag é gravada na coluna
-  MARCADOS_NOMEADO só para a pauta de curadoria
-- O quadradinho azul do site é "Nomeado" e o verde é "Dentro das Vagas". O azul
-  parece a resposta e não é: quem passa em vários é nomeado em vários. São
-  lidos e guardados para a curadoria, e não entram na decisão
+- A TAG AZUL "Nomeado" DESEMPATA desde a D26 (16/08/2026) — mas só com a guarda
+  `ranking.ORGAOS_CEGOS_A_TAG`, e só quando é UMA marca só. Ver abaixo
 - Nome NUNCA basta: a busca do site casa por PREFIXO, então "MARIA DE SOUZA
   LIMA" traz "Mariana de Souza Lima Velasco" junto. `linhas_da_pessoa` exige
   igualdade EXATA do nome normalizado. Sem isso, aprovação de uma pessoa vira
@@ -284,6 +284,138 @@ Edital CGU nº 5 de 13/06/2022, publicado no DOU (D17).
 - Toda página que lê `dados.csv` chama `mesclarFontesExternas`, e não as duas
   mescladas soltas: são duas agora, e uma regra que depende de quatro páginas
   lembrarem da mesma sequência é uma regra que a quinta página quebra
+
+## A marca azul do ranking desempata (D26, 16/08/2026)
+- A marca azul "Nomeado" AFIRMA UM FATO — a pessoa foi nomeada naquele concurso.
+  É por isso que ela decide, enquanto colocação e ano continuam proibidos (39% e
+  27%). Decisão `UNICO_NOMEADO`, ao lado de `UNICO`; as duas estão em
+  `ranking.DECISOES_QUE_PUBLICAM`, que existe para não haver um quinto lugar
+  comparando com a string `"UNICO"`
+- MAS A AUSÊNCIA DE MARCA NÃO AFIRMA NADA. O site não mantém a lista de nomeados
+  de todo concurso: medido nas 155 fichas, **TCU tem 0 marca azul em 38 linhas** e
+  a CGU **0 em 84**, e há 20 pessoas cuja nomeação no TCU o DOU comprova, todas
+  sem marca. Daí `ORGAOS_CEGOS_A_TAG` = {TCU, Senado, Câmara dos Deputados}: se
+  um deles está entre os candidatos SEM marca, a marca em outro lugar não decide.
+  Medido — marca solta 69 publicados e 53 certos (76,8%); com a guarda 53 e 50
+  (94,3%); sem marca nenhuma 48 e 46 (95,8%) e METADE da cobertura. Os erros da
+  marca solta são TODOS de quem foi para TCU ou Senado; nenhum com destino
+  estadual ou municipal
+- DUAS MARCAS NÃO SE DESEMPATAM. Escolher entre elas publicaria 5 a mais e
+  erraria 3: NAZLI SETTON FILIPPINI e JAIDIR ALVES COSTA DOS SANTOS foram os dois
+  para a Receita, e nos dois a RFB ESTAVA marcada, ao lado de outra marca que o
+  desempate por colocação preferiu. Duas marcas = o site diz que a pessoa foi
+  nomeada nos dois lugares, e qual ela foi exercer é o que ele não sabe
+- O PREÇO, e ele é aceito: quem tem TCU/Senado/Câmara na ficha vai para a pauta
+  mesmo com marca azul em outro lugar. ALAOR ANTONIO RODRIGUES VILELA JUNIOR é
+  10º em Câmara Consultor com azul na SEFAZ AM (92º); DANIEL LIMA OLIVEIRA é 4º
+  na Câmara com azul na SEFAZ RN (135º). Uma colocação dessas é destino plausível
+  demais para a máquina decidir contra ela
+- A COLUNA "Fez tb:" NÃO É ENFEITE. O site rende o quadradinho na linha própria E
+  na coluna "Fez tb:" das outras linhas da pessoa, e às vezes só num dos dois: o
+  "Nomeado" de ROSICLEIDE RAMOS ALVES no TCM SP existe SÓ lá. Ela também cita
+  concurso que a tabela não lista como linha (visto com RFB e Câmara dos
+  Deputados), e ler dali é o que impede chamar de "candidato único" quem tem um
+  segundo concurso escondido. Quem une as duas leituras é `aprovacoes_da_pessoa`,
+  e é por ela que a decisão passa — NUNCA por `linhas_da_pessoa` direto
+- O MESMO concurso é escrito `SEFAZ AM 22` na linha e `SEFAZ/AM/22` no "Fez tb:".
+  `rotulo_base` e `ano_do_rotulo` trocam a barra por espaço; sem isso a mesma
+  aprovação vira dois concursos e um deles cai fora do catálogo
+- A JANELA DE ANOS PARA TRÁS FOI REMOVIDA. Ela cortava concurso mais velho que
+  `saída - 3` supondo que aprovação antiga já teria sido exercida, e a nomeação
+  sai anos depois da homologação: apagava a resposta CERTA de ANDRE LUIZ LIMA DA
+  ROCHA (saída 05/2025, única aprovação SEFAZ RS **18**) e de ROSICLEIDE (saída
+  05/2024, azul no TCM SP **20**). A janela PARA A FRENTE fica: edição posterior
+  à saída não pode tê-la motivado
+
+## O ato em diário MUNICIPAL (D27, 16/08/2026)
+- TERCEIRA tentativa de destino, depois do DOU e do ranking, e só para quem os
+  dois não responderam. Fonte: API pública do Querido Diário (Open Knowledge
+  Brasil), sem chave, busca por FRASE EXATA — as aspas na `querystring` são o
+  que faz isso; sem elas a consulta vira OU e devolve 10.000 diários
+- O ÓRGÃO NÃO É LIDO DO TEXTO. Vem do TERRITÓRIO do diário, que a API entrega.
+  É o que dispensa qualquer extração de nome de órgão a partir de texto livre —
+  e portanto qualquer IA. `orgao_do_territorio` prefere SEMPRE o nome que o
+  catálogo do `ranking.py` já usa (é "Prefeitura DO Rio de Janeiro" e
+  "Prefeitura DE São Paulo"), e só constrói o molde para município novo
+- O DF FICA DE FORA. O DODF é um diário só para GDF, TCDF, Câmara Legislativa,
+  Defensoria e Polícia Civil — o território não identifica órgão. É onde estão
+  os casos mais tentadores (ANA CAROLINA GOMES MELLAO HADAD aparece nomeada
+  Defensora Pública do DF em 05/2024, e vai para a pauta)
+- ATO DA CÂMARA MUNICIPAL sai no diário DA PREFEITURA. Quando o trecho fala de
+  Legislativo, o território deixa de identificar o órgão e o caso vai à pauta —
+  senão quem virou Procurador Legislativo da Câmara de Maceió seria publicado
+  como "Prefeitura de Maceió"
+- A PALAVRA MAIS PRÓXIMA DO NOME VENCE, e isso não é detalhe: o ato que nomeia
+  CARLOS MOACYR FERREIRA NETO em Santos diz, logo adiante, "em vaga decorrente
+  da APOSENTADORIA de" outra pessoa. Vetar por presença descartava o ato inteiro.
+  `parece_nomeacao` compara a distância da fórmula de entrada e a do veto até
+  AQUELE nome, dentro de ±200 caracteres
+- NÃO se exige que o órgão esteja entre os candidatos do ranking, e há um caso
+  que prova por quê: o mesmo CARLOS MOACYR foi nomeado em SANTOS (ato explícito),
+  e Santos NÃO está na ficha dele; São Paulo está, e é onde aparecem uma licença
+  médica e um despacho de posse. Exigir o cruzamento publicaria o município errado
+- Dois municípios com ato da mesma pessoa é PAUTA (`VARIOS_DIARIOS`), não
+  desempate. É o caso do CARLOS MOACYR, que tem ato em Santos e em São Paulo
+- Lista de aprovados em ordem alfabética cola nomes uns nos outros, e é metade
+  do que a busca devolve. `ocorrencias_isoladas` exige que a palavra vizinha não
+  seja outro pedaço de nome — casos reais: "LUANA CAMILA PINHEIRO JUCA" contém
+  "CAMILA PINHEIRO", "SILVIO LUCIO PEREIRA CARDOSO" contém "LUCIO PEREIRA
+  CARDOSO". A regra derruba caso legítimo quando o nome anterior encosta no da
+  pessoa, e esse é o lado certo para errar
+- NÃO COBRE DIÁRIO ESTADUAL, e isso é o limite principal: das 20 pessoas que
+  estavam na pauta em 16/08/2026, 11 não têm um único diário, e são justamente
+  as de SEFAZ RN, AM, PE, CE e MG. Medido no gabarito de 123 destinos que o DOU
+  conhece: ZERO falso positivo (havia diário para 36 delas e a fonte não afirmou
+  nada em nenhuma)
+- BUSCA WEB SEM CHAVE NÃO FUNCIONA, e já foi testada — não repetir. Google, Bing,
+  Mojeek e Startpage bloqueiam requisição sem chave; só o DuckDuckGo lite
+  responde, com 3 a 8 resultados e sem diário oficial no índice (são PDFs). Pior:
+  "o candidato do ranking aparece nos resultados" confirma VÁRIOS candidatos ao
+  mesmo tempo, porque os resultados incluem páginas que listam todas as
+  aprovações da pessoa. COM chave é outra história — ver D28
+- CONVOCAÇÃO NÃO PUBLICA SOZINHA (revisto em 16/08/2026). Convocação é chamado a
+  comparecer, não entrada em cargo. LEONARDO TOIOMOTO foi convocado por Paulínia
+  três vezes seguidas, sempre como 13º do mesmo concurso — retrato de quem não
+  compareceu —, e a primeira versão da D27 publicou "Prefeitura de Paulínia" por
+  causa disso. O Diário da Cidade de São Paulo traz "NOMEAR LEONARDO TOIOMOTO",
+  de 15/01/2025: ele foi para o TCM-SP. `_ENTRADA_FORTE` publica, `_ENTRADA_FRACA`
+  vai para a pauta
+
+## O ato no sítio do órgão de chegada (D28, 16/08/2026)
+- QUARTA e última tentativa de destino, depois do DOU, do ranking e do diário
+  municipal. Alcança o que nenhuma das três alcança: tribunal de contas estadual,
+  defensoria, TRT — órgãos que publicam em sítio próprio
+- EXIGE CHAVE, e por isso é a única etapa OPCIONAL do observatório. Sem chave,
+  `buscaweb.buscar` devolve `None` e nada acontece. A chave mora no `.env`
+  (ignorado pelo Git) ou em variável de ambiente, que VENCE o arquivo — é o que
+  faz o mesmo código servir à máquina local e ao repository secret do CI
+- O ÓRGÃO VEM DO DOMÍNIO, nunca do texto: `tc.df.gov.br` é o TCDF, `trt4.jus.br`
+  é o TRT da 4ª Região. Mesma ideia do território no `diarios.py`, e é o que
+  dispensa IA. Domínio fora do catálogo NÃO vira destino
+- DIÁRIO ESTADUAL CONTINUA SEM RESPOSTA, e é o mesmo motivo do DODF: o DOE de um
+  estado publica ato de TODOS os órgãos dele. `imagens.seplag.ce.gov.br` e
+  `jornal.iof.mg.gov.br` estão em `HOSPEDEIROS_SEM_ORGAO`
+- O RUÍDO DOMINANTE é o nome da pessoa em LISTA DE CLASSIFICAÇÃO de concurso que
+  ela apenas prestou, hospedada em domínio oficial. VICTOR GABRIEL CARVALHO
+  SANTOS SOUZA aparece assim em `aracaju.se.gov.br` E em `seplag.ce.gov.br` — os
+  dois candidatos dele. `fala_de_posse` exige fórmula de posse mais perto do nome
+  que qualquer palavra de classificação
+- A JANELA DE DATA separa o destino DESTA saída de um emprego posterior: ALINNE
+  PATRICIA tomou posse no TCDF em 24/03/2025 (saída 05/2025) e aparece como
+  analista ATIVA no Senado em 2026. As duas coisas são verdade; só a primeira é
+  o destino da saída da CGU
+- CRUZAR COM O RANKING É O PORTÃO ERRADO — terceira vez que isso se confirma. Os
+  três achados mais valiosos (ALINNE no TCDF, SERGIO no TRT 4ª, ANA CAROLINA na
+  Defensoria do DF) são de órgão que o ranking NÃO conhece. O cruzamento virou
+  SELO, por pedido do usuário: `RANKING` quando o órgão também consta da ficha —
+  basta o nome estar na lista, sem exigir marca azul nem verde —, `GOOGLE`
+  quando só a busca o conhece
+- O plano gratuito do serper recusa frase entre aspas COMBINADA com `gl`/`hl`/
+  `num`: devolve `400 Query pattern not allowed for free accounts`. Manda-se só
+  `q`, e os resultados vêm brasileiros do mesmo jeito
+- A CHAVE NUNCA ENTRA NO NOME DO ARQUIVO DE CACHE. A chave do cache é a CONSULTA,
+  não a URL — no serpapi a chave vai na query string, e derivar nome de arquivo
+  dela gravaria o segredo no disco com nome legível
 
 ## Ferramentas
 - Scripts Python são STDLIB ONLY: o CI não roda pip install, e requests/bs4/

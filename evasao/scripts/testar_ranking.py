@@ -79,9 +79,11 @@ ANOS = [
 ]
 
 
-def _linha(nome, concurso, nomeado=False):
+def _linha(nome, concurso, nomeado=False, tambem=()):
     return {"nome": nome, "concurso": concurso, "cargo": "", "nota": "",
-            "colocacao": "", "nomeado": nomeado, "dentro_das_vagas": False}
+            "colocacao": "", "nomeado": nomeado, "dentro_das_vagas": False,
+            "tambem": [{"concurso": c, "colocacao": "1", "nomeado": n,
+                        "dentro_das_vagas": False} for c, n in tambem]}
 
 
 ALVO = "JOAO DA SILVA"
@@ -113,22 +115,13 @@ DECISAO = [
         ("SEM_CANDIDATO", ""),
     ),
     (
-        # O ranking sabe o CONJUNTO de concursos, não sabe qual a pessoa foi
-        # exercer. Medido: nos 62 ambíguos do gabarito o destino certo estava
-        # entre os candidatos nos 62, e mesmo assim nenhum desempate passa de
-        # 38,7%. Escolher um seria chutar com cara de dado.
-        "dois concursos possíveis: não se escolhe, vai para a curadoria",
+        # Sem marca nenhuma, o ranking sabe o CONJUNTO de concursos e não sabe
+        # qual a pessoa foi exercer. Medido: nos 62 ambíguos do gabarito o
+        # destino certo estava entre os candidatos nos 62, e mesmo assim nenhum
+        # desempate por colocação ou por ano passa de 38,7%.
+        "dois concursos possíveis e nenhuma marca: vai para a curadoria",
         ALVO, "202401",
         [_linha(ALVO, "CGU"), _linha(ALVO, "TCU"), _linha(ALVO, "Senado")],
-        ("AMBIGUO", ""),
-    ),
-    (
-        # A marca azul "Nomeado" acerta 6 de 18 quando usada para desempatar —
-        # ela diz que a pessoa foi nomeada NAQUELE concurso algum dia, e quem
-        # passa em vários é nomeado em vários.
-        "a marca 'Nomeado' NÃO desempata",
-        ALVO, "202401",
-        [_linha(ALVO, "CGU"), _linha(ALVO, "TCU", nomeado=True), _linha(ALVO, "Senado")],
         ("AMBIGUO", ""),
     ),
     (
@@ -161,14 +154,19 @@ DECISAO = [
         ("SEM_CANDIDATO", ""),
     ),
     (
-        # Caso real: TJDFT de 2022 como destino de quem saiu em 05/2026.
-        "concurso velho demais também não",
+        # A JANELA PARA TRÁS SAIU NA D26, e este caso é o motivo. Ela cortava
+        # concurso mais velho que `saída - 3` supondo que aprovação antiga já
+        # teria sido exercida — e a nomeação sai anos depois da homologação.
+        # Casos reais que ela apagava: ANDRE LUIZ LIMA DA ROCHA, saída 05/2025 e
+        # única aprovação na SEFAZ RS de 2018; ROSICLEIDE RAMOS ALVES, saída
+        # 05/2024 e "Nomeado" no TCM SP de 2020. Nos dois, "sem candidato".
+        "concurso antigo VALE: a nomeação sai anos depois da homologação",
         ALVO, "202605",
         [_linha(ALVO, "CGU"), _linha(ALVO, "TJDFT 22")],
-        ("SEM_CANDIDATO", ""),
+        ("UNICO", "Tribunal de Justiça do Distrito Federal e dos Territórios"),
     ),
     (
-        "dentro da janela, vale",
+        "e o mesmo concurso perto da saída também vale",
         ALVO, "202401",
         [_linha(ALVO, "CGU"), _linha(ALVO, "TJDFT 22")],
         ("UNICO", "Tribunal de Justiça do Distrito Federal e dos Territórios"),
@@ -241,19 +239,122 @@ DECISAO_VETERANO = [
     ),
 ]
 
-# A tag azul é registrada para a pauta e NUNCA decide. Ver a medição em
-# ranking.py: 6 de 18 como desempate, porque a tag não tem data — ela marca
-# quem foi nomeado naquele concurso em algum momento da vida, inclusive ANTES
-# de entrar na CGU.
-TAG = [
+# A MARCA AZUL "Nomeado" DESEMPATA (D26) — e a guarda que a torna utilizável é o
+# que estes casos protegem. Medido: com a guarda, 53 publicados e 50 certos
+# (94,3%); sem ela, 69 e 53 (76,8%). O site NÃO anota nomeação de todo concurso —
+# TCU tem zero marca azul em 38 linhas —, então a AUSÊNCIA de marca no TCU não
+# é informação, e a marca em outro lugar não exclui o TCU.
+DECISAO_TAG = [
     (
-        "a tag entra na resposta, para a pauta",
+        "a marca aponta um só e nada a cega: publica",
         ALVO, "202401",
-        [_linha(ALVO, "CGU"), _linha(ALVO, "TCU", nomeado=True), _linha(ALVO, "Senado")],
-        ["Tribunal de Contas da União"],
+        [_linha(ALVO, "CGU"), _linha(ALVO, "SEFAZ SP", nomeado=True),
+         _linha(ALVO, "ISS Campinas")],
+        ("UNICO_NOMEADO", "Secretaria de Fazenda de São Paulo"),
     ),
     (
-        "sem tag nenhuma, lista vazia",
+        # O erro que a guarda existe para impedir, e ele aconteceu 16 vezes na
+        # medição: quem foi para o TCU e tinha azul num concurso estadual.
+        "TCU sem marca entre os candidatos CEGA a marca: vai para a pauta",
+        ALVO, "202401",
+        [_linha(ALVO, "CGU"), _linha(ALVO, "SEFAZ SP", nomeado=True), _linha(ALVO, "TCU")],
+        ("AMBIGUO", ""),
+    ),
+    (
+        "idem Senado",
+        ALVO, "202401",
+        [_linha(ALVO, "CGU"), _linha(ALVO, "SEFAZ SP", nomeado=True), _linha(ALVO, "Senado")],
+        ("AMBIGUO", ""),
+    ),
+    (
+        "idem Câmara — e é o caso de DANIEL LIMA OLIVEIRA, 4º lá",
+        ALVO, "202401",
+        [_linha(ALVO, "CGU"), _linha(ALVO, "SEFAZ RN", nomeado=True),
+         _linha(ALVO, "Camara dos Deputados")],
+        ("AMBIGUO", ""),
+    ),
+    (
+        # Se o próprio órgão cego está marcado, a marca não está sendo cega ali:
+        # ela viu aquela nomeação. O que veta é o SILÊNCIO sobre ele.
+        "órgão cego COM marca não veta: ele é que é o marcado",
+        ALVO, "202401",
+        [_linha(ALVO, "CGU"), _linha(ALVO, "TCU", nomeado=True), _linha(ALVO, "SEFAZ SP")],
+        ("UNICO_NOMEADO", "Tribunal de Contas da União"),
+    ),
+    (
+        # Duas marcas não são empate a desempatar: são o site dizendo que a
+        # pessoa foi nomeada nos dois lugares. Medido, escolher entre elas
+        # publicaria 5 a mais e erraria 3 — NAZLI SETTON FILIPPINI e JAIDIR
+        # ALVES COSTA DOS SANTOS foram os dois para a Receita, com a RFB
+        # marcada ao lado de outra marca.
+        "duas marcas NÃO se desempatam",
+        ALVO, "202401",
+        [_linha(ALVO, "CGU"), _linha(ALVO, "SEFAZ SP", nomeado=True),
+         _linha(ALVO, "ISS Campinas", nomeado=True)],
+        ("AMBIGUO", ""),
+    ),
+    (
+        "concurso unificado no meio impede o desempate pela marca",
+        ALVO, "202401",
+        [_linha(ALVO, "CGU"), _linha(ALVO, "SEFAZ SP", nomeado=True),
+         _linha(ALVO, "ISS Campinas"), _linha(ALVO, "CNU")],
+        ("AMBIGUO", ""),
+    ),
+    (
+        "rótulo fora do catálogo também impede",
+        ALVO, "202401",
+        [_linha(ALVO, "CGU"), _linha(ALVO, "SEFAZ SP", nomeado=True),
+         _linha(ALVO, "ORGAO NOVO 24")],
+        ("AMBIGUO", ""),
+    ),
+    (
+        "sem a âncora da CGU, a marca não publica",
+        ALVO, "202401",
+        [_linha(ALVO, "SEFAZ SP", nomeado=True), _linha(ALVO, "ISS Campinas")],
+        ("SEM_ANCORA_CGU", ""),
+    ),
+]
+
+# A coluna "Fez tb:" NÃO é redundante, e tratá-la como enfeite custou o caso
+# ROSICLEIDE RAMOS ALVES: o "Nomeado" dela no TCM SP existe SÓ lá, e a linha do
+# TCM SP vem sem marca nenhuma. O site rende o quadradinho nos dois lugares e às
+# vezes só num deles.
+FEZ_TAMBEM = [
+    (
+        "marca que só o 'Fez tb:' tem conta como marca (caso ROSICLEIDE)",
+        ALVO, "202401",
+        [_linha(ALVO, "CGU", tambem=[("TCM/SP/20", True)]),
+         _linha(ALVO, "TCM SP 20"),
+         _linha(ALVO, "ALESP")],
+        ("UNICO_NOMEADO", "Tribunal de Contas do Município de São Paulo"),
+    ),
+    (
+        # O "Fez tb:" de ANDRE VINICIUS NUNES SILVA cita `91º Camara dos
+        # Deputados` e a tabela não traz essa linha. Sem ler daqui, ele teria
+        # "candidato único" onde há dois.
+        "concurso que só o 'Fez tb:' cita ainda assim é candidato",
+        ALVO, "202401",
+        [_linha(ALVO, "CGU", tambem=[("Camara dos Deputados", False)]),
+         _linha(ALVO, "TCE MG")],
+        ("AMBIGUO", ""),
+    ),
+    (
+        "a barra do 'Fez tb:' não cria concurso novo: SEFAZ/AM/22 é SEFAZ AM 22",
+        ALVO, "202401",
+        [_linha(ALVO, "CGU"), _linha(ALVO, "SEFAZ AM 22", tambem=[("SEFAZ/AM/22", False)])],
+        ("UNICO", "Secretaria de Fazenda do Amazonas"),
+    ),
+]
+
+TAG = [
+    (
+        "a marca entra na resposta, para a pauta, mesmo quando não decide",
+        ALVO, "202401",
+        [_linha(ALVO, "CGU"), _linha(ALVO, "SEFAZ SP", nomeado=True), _linha(ALVO, "TCU")],
+        ["Secretaria de Fazenda de São Paulo"],
+    ),
+    (
+        "sem marca nenhuma, lista vazia",
         ALVO, "202401",
         [_linha(ALVO, "CGU"), _linha(ALVO, "TCU"), _linha(ALVO, "Senado")],
         [],
@@ -283,6 +384,10 @@ RESPOSTA_VALIDA = [
 ]
 
 # A tabela do site, como ela é. Guarda contra o layout mudar em silêncio.
+#
+# A última célula é a coluna "Fez tb:", e ela vem como o site a escreve: itens
+# separados por <br>, cada um "[quadradinho?] Nº <rótulo> <link>", com o rótulo
+# em barras. É de lá que sai a marca que a linha própria às vezes perde.
 TABELA = """
 <table class="table"><thead><tr><th></th><th>Nome</th></tr></thead><tbody>
 <tr class='odd'>
@@ -292,7 +397,7 @@ TABELA = """
   <td style='text-align:center;'>Auditor <a href='x'><img src='y'></a></td>
   <td style='text-align:center;'>134.75</td>
   <td style='text-align:center;'>43&ordm; (Ampla)</td>
-  <td style='text-align:center;'>33&ordm; CGU</td>
+  <td style='text-align:center; white-space: nowrap;'>33&ordm; CGU <a href="x"><img src="y" /></a><br><span style="display: inline-block; background-color: #22c55e;"></span>5&ordm; SEFAZ/AM/22 <a href="x"><img src="y" /></a><br></td>
 </tr>
 </tbody></table>
 """
@@ -343,6 +448,26 @@ def main() -> int:
             print(f"        esperado {(decisao, orgao)}, "
                   f"obtido {(obtido['decisao'], obtido['orgao'])}")
 
+    print("— a marca azul 'Nomeado', e onde ela é cega —")
+    for descricao, nome, mes, linhas, (decisao, orgao) in DECISAO_TAG:
+        obtido = ranking.destino_da_pessoa(nome, mes, linhas)
+        ok = obtido["decisao"] == decisao and obtido["orgao"] == orgao
+        falhas += not ok
+        print(f"  {'ok  ' if ok else 'FALHA'} {descricao}")
+        if not ok:
+            print(f"        esperado {(decisao, orgao)}, "
+                  f"obtido {(obtido['decisao'], obtido['orgao'])}")
+
+    print("— a coluna 'Fez tb:' não é enfeite —")
+    for descricao, nome, mes, linhas, (decisao, orgao) in FEZ_TAMBEM:
+        obtido = ranking.destino_da_pessoa(nome, mes, linhas)
+        ok = obtido["decisao"] == decisao and obtido["orgao"] == orgao
+        falhas += not ok
+        print(f"  {'ok  ' if ok else 'FALHA'} {descricao}")
+        if not ok:
+            print(f"        esperado {(decisao, orgao)}, "
+                  f"obtido {(obtido['decisao'], obtido['orgao'])}")
+
     print("— a âncora só é exigida de quem pode tê-la (veterano) —")
     for descricao, nome, mes, linhas, concurso, (decisao, orgao) in DECISAO_VETERANO:
         obtido = ranking.destino_da_pessoa(nome, mes, linhas, concurso)
@@ -353,7 +478,7 @@ def main() -> int:
             print(f"        esperado {(decisao, orgao)}, "
                   f"obtido {(obtido['decisao'], obtido['orgao'])}")
 
-    print("— a tag 'Nomeado' é registrada, mas não decide —")
+    print("— a marca vai para a pauta mesmo quando não decide —")
     for descricao, nome, mes, linhas, esperado in TAG:
         obtido = ranking.destino_da_pessoa(nome, mes, linhas)
         ok = obtido["marcados_nomeado"] == esperado and obtido["orgao"] == ""
@@ -380,13 +505,26 @@ def main() -> int:
         ("colocação com º", linhas and linhas[0]["colocacao"] == "43º (Ampla)"),
         ("marca de nomeado lida da cor", linhas and linhas[0]["nomeado"] is True),
         ("sem tabela devolve lista vazia", ranking.analisar("<p>nada</p>") == []),
+        ("os dois itens do 'Fez tb:' são lidos", linhas and len(linhas[0]["tambem"]) == 2),
+        ("o rótulo do 'Fez tb:' vem sem a colocação",
+         linhas and linhas[0]["tambem"][0]["concurso"] == "CGU"),
+        ("a colocação do 'Fez tb:' vem separada",
+         linhas and linhas[0]["tambem"][0]["colocacao"] == "33"),
+        ("a marca verde do 'Fez tb:' é lida",
+         linhas and linhas[0]["tambem"][1]["dentro_das_vagas"] is True),
+        ("item do 'Fez tb:' sem marca não inventa uma",
+         linhas and linhas[0]["tambem"][0]["dentro_das_vagas"] is False),
+        ("a barra do 'Fez tb:' cai no mesmo rótulo-base da tabela",
+         ranking.rotulo_base("SEFAZ/AM/22") == ranking.rotulo_base("SEFAZ AM 22") == "SEFAZ AM"),
+        ("...e a edição sobrevive à barra", ranking.ano_do_rotulo("SEFAZ/AM/22") == 2022),
     ]
     for descricao, ok in casos:
         falhas += not ok
         print(f"  {'ok  ' if ok else 'FALHA'} {descricao}")
 
     total = (len(CANONICO) + len(SEM_CATALOGO) + len(UNIFICADOS) + len(ANOS)
-             + len(DECISAO) + len(DECISAO_VETERANO) + len(TAG)
+             + len(DECISAO) + len(DECISAO_TAG) + len(FEZ_TAMBEM)
+             + len(DECISAO_VETERANO) + len(TAG)
              + len(RESPOSTA_VALIDA) + len(casos))
     print()
     print(f"{total - falhas} de {total} invariantes OK")

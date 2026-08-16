@@ -214,6 +214,8 @@ export const ROTULO_POR_FONTE: Readonly<Record<string, string>> = {
   SIAPE: 'SIAPE',
   DOU: 'DOU',
   RANKING: 'Ranking',
+  DIARIO: 'Diário municipal',
+  GOOGLE: 'Busca',
   BUSCA: 'Busca',
   MANUAL: 'Curadoria',
 };
@@ -231,6 +233,17 @@ export const DESCRICAO_POR_FONTE: Readonly<Record<string, string>> = {
   RANKING:
     'Aprovação em concurso registrada no rankingdosconcursos.com.br, para quem ' +
     'o SIAPE ou o DOU já mostraram sair. É indício com fonte, não ato publicado',
+  // Este é ATO, e por isso a descrição não traz a ressalva do ranking: o que se
+  // leu foi a nomeação publicada pelo próprio município, achada pelo Querido
+  // Diário. O DOU não a alcança porque ela não é federal.
+  DIARIO:
+    'Ato de nomeação publicado no diário oficial do município de chegada, ' +
+    'localizado pelo Querido Diário (Open Knowledge Brasil)',
+  // O que o selo promete é o DOCUMENTO achado, não o buscador: o link abre a
+  // página do próprio órgão de chegada. O buscador foi só o caminho até ela.
+  GOOGLE:
+    'Ato de posse ou nomeação publicado no sítio do órgão de chegada, ' +
+    'localizado por busca na web',
   BUSCA: 'Busca por nome no DOU',
   MANUAL: 'Correção humana registrada em data/curadoria.csv',
 };

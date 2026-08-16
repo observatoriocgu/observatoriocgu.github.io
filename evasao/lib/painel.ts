@@ -39,13 +39,21 @@ import { LinhaCsv, baseDoSite } from './dados';
 export const comoRegistros = (linhas: LinhaCsv[]): RegistroAuditor[] =>
   linhas as unknown as RegistroAuditor[];
 
-/** `destinos_ranking.csv` como o navegador o consome (D24). */
+/**
+ * `destinos_ranking.csv` como o navegador o consome (D24, ampliado pela D27).
+ *
+ * O arquivo carrega DUAS fontes desde a D27 — o ranking dos concursos e o ato em
+ * diário municipal —, e por isso `fonteDestino` vem do próprio CSV em vez de ser
+ * fixado aqui. Fixá-lo era o que existia antes, e creditaria ao ranking um
+ * destino lido de um ato publicado.
+ */
 export const comoDestinosDoRanking = (linhas: LinhaCsv[]): DestinoDoRanking[] =>
   linhas.map((linha) => ({
     idServidor: linha.ID_SERVIDOR_PORTAL,
     nome: linha.NOME,
     decisao: linha.DECISAO,
     orgaoDestino: linha.ORGAO_DESTINO,
+    fonteDestino: linha.FONTE_DESTINO,
     urlDestino: linha.URL_DESTINO,
     candidatos: linha.CANDIDATOS ? linha.CANDIDATOS.split(' | ') : [],
   }));
@@ -213,12 +221,13 @@ export const mesclarSaidasDoDou = (
  * sendo CURADORIA > DOU > RANKING.
  *
  * O QUE O ARQUIVO JÁ RESOLVEU ANTES DE CHEGAR AQUI. O Python só escreve linha
- * com órgão quando sobrou UM candidato só: aprovação em concurso não é posse, e
- * quem passou em cinco concursos foi exercer no máximo um. Caso ambíguo fica no
- * arquivo sem `ORGAO_DESTINO`, aguardando curadoria, e a guarda `|| !destino.
- * ORGAO_DESTINO` abaixo é o que garante que ele não vaze para a tela por
- * descuido. Medida da regra contra os destinos que o DOU já conhece: 31 acertos
- * em 33 publicados.
+ * com órgão em duas situações: sobrou UM candidato só, ou sobrou mais de um e a
+ * marca azul "Nomeado" do site aponta exatamente um deles (D26). Aprovação em
+ * concurso não é posse, e quem passou em cinco concursos foi exercer no máximo
+ * um. Caso ambíguo fica no arquivo sem `ORGAO_DESTINO`, aguardando curadoria, e
+ * a guarda `|| !destino.ORGAO_DESTINO` abaixo é o que garante que ele não vaze
+ * para a tela por descuido. Medida da regra contra os 123 destinos que o DOU já
+ * conhece: 50 acertos em 53 publicados (94,3%).
  *
  * POR QUE NO NAVEGADOR, e não no `construir_painel.py`: o mesmo motivo da D22 —
  * o construtor depende dos snapshots do Portal, que não existem no CI, e quem
@@ -248,7 +257,9 @@ export const mesclarDestinosDoRanking = (
     return {
       ...registro,
       ORGAO_DESTINO: destino.orgaoDestino,
-      FONTE_DESTINO: 'RANKING',
+      // Vem do CSV: `RANKING` ou `DIARIO` (D27). Escrever a fonte aqui à mão
+      // creditaria ao ranking o que foi lido de um ato publicado em diário.
+      FONTE_DESTINO: destino.fonteDestino || 'RANKING',
       URL_DESTINO: destino.urlDestino,
     };
   });

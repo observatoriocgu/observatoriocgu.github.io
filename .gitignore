@@ -32,6 +32,12 @@ evasao/data/cache_dou/
 # de um candidato MUDA — vale 12 horas, e versionar cópia velha de dado que
 # muda é pior que não ter cache nenhum. Cada página comprimida tem 218 KB.
 evasao/data/cache_ranking/
+evasao/data/cache_diarios/
+
+# Cache das buscas web. Além de regenerável, ele guarda resposta de API PAGA:
+# não versionar é também não publicar o que se comprou. A chave nunca está aqui
+# — o nome do arquivo é derivado da CONSULTA, nunca da URL (ver buscaweb.py).
+evasao/data/cache_buscaweb/
 
 # Python (evasao/scripts/)
 __pycache__/

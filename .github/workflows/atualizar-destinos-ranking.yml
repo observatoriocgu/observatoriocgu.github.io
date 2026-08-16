@@ -1,7 +1,9 @@
-name: Atualizar destinos no Ranking dos Concursos (AFFC)
+name: Atualizar destinos de quem saiu da CGU (AFFC)
 
 # Procura, para quem JÁ SAIU da CGU e está sem órgão de destino, em que outro
-# concurso a pessoa foi aprovada — e grava o destino quando sobra um só.
+# concurso a pessoa foi aprovada — e grava o destino quando sobra um só. Desde a
+# D27, quando o ranking não responde, procura o ATO DE NOMEAÇÃO no diário oficial
+# do município de chegada, pela API pública do Querido Diário.
 #
 # A ordem é sempre "já sabendo que saiu (SIAPE/DOU) -> para onde", nunca o
 # contrário: aprovação em concurso não é saída, e quem continua na CGU não
@@ -19,7 +21,9 @@ name: Atualizar destinos no Ranking dos Concursos (AFFC)
 # resposta depois de 30 dias — rodar todo dia seria bater num site de terceiro
 # para reler o que já se sabe. O site tem limitador de ritmo próprio, que
 # responde uma página "Muitas Consultas" com status 200; o crawler o detecta e
-# espera, mas o melhor jeito de não esbarrar nele é não ir com frequência.
+# espera, mas o melhor jeito de não esbarrar nele é não ir com frequência. O
+# Querido Diário é API pública e sem chave, e por isso roda aqui sem segredo
+# nenhum — ao contrário de busca web, que bloqueia IP de datacenter (ver D27).
 
 on:
   schedule:
@@ -55,9 +59,27 @@ jobs:
         run: python scripts/testar_ranking.py
         working-directory: evasao
 
+      # Idem para a segunda fonte (D27). São dois testes e não um porque são
+      # duas bibliotecas independentes: o diário pode quebrar sem que o ranking
+      # perceba, e o que os dois escrevem é o mesmo arquivo.
+      - name: Testar a leitura de diários municipais
+        run: python scripts/testar_diarios.py
+        working-directory: evasao
+
+      # Roda SEM chave de propósito: a busca web é a única etapa opcional do
+      # observatório, e o teste tem de passar mesmo quando o segredo não existe.
+      - name: Testar o catálogo de domínios da busca web
+        run: python scripts/testar_buscaweb.py
+        working-directory: evasao
+
+      # SERPER_API_KEY é OPCIONAL. Sem o segredo configurado no repositório, a
+      # variável chega vazia, `segredos.chave_de_busca_web()` devolve "nenhuma" e
+      # a etapa de busca web simplesmente não roda — as outras três seguem iguais.
       - name: Procurar destino de quem saiu
         run: python scripts/enriquecer_destinos_ranking.py
         working-directory: evasao
+        env:
+          SERPER_API_KEY: ${{ secrets.SERPER_API_KEY }}
 
       - name: Commit e push do que mudou
         run: |
