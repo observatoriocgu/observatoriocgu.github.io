@@ -85,22 +85,25 @@ HOMONIMO_PREFIXO = (
 )
 
 NOMEACAO = [
-    ("ato de nomeação com a vaga descrita por aposentadoria de OUTRA pessoa",
-     SANTOS, "CARLOS MOACYR FERREIRA NETO", True),
-    ("convocação de aprovado, com o cargo colado ao nome",
-     PAULINIA, "LEONARDO TOIOMOTO", True),
+    ("nomeação é FORTE, mesmo com a vaga descrita por aposentadoria de outra pessoa",
+     SANTOS, "CARLOS MOACYR FERREIRA NETO", "forte"),
+    # A convocação é FRACA desde que o TCM-SP mostrou "NOMEAR LEONARDO TOIOMOTO":
+    # Paulínia o convocou três vezes seguidas, que é o retrato de quem não
+    # compareceu, e a D27 chegou a publicar Paulínia por causa disso.
+    ("convocação de aprovado é FRACA — não publica sozinha",
+     PAULINIA, "LEONARDO TOIOMOTO", "fraca"),
     ("licença médica não é entrada em cargo",
-     LICENCA, "CARLOS MOACYR FERREIRA NETO", False),
+     LICENCA, "CARLOS MOACYR FERREIRA NETO", ""),
     ("resultado de prova não é nomeação",
-     RESULTADO, "THIAGO SANTOS BRAGA", False),
+     RESULTADO, "THIAGO SANTOS BRAGA", ""),
     ("exoneração é saída, não entrada",
-     EXONERACAO, "MATHEUS KLOTZ BUSCH", False),
+     EXONERACAO, "MATHEUS KLOTZ BUSCH", ""),
     ("homônimo por sufixo não empresta ato a ninguém",
-     HOMONIMO_SUFIXO, "LUCIO PEREIRA CARDOSO", False),
+     HOMONIMO_SUFIXO, "LUCIO PEREIRA CARDOSO", ""),
     ("homônimo por prefixo tampouco",
-     HOMONIMO_PREFIXO, "CAMILA PINHEIRO", False),
+     HOMONIMO_PREFIXO, "CAMILA PINHEIRO", ""),
     ("nome que não está no trecho não casa",
-     SANTOS, "JOAO DA SILVA", False),
+     SANTOS, "JOAO DA SILVA", ""),
 ]
 
 # O território identifica o órgão? Só quando o diário é de um município e o ato
@@ -132,10 +135,18 @@ def _gazeta(territorio, uf, data, trechos):
 
 DECISAO = [
     (
-        "um município com ato: é o destino",
+        # Era "UNICO_DIARIO / Prefeitura de Paulínia" até a D28 achar o
+        # "NOMEAR LEONARDO TOIOMOTO" do TCM-SP. Convocação sozinha não publica.
+        "só convocação: vai para a pauta, não para a tela",
         "LEONARDO TOIOMOTO", "202505",
         [_gazeta("Paulínia", "SP", "2025-05-19", [PAULINIA])],
-        ("UNICO_DIARIO", "Prefeitura de Paulínia"),
+        ("SO_CONVOCACAO", ""),
+    ),
+    (
+        "um município com NOMEAÇÃO: é o destino",
+        "CARLOS MOACYR FERREIRA NETO", "202505",
+        [_gazeta("Santos", "SP", "2025-03-07", [SANTOS])],
+        ("UNICO_DIARIO", "Prefeitura de Santos"),
     ),
     (
         # Caso real: CARLOS MOACYR FERREIRA NETO tem ato em Santos e um pedido de

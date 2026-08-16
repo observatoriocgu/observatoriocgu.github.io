@@ -254,23 +254,29 @@ def ocorrencias_isoladas(trecho: str, nome: str) -> list[int]:
 
 # ---------------------------------------------------- o ato é de ENTRADA mesmo?
 
-# O que caracteriza entrada em cargo.
+# DUAS FORÇAS, e a distinção custou um destino publicado errado.
 #
-# `CONVOCA...` entra, e é o caso a entender: a convocação de aprovado é o ato que
-# o município publica ANTES da posse, e é o único que existe para LEONARDO
-# TOIOMOTO — Paulínia o convocou em 19/05, 05/06 e 25/06 de 2025, sempre como 13º
-# do concurso nº 02/2021 para AUDITOR FISCAL TRIBUTÁRIO, com exame médico
-# admissional, e ele saiu da CGU na competência 05/2025.
+# FORTE é o ato que diz que a pessoa ENTROU: nomear, dar posse, empossar,
+# admitir. FRACA é a CONVOCAÇÃO — o município chamando o aprovado a comparecer.
+# Parece a mesma coisa e não é.
 #
-# CONVOCAÇÃO NÃO É POSSE, e o observatório não finge que seja: o destino é
-# "indício com fonte, não fato apurado" desde sempre, e o selo leva ao diário
-# para quem quiser conferir. A convocação nominal, para cargo determinado, no
-# mês da saída, é evidência ao menos tão forte quanto a marca azul do ranking,
-# que já publica — tratá-la como menos seria incoerente.
-_ENTRADA = re.compile(
+# LEONARDO TOIOMOTO foi convocado por Paulínia em 19/05, 05/06 e 25/06 de 2025,
+# sempre como 13º do mesmo concurso: é o retrato de quem foi chamado e NÃO
+# compareceu. A primeira versão da D27 publicou "Prefeitura de Paulínia" com base
+# nisso. O Diário Oficial da Cidade de São Paulo, de 15/01/2025, traz "NOMEAR
+# LEONARDO TOIOMOTO, de acordo com o disposto nos artigos 10 e 15, item II, da
+# Lei Municipal nº 8.989/79, por ter sido aprovado em" — TCM-SP, ato de nomeação,
+# achado pela busca web da D28. A convocação estava contando uma história que o
+# ato desmente.
+#
+# Daí a regra: CONVOCAÇÃO NÃO PUBLICA SOZINHA. Ela vira pista na pauta, e perde
+# para qualquer nomeação.
+_ENTRADA_FORTE = re.compile(
     r"\bNOMEAR\b|\bNOMEIA\b|\bNOMEAD[OA]S?\b|\bNOMEACAO\b|\bNOMEACOES\b"
-    r"|\bPOSSE\b|\bEMPOSSAD[OA]S?\b|\bCONVOCA\w*\b|\bADMITID[OA]S?\b"
+    r"|\bPOSSE\b|\bEMPOSSAD[OA]S?\b|\bADMITID[OA]S?\b"
 )
+_ENTRADA_FRACA = re.compile(r"\bCONVOCA\w*\b")
+_ENTRADA = re.compile(f"{_ENTRADA_FORTE.pattern}|{_ENTRADA_FRACA.pattern}")
 
 # O que denuncia que aquele trecho NÃO é ato de entrada, mesmo contendo as
 # palavras acima. Cada um destes apareceu na sondagem:
@@ -301,27 +307,32 @@ _LEGISLATIVO = re.compile(
 JANELA_DA_FORMULA = 200
 
 
-def parece_nomeacao(trecho: str, nome: str) -> bool:
+def parece_nomeacao(trecho: str, nome: str) -> str:
     """
-    Alguma ocorrência isolada do nome está dentro de um ato de ENTRADA em cargo.
+    A força do ato de entrada que cerca o nome: `"forte"`, `"fraca"` ou `""`.
 
-    "Dentro de" é literal: a palavra que caracteriza entrada (`_ENTRADA`) tem de
-    estar a até `JANELA_DA_FORMULA` caracteres do nome, e nenhuma palavra que
-    desqualifica (`_NAO_E_ENTRADA`) pode estar na mesma vizinhança. Fora dessa
-    janela o texto é outro ato — diário oficial é uma pilha de atos coladas.
+    "Cerca" é literal: a palavra que caracteriza entrada tem de estar a até
+    `JANELA_DA_FORMULA` caracteres do nome, e nenhuma palavra que desqualifica
+    (`_NAO_E_ENTRADA`) pode estar mais perto dele. Fora dessa janela o texto é
+    outro ato — diário oficial é uma pilha de atos coladas.
+
+    Devolve string e não booleano porque a diferença entre nomeação e convocação
+    decide se o caso publica ou vai para a pauta (ver `_ENTRADA_FORTE`).
     """
     texto = normalizar(trecho)
     tamanho = len(normalizar(nome))
+    melhor = ""
     for posicao in ocorrencias_isoladas(trecho, nome):
         inicio = max(0, posicao - JANELA_DA_FORMULA)
         fim = posicao + tamanho + JANELA_DA_FORMULA
         vizinhanca = texto[inicio:fim]
         deslocamento = posicao - inicio
-        perto_entrada = _mais_perto(_ENTRADA, vizinhanca, deslocamento, tamanho)
         perto_veto = _mais_perto(_NAO_E_ENTRADA, vizinhanca, deslocamento, tamanho)
-        if perto_entrada is not None and perto_entrada < perto_veto:
-            return True
-    return False
+        if _mais_perto(_ENTRADA_FORTE, vizinhanca, deslocamento, tamanho) < perto_veto:
+            return "forte"
+        if _mais_perto(_ENTRADA_FRACA, vizinhanca, deslocamento, tamanho) < perto_veto:
+            melhor = "fraca"
+    return melhor
 
 
 def _mais_perto(padrao: re.Pattern, vizinhanca: str, nome_em: int, nome_tam: int) -> float:
@@ -405,17 +416,21 @@ def atos_da_pessoa(nome: str, gazetas: list[dict]) -> list[dict]:
     achados = []
     for gazeta in gazetas or []:
         trechos = [" ".join((t or "").split()) for t in (gazeta.get("excerpts") or [])]
-        bons = [t for t in trechos if parece_nomeacao(t, nome)]
+        forcas = {t: parece_nomeacao(t, nome) for t in trechos}
+        bons = [t for t in trechos if forcas[t]]
         if not bons:
             continue
         if any(e_legislativo(t) for t in bons):
             continue
+        # O diário todo vale pela força do MELHOR trecho que ele traz.
+        forca = "forte" if any(forcas[t] == "forte" for t in bons) else "fraca"
         orgao = orgao_do_territorio(gazeta.get("territory_name", ""),
                                     gazeta.get("state_code", ""))
         if not orgao:
             continue
         achados.append({
             "orgao": orgao,
+            "forca": forca,
             "data": gazeta.get("date", ""),
             "territorio": f"{gazeta.get('territory_name', '')}/{gazeta.get('state_code', '')}",
             # O PDF é o documento oficial e é o que se manda alguém ler; o `.txt`
@@ -435,7 +450,11 @@ def destino_da_pessoa(nome: str, mes_saida: str, gazetas: list[dict] | None) -> 
       SEM_ATO         há diário, mas nenhum é ato de entrada em cargo desta
                       pessoa (o mais comum de longe: lista de aprovados, homônimo
                       em outra cidade, licitação)
-      UNICO_DIARIO    um município só publicou ato de entrada -> vai à tela
+      SO_CONVOCACAO   há convocação de aprovado e nenhuma nomeação -> pauta.
+                      Convocação é chamado a comparecer, não entrada: LEONARDO
+                      TOIOMOTO foi convocado três vezes pela mesma prefeitura e
+                      nomeado em outra casa (ver `_ENTRADA_FORTE`)
+      UNICO_DIARIO    um município só publicou NOMEAÇÃO -> vai à tela
       VARIOS_DIARIOS  mais de um município -> pauta humana, com os trechos
 
     NÃO se exige que o órgão esteja entre os candidatos do ranking, e a razão é
@@ -466,10 +485,14 @@ def destino_da_pessoa(nome: str, mes_saida: str, gazetas: list[dict] | None) -> 
         resposta["decisao"] = "SEM_ATO"
         return resposta
 
-    orgaos = sorted({a["orgao"] for a in atos})
-    if len(orgaos) == 1:
+    # Só a NOMEAÇÃO publica. A convocação fica registrada, para a pauta.
+    fortes = sorted({a["orgao"] for a in atos if a["forca"] == "forte"})
+    if not fortes:
+        resposta["decisao"] = "SO_CONVOCACAO"
+        return resposta
+    if len(fortes) == 1:
         resposta["decisao"] = "UNICO_DIARIO"
-        resposta["orgao"] = orgaos[0]
+        resposta["orgao"] = fortes[0]
         return resposta
 
     resposta["decisao"] = "VARIOS_DIARIOS"

@@ -215,6 +215,7 @@ export const ROTULO_POR_FONTE: Readonly<Record<string, string>> = {
   DOU: 'DOU',
   RANKING: 'Ranking',
   DIARIO: 'Diário municipal',
+  GOOGLE: 'Busca',
   BUSCA: 'Busca',
   MANUAL: 'Curadoria',
 };
@@ -238,6 +239,11 @@ export const DESCRICAO_POR_FONTE: Readonly<Record<string, string>> = {
   DIARIO:
     'Ato de nomeação publicado no diário oficial do município de chegada, ' +
     'localizado pelo Querido Diário (Open Knowledge Brasil)',
+  // O que o selo promete é o DOCUMENTO achado, não o buscador: o link abre a
+  // página do próprio órgão de chegada. O buscador foi só o caminho até ela.
+  GOOGLE:
+    'Ato de posse ou nomeação publicado no sítio do órgão de chegada, ' +
+    'localizado por busca na web',
   BUSCA: 'Busca por nome no DOU',
   MANUAL: 'Correção humana registrada em data/curadoria.csv',
 };

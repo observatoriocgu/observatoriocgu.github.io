@@ -66,9 +66,20 @@ jobs:
         run: python scripts/testar_diarios.py
         working-directory: evasao
 
+      # Roda SEM chave de propósito: a busca web é a única etapa opcional do
+      # observatório, e o teste tem de passar mesmo quando o segredo não existe.
+      - name: Testar o catálogo de domínios da busca web
+        run: python scripts/testar_buscaweb.py
+        working-directory: evasao
+
+      # SERPER_API_KEY é OPCIONAL. Sem o segredo configurado no repositório, a
+      # variável chega vazia, `segredos.chave_de_busca_web()` devolve "nenhuma" e
+      # a etapa de busca web simplesmente não roda — as outras três seguem iguais.
       - name: Procurar destino de quem saiu
         run: python scripts/enriquecer_destinos_ranking.py
         working-directory: evasao
+        env:
+          SERPER_API_KEY: ${{ secrets.SERPER_API_KEY }}
 
       - name: Commit e push do que mudou
         run: |

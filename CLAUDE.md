@@ -161,8 +161,13 @@ Edital CGU nº 5 de 13/06/2022, publicado no DOU (D17).
                        regra de decisão do destino (D24)
 - diarios.py           biblioteca: ato de nomeação em diário MUNICIPAL, pelo
                        Querido Diário. Terceira tentativa de destino (D27)
+- buscaweb.py          biblioteca: ato de posse no sítio do próprio órgão de
+                       chegada, por busca web com chave. Quarta e última (D28)
+- segredos.py          lê chave de API do ambiente ou do .env. Tudo opcional
 - testar_diarios.py    regressão dos padrões de nomeação e da leitura do
                        território, sem rede. RODAR SEMPRE que mexer em diarios.py
+- testar_buscaweb.py   regressão do catálogo de domínios e dos padrões de posse,
+                       sem rede e SEM CHAVE. RODAR SEMPRE que mexer em buscaweb.py
 - enriquecer_destinos_ranking.py  destino de quem já saiu e o DOU não disse para
                        onde. `--conferir` mede a regra contra o gabarito do DOU
 - testar_dou.py        regressão da classificação, sem rede. RODAR SEMPRE que
@@ -362,12 +367,55 @@ Edital CGU nº 5 de 13/06/2022, publicado no DOU (D17).
   as de SEFAZ RN, AM, PE, CE e MG. Medido no gabarito de 123 destinos que o DOU
   conhece: ZERO falso positivo (havia diário para 36 delas e a fonte não afirmou
   nada em nenhuma)
-- BUSCA WEB GENÉRICA NÃO FUNCIONA, e já foi testada — não repetir. Google, Bing,
+- BUSCA WEB SEM CHAVE NÃO FUNCIONA, e já foi testada — não repetir. Google, Bing,
   Mojeek e Startpage bloqueiam requisição sem chave; só o DuckDuckGo lite
   responde, com 3 a 8 resultados e sem diário oficial no índice (são PDFs). Pior:
   "o candidato do ranking aparece nos resultados" confirma VÁRIOS candidatos ao
   mesmo tempo, porque os resultados incluem páginas que listam todas as
-  aprovações da pessoa. E o DDG seria bloqueado no CI de qualquer forma
+  aprovações da pessoa. COM chave é outra história — ver D28
+- CONVOCAÇÃO NÃO PUBLICA SOZINHA (revisto em 16/08/2026). Convocação é chamado a
+  comparecer, não entrada em cargo. LEONARDO TOIOMOTO foi convocado por Paulínia
+  três vezes seguidas, sempre como 13º do mesmo concurso — retrato de quem não
+  compareceu —, e a primeira versão da D27 publicou "Prefeitura de Paulínia" por
+  causa disso. O Diário da Cidade de São Paulo traz "NOMEAR LEONARDO TOIOMOTO",
+  de 15/01/2025: ele foi para o TCM-SP. `_ENTRADA_FORTE` publica, `_ENTRADA_FRACA`
+  vai para a pauta
+
+## O ato no sítio do órgão de chegada (D28, 16/08/2026)
+- QUARTA e última tentativa de destino, depois do DOU, do ranking e do diário
+  municipal. Alcança o que nenhuma das três alcança: tribunal de contas estadual,
+  defensoria, TRT — órgãos que publicam em sítio próprio
+- EXIGE CHAVE, e por isso é a única etapa OPCIONAL do observatório. Sem chave,
+  `buscaweb.buscar` devolve `None` e nada acontece. A chave mora no `.env`
+  (ignorado pelo Git) ou em variável de ambiente, que VENCE o arquivo — é o que
+  faz o mesmo código servir à máquina local e ao repository secret do CI
+- O ÓRGÃO VEM DO DOMÍNIO, nunca do texto: `tc.df.gov.br` é o TCDF, `trt4.jus.br`
+  é o TRT da 4ª Região. Mesma ideia do território no `diarios.py`, e é o que
+  dispensa IA. Domínio fora do catálogo NÃO vira destino
+- DIÁRIO ESTADUAL CONTINUA SEM RESPOSTA, e é o mesmo motivo do DODF: o DOE de um
+  estado publica ato de TODOS os órgãos dele. `imagens.seplag.ce.gov.br` e
+  `jornal.iof.mg.gov.br` estão em `HOSPEDEIROS_SEM_ORGAO`
+- O RUÍDO DOMINANTE é o nome da pessoa em LISTA DE CLASSIFICAÇÃO de concurso que
+  ela apenas prestou, hospedada em domínio oficial. VICTOR GABRIEL CARVALHO
+  SANTOS SOUZA aparece assim em `aracaju.se.gov.br` E em `seplag.ce.gov.br` — os
+  dois candidatos dele. `fala_de_posse` exige fórmula de posse mais perto do nome
+  que qualquer palavra de classificação
+- A JANELA DE DATA separa o destino DESTA saída de um emprego posterior: ALINNE
+  PATRICIA tomou posse no TCDF em 24/03/2025 (saída 05/2025) e aparece como
+  analista ATIVA no Senado em 2026. As duas coisas são verdade; só a primeira é
+  o destino da saída da CGU
+- CRUZAR COM O RANKING É O PORTÃO ERRADO — terceira vez que isso se confirma. Os
+  três achados mais valiosos (ALINNE no TCDF, SERGIO no TRT 4ª, ANA CAROLINA na
+  Defensoria do DF) são de órgão que o ranking NÃO conhece. O cruzamento virou
+  SELO, por pedido do usuário: `RANKING` quando o órgão também consta da ficha —
+  basta o nome estar na lista, sem exigir marca azul nem verde —, `GOOGLE`
+  quando só a busca o conhece
+- O plano gratuito do serper recusa frase entre aspas COMBINADA com `gl`/`hl`/
+  `num`: devolve `400 Query pattern not allowed for free accounts`. Manda-se só
+  `q`, e os resultados vêm brasileiros do mesmo jeito
+- A CHAVE NUNCA ENTRA NO NOME DO ARQUIVO DE CACHE. A chave do cache é a CONSULTA,
+  não a URL — no serpapi a chave vai na query string, e derivar nome de arquivo
+  dela gravaria o segredo no disco com nome legível
 
 ## Ferramentas
 - Scripts Python são STDLIB ONLY: o CI não roda pip install, e requests/bs4/

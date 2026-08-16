@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Procura o DESTINO de quem já saiu — e só dele — em duas fontes.
+Procura o DESTINO de quem já saiu — e só dele — em três fontes.
 
 Entrada : data/dados.csv        — quem o SIAPE mostra que saiu
           public/atos_dou.json  — as saídas que só o DOU conhece ainda (D22)
@@ -11,6 +11,8 @@ A ordem é sempre esta, e é o que separa este crawler de uma máquina de fofoca
     a pessoa JÁ SAIU (SIAPE ou DOU)  ->  o ranking diz PARA ONDE   (D24/D26)
                                      ->  se ele não disser, o DIÁRIO
                                          MUNICIPAL do órgão de chegada (D27)
+                                     ->  e por último a BUSCA WEB, que alcança
+                                         sítio próprio de órgão (D28)
 
 Nunca o contrário. Passar em concurso não é sair da CGU — há Auditor com seis
 aprovações que continua na CGU, e ele não aparece em lugar nenhum deste arquivo.
@@ -69,6 +71,7 @@ import sys
 from datetime import date, datetime, timedelta
 from pathlib import Path
 
+import buscaweb
 import diarios
 import ranking
 
@@ -86,6 +89,9 @@ COLUNAS = (
     # errada. `DECISAO` continua sendo a do ranking; a do diário tem coluna
     # própria, e `FONTE_DESTINO` diz qual das duas respondeu.
     "DECISAO_DIARIO", "ORGAO_DIARIO", "URL_DIARIO", "ATO_DIARIO",
+    # A quarta fonte (D28). `ORGAO_WEB` guarda o que a busca achou mesmo quando
+    # ela não publica — dois órgãos com ato é pauta, e a pauta precisa dos dois.
+    "DECISAO_WEB", "ORGAO_WEB", "URL_WEB", "ATO_WEB",
     "CONSULTADO_EM",
 )
 
@@ -102,6 +108,12 @@ TIPO_ATO_ALVO = "vacancia"
 
 FONTE = "RANKING"
 FONTE_DIARIO = "DIARIO"
+# O selo da busca web quando SÓ ela conhece aquele órgão. Quando o órgão também
+# consta da ficha do ranking — basta o nome estar na lista, sem marca nenhuma —
+# o selo é `RANKING`, porque aí são duas fontes independentes concordando. Foi o
+# pedido explícito do usuário, e é a leitura certa: o selo diz o que ATESTA o
+# fato, não quem o achou primeiro.
+FONTE_WEB = "GOOGLE"
 
 DIAS_PARA_RECONSULTAR = 30
 
@@ -229,7 +241,9 @@ def consultar(alvo: dict, usar_cache: bool, verboso: bool = False) -> dict:
             "CANDIDATOS": "", "MARCADOS_NOMEADO": "",
             "ROTULOS_SEM_CATALOGO": "",
             "DECISAO_DIARIO": "", "ORGAO_DIARIO": "", "URL_DIARIO": "",
-            "ATO_DIARIO": "", "CONSULTADO_EM": "",
+            "ATO_DIARIO": "",
+            "DECISAO_WEB": "", "ORGAO_WEB": "", "URL_WEB": "", "ATO_WEB": "",
+            "CONSULTADO_EM": "",
         }
 
     achado = ranking.destino_da_pessoa(
@@ -246,6 +260,25 @@ def consultar(alvo: dict, usar_cache: bool, verboso: bool = False) -> dict:
         achado_diario = diarios.destino_da_pessoa(
             alvo["NOME"], alvo["MES_SAIDA"], gazetas)
 
+    # A BUSCA WEB é a última (D28), e roda quando as três anteriores calaram. Ela
+    # alcança o que nenhuma delas alcança — tribunal de contas estadual, defensoria,
+    # TRT — porque esses órgãos publicam em sítio próprio, fora do DOU e fora do
+    # diário municipal. Sem chave configurada ela devolve `None` e nada acontece.
+    achado_web = {"decisao": "", "orgao": "", "achados": [], "url": ""}
+    if not achado["orgao"] and not achado_diario["orgao"]:
+        achado_web = buscaweb.destino_da_pessoa(
+            alvo["NOME"], alvo["MES_SAIDA"],
+            buscaweb.buscar(alvo["NOME"], usar_cache=usar_cache))
+
+    # O SELO do que a busca web achou: `RANKING` quando aquele órgão TAMBÉM está
+    # na ficha do ranking — basta o nome constar da lista, sem exigir marca azul
+    # nem verde —, porque aí são duas fontes independentes dizendo o mesmo;
+    # `GOOGLE` quando só a busca o conhece. O selo diz o que ATESTA o fato.
+    fonte_do_web = FONTE_WEB
+    if achado_web["orgao"] and achado_web["orgao"] in buscaweb.orgaos_na_ficha(
+            alvo["NOME"], linhas):
+        fonte_do_web = FONTE
+
     if verboso:
         minhas = ranking.linhas_da_pessoa(alvo["NOME"], linhas)
         print(f"  {len(linhas)} linha(s) na busca, {len(minhas)} da própria pessoa")
@@ -257,18 +290,22 @@ def consultar(alvo: dict, usar_cache: bool, verboso: bool = False) -> dict:
             print(f"    DIÁRIO {ato['data']} {ato['territorio']:22} -> {ato['orgao']}")
             print(f"           {ato['trecho'][:140]}")
 
-    orgao = achado["orgao"] or achado_diario["orgao"]
-    fonte = FONTE if achado["orgao"] else (FONTE_DIARIO if achado_diario["orgao"] else "")
+    orgao = achado["orgao"] or achado_diario["orgao"] or achado_web["orgao"]
     primeiro_ato = achado_diario["atos"][0] if achado_diario["atos"] else None
-    # O link publicado tem de abrir o DIÁRIO, não a consulta que o achou: quem
+    primeiro_web = achado_web["achados"][0] if achado_web["achados"] else None
+    # O link publicado tem de abrir o DOCUMENTO, não a consulta que o achou: quem
     # clica quer ler o ato. A URL da busca fica no relatório da execução, para
-    # quem quiser repetir a pergunta.
+    # quem quiser repetir a pergunta. A exceção é o destino selado `RANKING`, cujo
+    # link é a ficha — é o que o selo promete.
     if achado["orgao"]:
-        url = achado["url"]
+        fonte, url = FONTE, achado["url"]
     elif achado_diario["orgao"] and primeiro_ato:
-        url = primeiro_ato["url"]
+        fonte, url = FONTE_DIARIO, primeiro_ato["url"]
+    elif achado_web["orgao"] and primeiro_web:
+        fonte = fonte_do_web
+        url = ranking.url_da_consulta(alvo["NOME"]) if fonte == FONTE else primeiro_web["url"]
     else:
-        url = ""
+        fonte, url = "", ""
 
     return {
         "ID_SERVIDOR_PORTAL": alvo["ID_SERVIDOR_PORTAL"],
@@ -289,6 +326,10 @@ def consultar(alvo: dict, usar_cache: bool, verboso: bool = False) -> dict:
         "ORGAO_DIARIO": " | ".join(sorted({a["orgao"] for a in achado_diario["atos"]})),
         "URL_DIARIO": primeiro_ato["url"] if primeiro_ato else "",
         "ATO_DIARIO": primeiro_ato["trecho"] if primeiro_ato else "",
+        "DECISAO_WEB": achado_web["decisao"],
+        "ORGAO_WEB": " | ".join(sorted({a["orgao"] for a in achado_web["achados"]})),
+        "URL_WEB": primeiro_web["url"] if primeiro_web else "",
+        "ATO_WEB": primeiro_web["trecho"] if primeiro_web else "",
         "CONSULTADO_EM": date.today().isoformat(),
     }
 
@@ -423,6 +464,7 @@ def main() -> int:
                   if l.get("FONTE_DESTINO") == FONTE
                   and l.get("DECISAO") == "UNICO_NOMEADO"]
     pelo_diario = [l for l in resolvidos if l.get("FONTE_DESTINO") == FONTE_DIARIO]
+    pela_web = [l for l in resolvidos if l.get("DECISAO_WEB") == "UNICO_WEB"]
     # `SEM_ANCORA_CGU` entra na mesma pauta: há um candidato só, e o que falta é
     # a prova de que a ficha é desta pessoa. É decisão de gente, não de máquina —
     # e foi por não ter essa prova que dois destinos errados quase foram ao ar.
@@ -431,7 +473,8 @@ def main() -> int:
     ambiguos = [l for l in linhas_finais
                 if not l.get("ORGAO_DESTINO")
                 and (l.get("DECISAO") in ("AMBIGUO", "SEM_ANCORA_CGU")
-                     or l.get("DECISAO_DIARIO") == "VARIOS_DIARIOS")]
+                     or l.get("DECISAO_DIARIO") in ("VARIOS_DIARIOS", "SO_CONVOCACAO")
+                     or l.get("DECISAO_WEB") == "VARIOS_WEB")]
     falhas = [l for l in linhas_finais if l.get("DECISAO") == "FALHA_NA_CONSULTA"]
     sem_catalogo = sorted({r for l in linhas_finais
                            for r in (l.get("ROTULOS_SEM_CATALOGO") or "").split(" | ") if r})
@@ -444,6 +487,7 @@ def main() -> int:
     # destinos que o DOU já conhece — ver `ranking.destino_da_pessoa`.
     print(f"    ...destes, pela marca 'Nomeado' : {len(pela_marca)}")
     print(f"    ...destes, por ato em diário    : {len(pelo_diario)}")
+    print(f"    ...destes, por busca web        : {len(pela_web)}")
     print(f"  aguardando curadoria              : {len(ambiguos)}")
     print(f"  sem ficha ou sem candidato        : "
           f"{len(linhas_finais) - len(resolvidos) - len(ambiguos) - len(falhas)}")
@@ -474,6 +518,8 @@ def main() -> int:
             # municípios nomearam a mesma pessoa, e escolher é de gente.
             if linha.get("ORGAO_DIARIO"):
                 print(f"    {'ato em diário:':34} {linha['ORGAO_DIARIO'][:70]}")
+            if linha.get("ORGAO_WEB"):
+                print(f"    {'busca web:':34} {linha['ORGAO_WEB'][:70]}")
         if len(ambiguos) > 10:
             print(f"  ... e mais {len(ambiguos) - 10}, no arquivo")
 

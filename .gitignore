@@ -34,6 +34,11 @@ evasao/data/cache_dou/
 evasao/data/cache_ranking/
 evasao/data/cache_diarios/
 
+# Cache das buscas web. Além de regenerável, ele guarda resposta de API PAGA:
+# não versionar é também não publicar o que se comprou. A chave nunca está aqui
+# — o nome do arquivo é derivado da CONSULTA, nunca da URL (ver buscaweb.py).
+evasao/data/cache_buscaweb/
+
 # Python (evasao/scripts/)
 __pycache__/
 *.py[cod]
