@@ -230,13 +230,12 @@ Edital CGU nº 5 de 13/06/2022, publicado no DOU (D17).
   seis aprovações que continua na casa, e ele não pode aparecer em lugar nenhum
   do `destinos_ranking.csv`. Só quem tem saída registrada é consultado
 - O ranking sabe o CONJUNTO de concursos em que a pessoa passou; NÃO sabe qual
-  ela foi exercer. Por isso só se publica quando sobra UM órgão candidato.
-  Ambíguo vai para pauta humana, com a lista e o link — nunca para a tela
-- NÃO INVENTAR DESEMPATE. Todos foram medidos contra os 118 destinos que o DOU
-  já conhece e todos reprovaram: marca "Nomeado" 6 de 18 (33,3%), melhor
-  colocação 24 de 62 (38,7%), colocação até 100º 26,7%. Nos 62 ambíguos o
-  destino certo estava entre os candidatos nos 62 — o que falta não é dado, é o
-  critério, e ele não existe
+  ela foi exercer. Publica-se quando sobra UM órgão candidato, ou quando a marca
+  azul aponta um só (D26). Ambíguo vai para pauta humana, com a lista e o link
+- NÃO INVENTAR DESEMPATE além da marca azul. Os outros foram medidos contra os
+  destinos que o DOU já conhece e reprovaram: melhor colocação 24 de 62 (38,7%),
+  colocação até 100º 26,7%. Nos 62 ambíguos o destino certo estava entre os
+  candidatos nos 62 — o que falta não é dado, é o critério
 - A ÂNCORA: só se publica se a ficha do site tiver também a linha do concurso da
   própria CGU. É a prova de que aquela ficha é desta pessoa, e não de um
   homônimo perfeito, e sinal de que a lista de concursos dela ali está completa.
@@ -249,16 +248,8 @@ Edital CGU nº 5 de 13/06/2022, publicado no DOU (D17).
   uma aprovação única no TCU ficava fora do painel só por isso. Medido:
   CGU-2021 com âncora 43 de 45 (95,6%); CGU-2021 SEM âncora 0 de 2; VETERANO
   (sempre sem âncora) 2 de 2. A regra final publica 47 e acerta 45 (95,7%)
-- A TAG AZUL "Nomeado" NÃO DESEMPATA, e a tentação de usá-la é forte porque
-  parece a resposta. Ela NÃO TEM DATA: marca quem foi nomeado naquele concurso
-  em algum momento da vida, inclusive ANTES de entrar na CGU. Medido: 6 de 18
-  (33,3%). Os 12 erros são quase todos tag em SEFAZ/ISS/TCE estadual de alguém
-  que foi para Câmara, Senado ou TCU. Dois casos com a MESMA tag `ISS Aracaju`
-  foram, na verdade, para TCU e para o Senado. A tag é gravada na coluna
-  MARCADOS_NOMEADO só para a pauta de curadoria
-- O quadradinho azul do site é "Nomeado" e o verde é "Dentro das Vagas". O azul
-  parece a resposta e não é: quem passa em vários é nomeado em vários. São
-  lidos e guardados para a curadoria, e não entram na decisão
+- A TAG AZUL "Nomeado" DESEMPATA desde a D26 (16/08/2026) — mas só com a guarda
+  `ranking.ORGAOS_CEGOS_A_TAG`, e só quando é UMA marca só. Ver abaixo
 - Nome NUNCA basta: a busca do site casa por PREFIXO, então "MARIA DE SOUZA
   LIMA" traz "Mariana de Souza Lima Velasco" junto. `linhas_da_pessoa` exige
   igualdade EXATA do nome normalizado. Sem isso, aprovação de uma pessoa vira
@@ -284,6 +275,48 @@ Edital CGU nº 5 de 13/06/2022, publicado no DOU (D17).
 - Toda página que lê `dados.csv` chama `mesclarFontesExternas`, e não as duas
   mescladas soltas: são duas agora, e uma regra que depende de quatro páginas
   lembrarem da mesma sequência é uma regra que a quinta página quebra
+
+## A marca azul do ranking desempata (D26, 16/08/2026)
+- A marca azul "Nomeado" AFIRMA UM FATO — a pessoa foi nomeada naquele concurso.
+  É por isso que ela decide, enquanto colocação e ano continuam proibidos (39% e
+  27%). Decisão `UNICO_NOMEADO`, ao lado de `UNICO`; as duas estão em
+  `ranking.DECISOES_QUE_PUBLICAM`, que existe para não haver um quinto lugar
+  comparando com a string `"UNICO"`
+- MAS A AUSÊNCIA DE MARCA NÃO AFIRMA NADA. O site não mantém a lista de nomeados
+  de todo concurso: medido nas 155 fichas, **TCU tem 0 marca azul em 38 linhas** e
+  a CGU **0 em 84**, e há 20 pessoas cuja nomeação no TCU o DOU comprova, todas
+  sem marca. Daí `ORGAOS_CEGOS_A_TAG` = {TCU, Senado, Câmara dos Deputados}: se
+  um deles está entre os candidatos SEM marca, a marca em outro lugar não decide.
+  Medido — marca solta 69 publicados e 53 certos (76,8%); com a guarda 53 e 50
+  (94,3%); sem marca nenhuma 48 e 46 (95,8%) e METADE da cobertura. Os erros da
+  marca solta são TODOS de quem foi para TCU ou Senado; nenhum com destino
+  estadual ou municipal
+- DUAS MARCAS NÃO SE DESEMPATAM. Escolher entre elas publicaria 5 a mais e
+  erraria 3: NAZLI SETTON FILIPPINI e JAIDIR ALVES COSTA DOS SANTOS foram os dois
+  para a Receita, e nos dois a RFB ESTAVA marcada, ao lado de outra marca que o
+  desempate por colocação preferiu. Duas marcas = o site diz que a pessoa foi
+  nomeada nos dois lugares, e qual ela foi exercer é o que ele não sabe
+- O PREÇO, e ele é aceito: quem tem TCU/Senado/Câmara na ficha vai para a pauta
+  mesmo com marca azul em outro lugar. ALAOR ANTONIO RODRIGUES VILELA JUNIOR é
+  10º em Câmara Consultor com azul na SEFAZ AM (92º); DANIEL LIMA OLIVEIRA é 4º
+  na Câmara com azul na SEFAZ RN (135º). Uma colocação dessas é destino plausível
+  demais para a máquina decidir contra ela
+- A COLUNA "Fez tb:" NÃO É ENFEITE. O site rende o quadradinho na linha própria E
+  na coluna "Fez tb:" das outras linhas da pessoa, e às vezes só num dos dois: o
+  "Nomeado" de ROSICLEIDE RAMOS ALVES no TCM SP existe SÓ lá. Ela também cita
+  concurso que a tabela não lista como linha (visto com RFB e Câmara dos
+  Deputados), e ler dali é o que impede chamar de "candidato único" quem tem um
+  segundo concurso escondido. Quem une as duas leituras é `aprovacoes_da_pessoa`,
+  e é por ela que a decisão passa — NUNCA por `linhas_da_pessoa` direto
+- O MESMO concurso é escrito `SEFAZ AM 22` na linha e `SEFAZ/AM/22` no "Fez tb:".
+  `rotulo_base` e `ano_do_rotulo` trocam a barra por espaço; sem isso a mesma
+  aprovação vira dois concursos e um deles cai fora do catálogo
+- A JANELA DE ANOS PARA TRÁS FOI REMOVIDA. Ela cortava concurso mais velho que
+  `saída - 3` supondo que aprovação antiga já teria sido exercida, e a nomeação
+  sai anos depois da homologação: apagava a resposta CERTA de ANDRE LUIZ LIMA DA
+  ROCHA (saída 05/2025, única aprovação SEFAZ RS **18**) e de ROSICLEIDE (saída
+  05/2024, azul no TCM SP **20**). A janela PARA A FRENTE fica: edição posterior
+  à saída não pode tê-la motivado
 
 ## Ferramentas
 - Scripts Python são STDLIB ONLY: o CI não roda pip install, e requests/bs4/

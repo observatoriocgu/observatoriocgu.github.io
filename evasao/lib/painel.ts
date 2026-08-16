@@ -213,12 +213,13 @@ export const mesclarSaidasDoDou = (
  * sendo CURADORIA > DOU > RANKING.
  *
  * O QUE O ARQUIVO JÁ RESOLVEU ANTES DE CHEGAR AQUI. O Python só escreve linha
- * com órgão quando sobrou UM candidato só: aprovação em concurso não é posse, e
- * quem passou em cinco concursos foi exercer no máximo um. Caso ambíguo fica no
- * arquivo sem `ORGAO_DESTINO`, aguardando curadoria, e a guarda `|| !destino.
- * ORGAO_DESTINO` abaixo é o que garante que ele não vaze para a tela por
- * descuido. Medida da regra contra os destinos que o DOU já conhece: 31 acertos
- * em 33 publicados.
+ * com órgão em duas situações: sobrou UM candidato só, ou sobrou mais de um e a
+ * marca azul "Nomeado" do site aponta exatamente um deles (D26). Aprovação em
+ * concurso não é posse, e quem passou em cinco concursos foi exercer no máximo
+ * um. Caso ambíguo fica no arquivo sem `ORGAO_DESTINO`, aguardando curadoria, e
+ * a guarda `|| !destino.ORGAO_DESTINO` abaixo é o que garante que ele não vaze
+ * para a tela por descuido. Medida da regra contra os 123 destinos que o DOU já
+ * conhece: 50 acertos em 53 publicados (94,3%).
  *
  * POR QUE NO NAVEGADOR, e não no `construir_painel.py`: o mesmo motivo da D22 —
  * o construtor depende dos snapshots do Portal, que não existem no CI, e quem

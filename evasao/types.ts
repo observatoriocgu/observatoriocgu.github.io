@@ -267,12 +267,14 @@ export interface DestinoDoRanking {
   idServidor: string;
   nome: string;
   /**
-   * `UNICO` (sobrou um candidato — é o único caso que preenche destino),
-   * `AMBIGUO`, `SEM_FICHA`, `SEM_CANDIDATO`, `SEM_CATALOGO` ou
-   * `FALHA_NA_CONSULTA`.
+   * Como o ranking chegou (ou não chegou) ao destino. Duas preenchem
+   * `orgaoDestino`: `UNICO` (sobrou um candidato só) e `UNICO_NOMEADO` (sobrou
+   * mais de um, e a marca azul "Nomeado" do site aponta um — D26). As demais
+   * são pauta: `AMBIGUO`, `SEM_ANCORA_CGU`, `SEM_FICHA`, `SEM_CANDIDATO`,
+   * `SEM_CATALOGO` ou `FALHA_NA_CONSULTA`.
    */
   decisao: string;
-  /** Vazio em tudo que não seja `UNICO`. */
+  /** Vazio em tudo que não seja `UNICO` ou `UNICO_NOMEADO`. */
   orgaoDestino: string;
   /** A consulta que qualquer pessoa pode repetir no navegador. */
   urlDestino: string;

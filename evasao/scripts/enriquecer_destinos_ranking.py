@@ -25,14 +25,18 @@ esperaria a próxima execução local. Então o arquivo é lido pelo NAVEGADOR, 
 
 O QUE VAI À TELA E O QUE VAI PARA A PAUTA
 -----------------------------------------
-Só `DECISAO = UNICO` vira destino em tela. Ambíguo fica no arquivo com a lista
-de candidatos e o link da consulta, para decisão humana — e a decisão humana
-tem lugar próprio, `data/curadoria.csv`, que vence tudo (basta a linha com
-ID_SERVIDOR_PORTAL, ORGAO_DESTINO, FONTE_DESTINO=MANUAL e URL_DESTINO).
+Viram destino em tela as decisões de `ranking.DECISOES_QUE_PUBLICAM`: `UNICO`
+(sobrou um órgão só) e, desde a D26, `UNICO_NOMEADO` (sobrou mais de um, mas a
+marca azul "Nomeado" do site aponta um deles e nenhum órgão cego à marca está no
+caminho). Ambíguo fica no arquivo com a lista de candidatos e o link da consulta,
+para decisão humana — e a decisão humana tem lugar próprio, `data/curadoria.csv`,
+que vence tudo (basta a linha com ID_SERVIDOR_PORTAL, ORGAO_DESTINO,
+FONTE_DESTINO=MANUAL e URL_DESTINO).
 
-A régua está medida, não estimada: contra os 118 destinos que o DOU já conhece,
-a regra publica 45 e acerta 43 (95,6%). Qualquer desempate entre candidatos
-múltiplos fica em 27-39%, e por isso não existe desempate aqui. Ver `ranking.py`.
+A régua está medida, não estimada: contra os 123 destinos que o DOU já conhece,
+a regra publica 53 e acerta 50 (94,3%), contra 48 e 46 (95,8%) da regra sem a
+marca — 1,5 ponto de precisão pelo DOBRO da cobertura. Fora a marca azul, nenhum
+desempate passou de 39%, e por isso não existe outro aqui. Ver `ranking.py`.
 
 INCREMENTAL
 -----------
@@ -181,7 +185,8 @@ def alvos(pessoas: list[dict], recentes: list[dict]) -> list[dict]:
 def precisa_consultar(anterior: dict | None, refazer: bool, hoje: date) -> bool:
     if refazer or not anterior:
         return True
-    if anterior.get("DECISAO") == "UNICO" and anterior.get("ORGAO_DESTINO"):
+    if (anterior.get("DECISAO") in ranking.DECISOES_QUE_PUBLICAM
+            and anterior.get("ORGAO_DESTINO")):
         return False
     try:
         consultado = datetime.strptime(anterior.get("CONSULTADO_EM", ""), "%Y-%m-%d").date()
@@ -264,7 +269,7 @@ def conferir(pessoas: list[dict], limite: int | None, usar_cache: bool) -> int:
         achado = ranking.destino_da_pessoa(
             pessoa["NOME"], pessoa["MES_SAIDA"], linhas, pessoa.get("CONCURSO", ""))
         contagem[achado["decisao"]] = contagem.get(achado["decisao"], 0) + 1
-        if achado["decisao"] == "UNICO":
+        if achado["orgao"]:
             if achado["orgao"] == pessoa["ORGAO_DESTINO"]:
                 acertos += 1
             else:
@@ -341,7 +346,7 @@ def main() -> int:
     for i, alvo in enumerate(a_consultar, 1):
         linha = consultar(alvo, usar_cache)
         resultado.append(linha)
-        marca = "->" if linha["DECISAO"] == "UNICO" else "  "
+        marca = "->" if linha["DECISAO"] in ranking.DECISOES_QUE_PUBLICAM else "  "
         print(f"  {i:3}/{len(a_consultar)} {marca} {alvo['NOME'][:38]:38} "
               f"{linha['DECISAO']:13} {linha['ORGAO_DESTINO'][:34]}")
 
@@ -361,7 +366,9 @@ def main() -> int:
 
     gravar_csv(ARQ_DESTINOS, linhas_finais)
 
-    resolvidos = [l for l in linhas_finais if l.get("DECISAO") == "UNICO"]
+    resolvidos = [l for l in linhas_finais
+                  if l.get("DECISAO") in ranking.DECISOES_QUE_PUBLICAM]
+    pela_marca = [l for l in resolvidos if l.get("DECISAO") == "UNICO_NOMEADO"]
     # `SEM_ANCORA_CGU` entra na mesma pauta: há um candidato só, e o que falta é
     # a prova de que a ficha é desta pessoa. É decisão de gente, não de máquina —
     # e foi por não ter essa prova que dois destinos errados quase foram ao ar.
@@ -374,6 +381,10 @@ def main() -> int:
     print()
     print(f"{ARQ_DESTINOS.name}: {len(linhas_finais)} linha(s)")
     print(f"  destino identificado (vai à tela) : {len(resolvidos)}")
+    # Separado porque é o grupo a conferir primeiro: candidato único não teve
+    # escolha a fazer, a marca azul teve. Medido, ela acerta 94,3% contra os
+    # destinos que o DOU já conhece — ver `ranking.destino_da_pessoa`.
+    print(f"    ...destes, pela marca 'Nomeado' : {len(pela_marca)}")
     print(f"  aguardando curadoria              : {len(ambiguos)}")
     print(f"  sem ficha ou sem candidato        : "
           f"{len(linhas_finais) - len(resolvidos) - len(ambiguos) - len(falhas)}")
@@ -391,9 +402,14 @@ def main() -> int:
         print()
         print("Ambíguos: o ranking mostra mais de um concurso possível e não diz qual")
         print("a pessoa foi exercer. Para decidir, conferir a fonte e registrar em")
-        print("data/curadoria.csv (ORGAO_DESTINO, FONTE_DESTINO=MANUAL, URL_DESTINO):")
+        print("data/curadoria.csv (ORGAO_DESTINO, FONTE_DESTINO=MANUAL, URL_DESTINO).")
+        print("`marca:` é o que o site assinala como 'Nomeado' — quando aparece aqui é")
+        print("porque um órgão cego à marca (TCU, Senado, Câmara) está entre os")
+        print("candidatos, ou porque há mais de uma marca:")
         for linha in ambiguos[:10]:
             print(f"  - {linha['NOME'][:34]:34} {linha['CANDIDATOS'][:70]}")
+            if linha.get("MARCADOS_NOMEADO"):
+                print(f"    {'marca:':34} {linha['MARCADOS_NOMEADO'][:70]}")
         if len(ambiguos) > 10:
             print(f"  ... e mais {len(ambiguos) - 10}, no arquivo")
 

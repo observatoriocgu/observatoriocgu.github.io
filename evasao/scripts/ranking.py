@@ -26,37 +26,39 @@ COMO O SITE SE COMPORTA (levantado em 15/08/2026, não há documentação)
     isso que `linhas_da_pessoa` exige igualdade EXATA do nome normalizado —
     é a mesma armadilha de homônimo por prefixo que o `dou.cita_nome` trata.
   - a tabela traz uma linha por (candidato x concurso x cargo), com nota e
-    colocação, e uma coluna "Fez tb:" que só repete os outros concursos da
-    própria pessoa — não acrescenta informação e não é lida aqui.
+    colocação, e uma coluna "Fez tb:" que repete os outros concursos da própria
+    pessoa. Ela PARECE redundante e não é: às vezes traz a marca que a linha
+    própria perdeu, e às vezes cita concurso que a tabela nem lista como linha.
+    Ver `aprovacoes_da_pessoa`.
 
-A LEGENDA DE CORES, E POR QUE ELA NÃO RESOLVE
----------------------------------------------
-O site marca cada linha com um quadradinho: verde `#22c55e` = "Dentro das
-Vagas", azul `#3b82f6` = "Nomeado". "Nomeado" parece ser exatamente a resposta
-que o observatório quer — e não é. Medido contra os 118 destinos que o DOU já
-conhece: escolher o concurso marcado "Nomeado" acerta 6 de 18 (33,3%). A marca
-diz que a pessoa foi nomeada NAQUELE concurso em algum momento, e quem passa em
-vários é nomeado em vários — só um deles é o emprego que ela foi exercer. Há
-Auditor marcado "Nomeado" em cinco concursos ao mesmo tempo.
+A LEGENDA DE CORES, E ONDE ELA ENXERGA
+--------------------------------------
+O site marca cada aprovação com um quadradinho: verde `#22c55e` = "Dentro das
+Vagas", azul `#3b82f6` = "Nomeado". O azul afirma um FATO — a pessoa foi nomeada
+naquele concurso —, e é por isso que ele DESEMPATA desde a D26, enquanto todos
+os outros critérios continuam proibidos.
 
-Por isso as marcas são lidas e guardadas (`nomeado`, `dentro_das_vagas`), para
-aparecerem na pauta de curadoria, mas NÃO entram na decisão automática.
+O que ele não afirma é o contrário. **A ausência de marca não quer dizer que a
+pessoa não foi nomeada**: o site não mantém a lista de nomeados de todo concurso.
+Medido nas 155 fichas baixadas em 16/08/2026, o TCU tem **zero marca azul em 38
+linhas** e a própria CGU **zero em 84** — e 20 pessoas do gabarito têm nomeação
+no TCU comprovada pelo DOU, nenhuma com marca. Daí a guarda `ORGAOS_CEGOS_A_TAG`,
+que é o que separa um desempate de 94,5% de um de 75,7%.
 
 O QUE O RANKING SABE E O QUE ELE NÃO SABE
 -----------------------------------------
-Ele sabe em que concursos a pessoa passou. Ele NÃO sabe qual deles ela foi
-exercer. E isto está medido, não suposto: nos 62 casos ambíguos do gabarito, o
-destino verdadeiro estava entre os candidatos nos 62 — a informação ESTÁ lá, o
-que falta é o critério para escolher. E ele não existe:
+Ele sabe em que concursos a pessoa passou, e às vezes em qual ela foi nomeada.
+Ele NUNCA sabe qual ela foi EXERCER. Fora a marca azul, nenhum critério de
+escolha sobreviveu à medição:
 
-    marca "Nomeado"          6 de 18   33,3%
     melhor colocação        24 de 62   38,7%
     colocação até 100º       4 de 15   26,7%
     ano igual ao da saída    0 de  1        —
 
-Conclusão, e é ela que define esta biblioteca: **só se publica quando sobra um
-candidato só**. O resto vai para a pauta humana, com a lista de candidatos e o
-link da consulta. Ver `destino_da_pessoa`.
+Conclusão, e é ela que define esta biblioteca: **publica-se quando sobra um
+candidato só, ou quando a marca azul aponta um e nenhum órgão cego a ela está no
+caminho**. O resto vai para a pauta humana, com a lista de candidatos e o link
+da consulta. Ver `destino_da_pessoa`.
 """
 
 from __future__ import annotations
@@ -115,6 +117,41 @@ def _texto(celula: str) -> str:
     return " ".join(html_mod.unescape(re.sub(r"<[^>]+>", " ", celula)).split())
 
 
+# Cada item da coluna "Fez tb:" é "[quadradinho?] 43º <rótulo do concurso> <link>",
+# separado dos outros por <br>. O número é a colocação, e sai daqui.
+_ITEM_FEZ_TAMBEM = re.compile(r"^(\d+)\s*[ºo°]?\s*(.+)$")
+
+
+def _fez_tambem(celula: str) -> list[dict]:
+    """
+    Os outros concursos DA MESMA PESSOA, como a última coluna os lista.
+
+    Não é enfeite, e por muito tempo pareceu ser: **esta coluna carrega marcas
+    que a célula da própria linha não tem**. O site rende o quadradinho nos dois
+    lugares e às vezes só num deles — medido nas fichas baixadas, três pessoas
+    têm a marca azul SÓ aqui, e uma delas é o caso que motivou esta leitura
+    (ROSICLEIDE RAMOS ALVES, "Nomeado" no TCM SP, invisível na linha do TCM SP).
+
+    Ela também cita, de vez em quando, concurso que a tabela NÃO lista como
+    linha — visto com `RFB` e `Camara dos Deputados`. Ler daqui é o que impede
+    chamar de "candidato único" quem tem um segundo concurso escondido.
+    """
+    itens = []
+    for pedaco in re.split(r"<br\s*/?>", celula):
+        texto = _texto(pedaco)
+        achado = _ITEM_FEZ_TAMBEM.match(texto)
+        if not achado:
+            continue
+        marcas = re.findall(r"background-color:\s*(#[0-9a-fA-F]{6})", pedaco)
+        itens.append({
+            "concurso": achado.group(2),
+            "colocacao": achado.group(1),
+            "nomeado": COR_NOMEADO in marcas,
+            "dentro_das_vagas": COR_DENTRO_DAS_VAGAS in marcas,
+        })
+    return itens
+
+
 def analisar(pagina: str) -> list[dict]:
     """
     As linhas da tabela de resultados. Lista vazia quando não há tabela.
@@ -123,6 +160,9 @@ def analisar(pagina: str) -> list[dict]:
     o que aparece se o site mudar de forma. Quem chama não consegue distinguir os
     dois casos — e não precisa: nos dois, o observatório não afirma nada. O que
     protege contra a mudança silenciosa de layout é `testar_ranking.py`.
+
+    Cada linha traz também `tambem`, a leitura da coluna "Fez tb:" — ver
+    `_fez_tambem` para o porquê de ela não poder ser ignorada.
     """
     corpo = re.search(r"<tbody>(.*?)</tbody>", pagina, re.S)
     if not corpo:
@@ -142,6 +182,7 @@ def analisar(pagina: str) -> list[dict]:
             "colocacao": _texto(celulas[5]),
             "nomeado": COR_NOMEADO in marcas,
             "dentro_das_vagas": COR_DENTRO_DAS_VAGAS in marcas,
+            "tambem": _fez_tambem(celulas[6]),
         })
     return linhas
 
@@ -217,6 +258,56 @@ def linhas_da_pessoa(nome: str, linhas: list[dict]) -> list[dict]:
     return [linha for linha in linhas if normalizar(linha["nome"]) == alvo]
 
 
+def aprovacoes_da_pessoa(nome: str, linhas: list[dict]) -> list[dict]:
+    """
+    As aprovações da pessoa, uma por concurso, unindo as DUAS leituras da página.
+
+    O site conta a mesma coisa em dois lugares — a linha da tabela e a coluna
+    "Fez tb:" das outras linhas da pessoa — e conta diferente:
+
+      - a MARCA às vezes só aparece num dos dois. ROSICLEIDE RAMOS ALVES tem
+        "Nomeado" no TCM SP visível apenas no "Fez tb:"; a linha do TCM SP vem
+        sem marca nenhuma. Por isso a marca é a UNIÃO das duas, nunca a da
+        linha sozinha.
+      - o CONCURSO às vezes só aparece num dos dois. O "Fez tb:" de ANDRE
+        VINICIUS NUNES SILVA cita `91º Camara dos Deputados` e a tabela não
+        traz essa linha. Ler daqui é o que impede chamar de "candidato único"
+        quem tem um segundo concurso que a tabela escondeu.
+
+    Uma aprovação por rótulo INTEIRO, edição incluída — `TCE PE 17` e `TCE PE 25`
+    seguem separados. São o mesmo órgão, e viram um candidato só lá na frente,
+    mas cada um tem a SUA edição, e é por ela que a janela de anos decide. Fundir
+    aqui pelo `rotulo_base` faria as duas edições herdarem o ano de uma delas.
+    """
+    minhas = linhas_da_pessoa(nome, linhas)
+    por_rotulo: dict[str, dict] = {}
+
+    def juntar(concurso: str, colocacao: str, nomeado: bool, dentro: bool) -> None:
+        # A mesma aprovação é escrita `SEFAZ AM 22` na linha e `SEFAZ/AM/22` no
+        # "Fez tb:". Normalizar a barra é o que faz as duas caírem na mesma chave.
+        chave = normalizar(concurso.replace("/", " "))
+        if not chave:
+            return
+        atual = por_rotulo.setdefault(chave, {
+            "concurso": concurso, "colocacao": colocacao,
+            "nomeado": False, "dentro_das_vagas": False,
+        })
+        atual["nomeado"] = atual["nomeado"] or nomeado
+        atual["dentro_das_vagas"] = atual["dentro_das_vagas"] or dentro
+
+    # As linhas da tabela primeiro: é delas que sai a grafia do rótulo que vai
+    # para o relatório, e a do "Fez tb:" usa barra ("SEFAZ/AM/22").
+    for linha in minhas:
+        juntar(linha["concurso"], linha["colocacao"],
+               linha["nomeado"], linha["dentro_das_vagas"])
+    for linha in minhas:
+        for item in linha.get("tambem", ()):
+            juntar(item["concurso"], item["colocacao"],
+                   item["nomeado"], item["dentro_das_vagas"])
+
+    return list(por_rotulo.values())
+
+
 # -------------------------------------------------- o catálogo de órgãos (D24)
 #
 # O problema que este catálogo existe para impedir: o mesmo órgão entrando duas
@@ -286,6 +377,7 @@ ORGAO_POR_ROTULO = {
     "PGE PE": "Governo do Estado de Pernambuco",
     "CAGE RS": "Governo do Estado do Rio Grande do Sul",
     "ALESP": "Assembleia Legislativa do Estado de São Paulo",
+    "ALEPE": "Assembleia Legislativa do Estado de Pernambuco",
     "TCM SP": "Tribunal de Contas do Município de São Paulo",
     # Fisco/procuradoria municipal: o rótulo do site é "ISS <cidade>" ou a sigla
     # da secretaria. Os dois viram o MESMO nome de prefeitura — "SMF RJ" e
@@ -364,8 +456,13 @@ def rotulo_base(rotulo: str) -> str:
     Cuidado embutido: o ano só é cortado no FIM. `TRT 13 PB` guarda o 13, que é
     a Região, não uma edição — cortá-lo transformaria a 13ª e a 6ª Regiões no
     mesmo tribunal.
+
+    A barra vira espaço porque o MESMO concurso é escrito das duas formas no
+    mesmo HTML: a linha da tabela diz `SEFAZ AM 22` e a coluna "Fez tb:" diz
+    `SEFAZ/AM/22`. Sem isso as duas leituras da mesma aprovação viram dois
+    concursos, e um deles cai fora do catálogo.
     """
-    base = normalizar(rotulo)
+    base = normalizar(rotulo.replace("/", " "))
     for _ in range(3):  # "SEFAZ RS TEC 18" precisa de duas passadas
         antes = base
         base = _NIVEL_NO_FIM.sub("", _ANO_NO_FIM.sub("", base)).strip()
@@ -383,7 +480,7 @@ def ano_do_rotulo(rotulo: str) -> int | None:
     derrubaria quase todo o sinal — foi medido: exigir ano conhecido leva o
     acerto a 0 de 4.
     """
-    texto = normalizar(rotulo)
+    texto = normalizar(rotulo.replace("/", " "))
     achado = re.search(r"\b(?:19|20)\d{2}\b", texto)
     if achado:
         return int(achado.group(0))
@@ -428,14 +525,62 @@ def canonico(rotulo: str) -> str | None:
 
 # --------------------------------------------------------------- a decisão
 #
-# JANELA DE ANOS. Um concurso publicado DEPOIS da saída não pode ser o motivo
-# dela, e um de muitos anos antes já teria sido exercido. Medido no gabarito de
-# 118 destinos conhecidos: com a janela em [saída-3, saída] são 45 publicados e
-# 43 certos; abrindo para [saída-4, saída] passa a 50 e 45, e sem janela nenhuma
-# cai para 49 e 44. Os casos que a janela corrige são concretos — uma Câmara
-# municipal de 2026 aparecendo como destino de quem saiu em 11/2025, e um TJDFT
-# de 2022 como destino de quem saiu em 05/2026.
-ANOS_DE_FOLGA_ANTES = 3
+# JANELA DE ANOS, e ela só olha PARA A FRENTE. Um concurso cuja edição é
+# POSTERIOR à saída não pode ter motivado a saída — isso é lógica, não
+# estatística, e continua valendo (caso real: uma Câmara municipal de 2026
+# aparecendo como destino de quem saiu em 11/2025).
+#
+# O LADO DE TRÁS FOI REMOVIDO em 16/08/2026 (D26). Ele descartava concurso mais
+# velho que `saída - 3`, na suposição de que aprovação antiga já teria sido
+# exercida. A suposição é falsa: a nomeação sai anos depois da homologação, e a
+# janela estava apagando a resposta CERTA em casos concretos —
+#
+#     ANDRE LUIZ LIMA DA ROCHA   saída 05/2025, única aprovação SEFAZ RS **18**
+#     ROSICLEIDE RAMOS ALVES     saída 05/2024, "Nomeado" no TCM SP **20**
+#
+# nos dois, o concurso caía fora por ser velho, e a pessoa ia para a pauta como
+# "sem candidato". Medido no gabarito de 113 destinos que o DOU conhece, o corte
+# custa pouco e some junto com a regra nova: sem a janela de trás são 45
+# publicados e 43 certos, contra 45 e 44 com ela; com a tag azul no jogo os dois
+# empatam em 55 publicados e 52 certos.
+ANOS_DE_FOLGA_ANTES: int | None = None
+
+# ONDE A TAG AZUL É CEGA — e é isto que a torna utilizável (D26).
+#
+# O site não anota nomeação de todo concurso. Medido nas 155 fichas baixadas:
+# TCU tem **0 marca azul em 38 linhas** e a própria CGU **0 em 84**, enquanto
+# SEFAZ e ISS aparecem marcados com frequência. Ou seja, a AUSÊNCIA de marca no
+# TCU não diz nada — o site simplesmente não mantém aquela lista.
+#
+# A consequência é exata, e foi medida: usando a tag como desempate solta, os
+# erros contra o gabarito são TODOS de gente que foi para o TCU ou para o
+# Senado e tinha marca azul num concurso estadual antigo. Nenhum erro com
+# destino estadual ou municipal. Logo, quando um destes órgãos está entre os
+# candidatos SEM marca, a tag não está discriminando nada e não pode decidir.
+#
+#     tag solta                 69 publicados, 53 certos  (76,8%)
+#     tag com esta guarda       53 publicados, 50 certos  (94,3%)
+#     sem tag nenhuma (antes)   48 publicados, 46 certos  (95,8%), e metade da
+#                                                          cobertura
+#
+# O preço é conhecido e aceito: quem tem TCU, Senado ou Câmara na ficha continua
+# indo para a pauta humana mesmo com marca azul em outro lugar. Os dois casos
+# são exemplares — e nos dois a colocação no órgão cego é boa demais para a
+# máquina decidir contra ela:
+#
+#     ALAOR ANTONIO RODRIGUES VILELA JUNIOR   10º Câmara Consultor, azul na SEFAZ AM (92º)
+#     DANIEL LIMA OLIVEIRA                     4º Câmara,           azul na SEFAZ RN (135º)
+ORGAOS_CEGOS_A_TAG = frozenset({
+    "Tribunal de Contas da União",
+    "Senado Federal",
+    "Câmara dos Deputados",
+})
+
+# As decisões que viram destino em tela. Existe como constante para que
+# acrescentar uma terceira não dependa de alguém achar os quatro lugares do
+# enriquecedor que comparavam com a string "UNICO" — foi o que aconteceu quando
+# `UNICO_NOMEADO` entrou (D26).
+DECISOES_QUE_PUBLICAM = frozenset({"UNICO", "UNICO_NOMEADO"})
 
 # O pseudo-concurso de quem já estava na CGU antes do primeiro concurso
 # monitorado (D9). Espelha `painel.ID_CONCURSO_VETERANO`.
@@ -484,20 +629,47 @@ def destino_da_pessoa(
 
     Devolve sempre um dicionário com `decisao`:
       SEM_FICHA       ninguém com esse nome exato no site
-      SEM_CANDIDATO   a pessoa está lá, mas sem nenhum outro concurso na janela
+      SEM_CANDIDATO   a pessoa está lá, mas sem nenhum outro concurso
       UNICO           sobrou um órgão só  -> este é o destino, e vai à tela
+      UNICO_NOMEADO   sobrou mais de um, mas a marca azul "Nomeado" aponta um só
+                      e nenhum dos outros é órgão cego a ela -> vai à tela (D26)
       AMBIGUO         sobrou mais de um, ou há concurso unificado no meio
       SEM_CATALOGO    todo candidato tem rótulo que o catálogo não conhece
       SEM_ANCORA_CGU  há candidato, mas a ficha não tem o concurso da CGU —
                       e esta pessoa é de um concurso que o site cobre, então a
                       falta significa alguma coisa (ver `exige_ancora`)
 
-    Só `UNICO` publica. A régua vem da medição contra os 118 destinos que o DOU
-    já conhece, refeita com os dados limpos:
+    `UNICO` e `UNICO_NOMEADO` publicam, e são guardados separados de propósito:
+    o primeiro é o caso em que não havia escolha a fazer, o segundo é o caso em
+    que a marca do site desempatou. Quem for curar sabe olhar o segundo primeiro.
 
-      sem âncora nenhuma                    49 publicados, 45 certos  (91,8%)
-      âncora exigida de todos               45 publicados, 43 certos  (95,6%)
-      âncora só de quem pode tê-la (atual)  47 publicados, 45 certos  (95,7%)
+    A régua vem da medição contra os 113 destinos que o DOU já conhece:
+
+      só candidato único (a regra até a D25)  48 publicados, 46 certos  (95,8%)
+      + a marca azul com guarda (D26)         53 publicados, 50 certos  (94,3%)
+
+    A segunda linha é a atual. Ela troca 1,5 ponto de precisão pelo DOBRO da
+    cobertura sobre quem segue sem destino: 9 saídas resolvidas viram 18, de 37.
+    Só a marca COM a guarda de `ORGAOS_CEGOS_A_TAG` faz essa troca — a marca
+    solta desaba para 76,8%.
+
+    E a queda de 95,8% para 94,3% NÃO é da marca. Aberto por decisão, no mesmo
+    gabarito: `UNICO` publica 48 e acerta 45; `UNICO_NOMEADO` publica 5 e acerta
+    5. Os três erros são todos do caminho antigo — o que mudou nele foi a saída
+    da janela de anos para trás, que custou um acerto e devolveu dois casos que
+    ela apagava. Cinco acertos em cinco é amostra pequena demais para virar
+    número de propaganda; o que ela sustenta é que a marca com guarda não é a
+    parte frágil desta regra.
+
+    E SÓ DECIDE QUANDO A MARCA É UMA SÓ. Escolher entre vários marcados foi
+    medido e reprovou: publicaria 5 a mais e erraria 3 deles, derrubando o
+    conjunto para 91,4%. Os dois erros são do mesmo tipo, e é um tipo que não
+    tem conserto por heurística — NAZLI SETTON FILIPPINI e JAIDIR ALVES COSTA
+    DOS SANTOS foram os dois para a Receita, e nos dois a RFB ESTAVA marcada de
+    azul, ao lado de outra marca que o desempate por colocação preferiu (ISS
+    Guarulhos 1º sobre RFB 6º; Senado 64º sobre RFB 87º). Com duas marcas, o
+    site está dizendo que a pessoa foi nomeada nos dois lugares, e qual ela foi
+    exercer é justamente o que ele não sabe.
 
     A ÂNCORA é a linha do concurso da própria CGU na ficha. Sem ela, o que se tem
     é um nome batendo com um nome num site que nem sabe que essa pessoa foi da
@@ -511,32 +683,34 @@ def destino_da_pessoa(
     ter aquela linha. A regra final publica 47 e acerta 45 — mais que os 45 e 43
     da âncora indiscriminada, e muito mais que os 49 e 45 sem âncora nenhuma.
 
-    E NÃO EXISTE DESEMPATE entre candidatos múltiplos. Todos foram medidos e
-    todos reprovaram (27-39%), enquanto nos 62 casos ambíguos o destino certo
-    estava na lista nos 62. O ranking sabe o conjunto e não sabe escolher dentro
-    dele; escolher no chute publicaria afirmação errada sobre pessoa nomeada,
-    que é o que o observatório não faz.
+    O DESEMPATE ENTRE CANDIDATOS MÚLTIPLOS existe desde a D26, e é UM SÓ: a marca
+    azul "Nomeado" do site, com a guarda de `ORGAOS_CEGOS_A_TAG`. Os desempates
+    por colocação, por ano e por "melhor classificado" continuam reprovados
+    (27-39%) e continuam fora. A marca é diferente deles porque não é heurística:
+    ela afirma que a pessoa FOI NOMEADA naquele concurso. O que ela não sabe é o
+    que a guarda cobre — que o silêncio dela sobre o TCU não significa nada.
     """
     resposta = {
         "decisao": "SEM_FICHA",
         "orgao": "",
         "candidatos": [],
-        # Os candidatos que carregam a tag azul "Nomeado". NÃO decidem nada (ver
-        # a medição no topo do módulo): vão para a pauta, para que quem for
-        # curar veja de imediato o que o site marcou.
+        # Os candidatos que carregam a tag azul "Nomeado". Desde a D26 eles
+        # DECIDEM, quando a guarda deixa; e vão para a pauta sempre, para que
+        # quem for curar veja de imediato o que o site marcou.
         "marcados_nomeado": [],
         "rotulos_sem_catalogo": [],
         "url": url_da_consulta(nome),
     }
 
-    minhas = linhas_da_pessoa(nome, linhas)
-    if not minhas:
+    aprovacoes = aprovacoes_da_pessoa(nome, linhas)
+    if not aprovacoes:
         return resposta
 
     # `concurso` vazio cai no caminho ESTRITO de propósito: quem chama sem
     # dizer de quem se trata recebe a regra mais conservadora, não a mais frouxa.
     ancora_necessaria = exige_ancora(concurso)
-    tem_ancora = any(canonico(linha["concurso"]) == ORGAO_CGU for linha in minhas)
+    tem_ancora = any(canonico(a["concurso"]) == ORGAO_CGU for a in aprovacoes)
+    ancora_ok = tem_ancora or not ancora_necessaria
 
     ano_saida = int(mes_saida[:4]) if len(mes_saida) >= 4 and mes_saida[:4].isdigit() else None
 
@@ -544,28 +718,30 @@ def destino_da_pessoa(
     tem_unificado = False
     sem_catalogo: list[str] = []
 
-    for linha in minhas:
-        orgao = canonico(linha["concurso"])
+    for aprovacao in aprovacoes:
+        orgao = canonico(aprovacao["concurso"])
         if orgao == ORGAO_CGU:
             continue  # o concurso de entrada não é destino de saída
 
-        ano = ano_do_rotulo(linha["concurso"])
+        ano = ano_do_rotulo(aprovacao["concurso"])
         if ano is not None and ano_saida is not None:
-            if ano > ano_saida or ano < ano_saida - ANOS_DE_FOLGA_ANTES:
+            if ano > ano_saida:
+                continue  # edição posterior à saída não pode tê-la motivado
+            if ANOS_DE_FOLGA_ANTES is not None and ano < ano_saida - ANOS_DE_FOLGA_ANTES:
                 continue
 
         if orgao is None:
             tem_unificado = True
         elif orgao == "":
-            sem_catalogo.append(linha["concurso"])
+            sem_catalogo.append(aprovacao["concurso"])
         else:
-            candidatos.setdefault(orgao, []).append(linha)
+            candidatos.setdefault(orgao, []).append(aprovacao)
 
-    resposta["candidatos"] = sorted(candidatos)
-    resposta["marcados_nomeado"] = sorted(
-        orgao for orgao, linhas_do_orgao in candidatos.items()
-        if any(linha["nomeado"] for linha in linhas_do_orgao)
+    marcados = sorted(
+        orgao for orgao, aa in candidatos.items() if any(a["nomeado"] for a in aa)
     )
+    resposta["candidatos"] = sorted(candidatos)
+    resposta["marcados_nomeado"] = marcados
     resposta["rotulos_sem_catalogo"] = sorted(set(sem_catalogo))
 
     if not candidatos and not tem_unificado:
@@ -576,9 +752,27 @@ def destino_da_pessoa(
     # unificado pode esconder o órgão de chegada. Nos dois casos há candidato
     # que não sabemos nomear, então não há candidato único — só parece haver.
     if (len(candidatos) == 1 and not tem_unificado and not sem_catalogo
-            and (tem_ancora or not ancora_necessaria)):
+            and ancora_ok):
         resposta["decisao"] = "UNICO"
         resposta["orgao"] = resposta["candidatos"][0]
+        return resposta
+
+    # A MARCA AZUL DESEMPATA (D26) — nas condições em que ela enxerga.
+    #
+    # Ela é cega em `ORGAOS_CEGOS_A_TAG`: se um deles está entre os candidatos e
+    # NÃO está marcado, a falta de marca é do site, não da pessoa, e a marca em
+    # outro lugar não a exclui. Também não se desempata quando há concurso
+    # unificado ou rótulo fora do catálogo no meio: ali existe candidato que
+    # sequer sabemos nomear, e "sobrou um marcado" seria ilusão.
+    #
+    # E é UMA marca só. Duas marcas não são um empate a desempatar: são o site
+    # dizendo que a pessoa foi nomeada nos dois lugares. Escolher entre elas foi
+    # medido e reprovou (ver o docstring) — vai para a pauta, com as duas à
+    # vista em `marcados_nomeado`.
+    if (len(marcados) == 1 and ancora_ok and not tem_unificado and not sem_catalogo
+            and not (set(candidatos) - set(marcados)) & ORGAOS_CEGOS_A_TAG):
+        resposta["decisao"] = "UNICO_NOMEADO"
+        resposta["orgao"] = marcados[0]
         return resposta
 
     # Sem a ÂNCORA — e só para quem poderia tê-la —, o que sobrou não é candidato

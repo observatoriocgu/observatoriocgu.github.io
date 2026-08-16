@@ -62,12 +62,14 @@ Todas as decisões abaixo estão **fechadas**. As fases podem ser executadas sem
 | D19 | Entrada dos atos do DOU | Fase 2.5 + Fase 2 (v2) | **um índice único de atos**, `data/atos_dou.csv`, com chave no ato (`URL_TITLE`), alimentado pelas **duas** varreduras — a por frase (`varrer_dou.py`) e a por nome (`enriquecer_saidas.py`) — e uma pasta única de cópias, `data/saidas_dou/`. O card deixa de ter crawler próprio e passa a ser **derivado** do índice (`gerar_card_dou.py`). Some a pasta `data/dias_sem_perder_AFFC/`. **Ajusta a delimitação da D10**: a varredura por frase continua não sendo fonte de contagem, mas passa a registrar **tudo** o que encontra, em vez de parar no primeiro ato de cada tipo |
 | D25 | Identidade do ato e motivos que faltavam | Fase 2 (v2) | **a identidade deixa de ser um portão e passa a ser um nível**: `SIAPE` (matrícula bate), `NOME` (a fórmula do ato nomeia exatamente a pessoa) ou `CITACAO` (só o nome solto). A matrícula divergente **rebaixa** em vez de vetar, porque o DOU erra os dois lados — erra o nome (`PAGLIONE` por `PAGLIONI`) e erra a matrícula (três vacâncias reais). O classificador ganha o **motivo da vacância** (posse em outro cargo → vacância; desistência do estágio probatório → exoneração; inciso do art. 33 quando o ato só cita a lei), a **retificação** (que leva ao ato original em vez de virar o ato) e a **cessão**. Ganha também três recusas: ato **normativo**, **ajustamento de conduta** e **reversão de aposentadoria** — esta última publicava como saída cinco Auditores que estavam **voltando** |
 | D24 | Destino pelo Ranking dos Concursos | Fase 2 (v2) | **um crawler por PESSOA**, `rankingdosconcursos.com.br`, que só é consultado para quem **já saiu** (SIAPE ou DOU) e está sem `ORGAO_DESTINO`. Publica **só quando sobra um órgão candidato**; ambíguo vira pauta humana. O nome do órgão vem de um **catálogo explícito**, nunca do rótulo do site. `FONTE_DESTINO = RANKING` — que é o que a **D14** sempre reservou para esta fonte. Mescla no **navegador**, como a D22, e só sobre destino vazio |
+| D26 | A marca azul desempata | Fase 2 (v2) | **revê a D24 na parte do desempate.** A marca "Nomeado" do ranking passa a decidir (`UNICO_NOMEADO`), porque ela **afirma um fato** — a pessoa foi nomeada naquele concurso — e não é heurística como colocação ou ano. Mas a **ausência** de marca não afirma nada: o site não anota nomeação de todo concurso (**TCU: 0 marca azul em 38 linhas; CGU: 0 em 84**), então a guarda `ORGAOS_CEGOS_A_TAG` impede que a marca decida contra TCU, Senado ou Câmara não marcados. **Duas marcas não se desempatam.** Some a **janela de anos para trás**, que apagava a resposta certa de quem passou em concurso antigo e foi nomeado anos depois. Passa-se a ler a coluna **"Fez tb:"**, que traz marca que a linha própria perde e cita concurso que a tabela não lista. Medido contra os 123 destinos que o DOU conhece: **53 publicados, 50 certos (94,3%)**, contra 48 e 46 (95,8%) da regra antiga — 1,5 ponto de precisão pelo **dobro** da cobertura (9 → 18 saídas resolvidas) |
 
 **Efeito das decisões novas sobre as antigas:**
 
 - **D9 sobrevive parcialmente.** `CONCURSO` continua coluna própria, separada de `AREA`, com `VETERANO` como valor. Muda a **origem**: o concurso passa a ser derivado da primeira aparição na série mensal, não da lista da FGV. A parte da D9 sobre chave de identidade é revogada pela **D12**.
 - **D10 sobrevive inteira.** O card "dias sem perder um Auditor" continua vindo do crawler de frase da Fase 2.5, e seus padrões de classificação — validados ato a ato — são **reaproveitados sem reescrita** pelo crawler por nome da Fase 2.
 - **D5 fica em suspenso.** Sem `CADASTRO DE RESERVA`/`DESISTENTE` no universo (**D11**), o card de custo perde parte do sentido original; decidir na Fase 3 se volta e sobre qual base.
+- **D24 sobrevive quase inteira, revista pela D26 num ponto.** O "só publica quando sobra um candidato" deixa de ser a única porta: a marca azul "Nomeado" abre uma segunda, `UNICO_NOMEADO`. Tudo o mais da D24 fica de pé — a ordem `já saiu → procurar para onde`, o catálogo explícito de órgãos, a âncora, a mescla no navegador e a precedência CURADORIA > DOU > RANKING.
 
 **Pendências operacionais que essas decisões geram** (não bloqueiam nenhuma fase):
 
@@ -1092,15 +1094,15 @@ como os 251 atos são o do `testar_dou.py`):
 
 | Regra | Publica | Acerta | Precisão |
 |---|---|---|---|
-| candidato único **com âncora na CGU** — *adotada* | 45 | 43 | **95,6%** |
+| candidato único **com âncora na CGU** | 45 | 43 | **95,6%** |
 | candidato único sem âncora | 49 | 45 | 91,8% |
 | desempate por melhor colocação | 62 | 24 | 38,7% |
-| desempate pela marca "Nomeado" do site | 18 | 6 | 33,3% |
 | desempate por colocação até 100º | 15 | 4 | 26,7% |
 
 Nos **62 casos ambíguos, o destino verdadeiro estava entre os candidatos nos 62**. A informação
-está lá; o que não existe é o critério para escolher dentro dela. Por isso **não há desempate**:
-ambíguo vai para pauta humana, com a lista e o link, nunca para a tela.
+está lá; o que não existe é o critério para escolher dentro dela — **com uma exceção, achada na
+D26 e medida abaixo: a marca azul "Nomeado"**. Fora ela, ambíguo vai para pauta humana, com a
+lista e o link, nunca para a tela.
 
 **A âncora** é a linha do concurso da própria CGU na ficha do site. Sem ela, o que se tem é um nome
 batendo com um nome num site que nem sabe que essa pessoa foi da CGU. Custa 2 acertos, corta 2
@@ -1140,11 +1142,108 @@ tabela racharia pela outra ponta. Casos reais que o catálogo funde: `TCU` / `TC
 | "Destino não identificado" na tela | **43 → 29** |
 | `testar_ranking.py` | **55 invariantes**, sem rede |
 
+*(Números da D24, superados pela **2.6.1** abaixo.)*
+
 Automação: `.github/workflows/atualizar-destinos-ranking.yml`, **semanal**, roda no CI porque as duas
 entradas (`dados.csv` e `atos_dou.json`) estão no Git. Incremental — quem já foi resolvido não é
 reconsultado, e quem ficou sem resposta volta à fila depois de 30 dias. A mescla é no **navegador**
 (`mesclarDestinosDoRanking`), como a D22, e só sobre destino **vazio**: DOU e curadoria continuam
 vencendo.
+
+### 2.6.1 A marca azul passa a desempatar ✅ *(16/08/2026, D26)*
+
+**O pedido:** *"Veja porque o crawler do ranking dos concursos não tá puxando casos óbvios de
+pessoas que saíram da CGU. Eu fui no site e pesquisei essas pessoas e literalmente foi só buscar o
+nome delas e olhar o órgão marcado de azul que eu achei onde elas estão."* Com seis casos
+conferidos à mão, e a ressalva de que **não precisa ser 100% preciso**.
+
+#### Três defeitos, e só o terceiro era o que parecia
+
+1. **A coluna "Fez tb:" carregava marca que a linha própria não tinha.** O site rende o quadradinho
+   em dois lugares — na célula da linha e dentro do "Fez tb:" das outras linhas da mesma pessoa — e
+   às vezes **só num deles**. O `analisar` lia apenas a célula da linha. É por isso que o
+   "Nomeado" de **ROSICLEIDE RAMOS ALVES no TCM SP**, que o usuário viu no navegador, não existia
+   para o crawler: `MARCADOS_NOMEADO` dela vinha **vazio**. A mesma coluna cita, de vez em quando,
+   concurso que a tabela **não lista como linha** (visto com `RFB` e `Camara dos Deputados`) — ler
+   dali também impede chamar de "candidato único" quem tem um segundo concurso escondido.
+2. **A janela de anos para trás apagava a resposta certa.** Ela cortava concurso mais velho que
+   `saída - 3`, supondo que aprovação antiga já teria sido exercida. A nomeação sai anos depois da
+   homologação: **ANDRE LUIZ LIMA DA ROCHA** (saída 05/2025, aprovação única na SEFAZ RS de **2018**)
+   virava "sem candidato", e o TCM SP de **2020** da ROSICLEIDE caía fora antes de a marca ser
+   olhada. A janela **para a frente** fica — edição posterior à saída não pode ter motivado a saída.
+3. **A marca azul não decidia** — e a medição da D24 que a reprovava (6 de 18) estava certa **sobre
+   o que ela mediu**, e era o motivo errado. Ver abaixo.
+
+#### Por que a marca reprovava, e o que a torna utilizável
+
+A tentação é ler a marca como "foi para cá". Ela não é isso: ela diz que a pessoa **foi nomeada**
+naquele concurso. O problema nunca foi a marca, foi o **silêncio** dela — o site não mantém a lista
+de nomeados de todo concurso. Contado sobre as 155 fichas baixadas:
+
+| Concurso | linhas | com marca azul |
+|---|---|---|
+| CGU | 84 | **0** |
+| TCU | 38 | **0** |
+| TC DF | 10 | 0 |
+| TCE PE | 13 | 0 |
+| Senado | 25 | 7 |
+| SEFAZ / ISS / TCE estaduais | — | frequente |
+
+**Vinte pessoas do gabarito têm nomeação no TCU comprovada pelo DOU. Nenhuma tem marca.** Daí o
+padrão dos erros, que é exato: usando a marca solta, **todos** os erros contra o gabarito são de
+quem foi para TCU ou Senado e tinha azul num concurso estadual. **Nenhum** erro com destino estadual
+ou municipal. A regra que decorre disso é `ORGAOS_CEGOS_A_TAG` = {TCU, Senado, Câmara dos
+Deputados}: se um deles está entre os candidatos **sem** marca, a marca em outro lugar não decide —
+ali ela não está discriminando nada.
+
+| Regra | Publica | Acerta | Precisão | Pendentes resolvidos |
+|---|---|---|---|---|
+| candidato único (a regra até a D25) | 48 | 46 | 95,8% | 9 de 37 |
+| **candidato único + marca com guarda** — *adotada* | 53 | 50 | **94,3%** | **18 de 37** |
+| marca com guarda, escolhendo entre várias | 58 | 53 | 91,4% | 21 de 37 |
+| marca solta, sem guarda | 69 | 53 | 76,8% | 20 de 37 |
+
+**A queda de 95,8% para 94,3% não é da marca.** Aberto por decisão, no mesmo gabarito: `UNICO`
+publica 48 e acerta 45; `UNICO_NOMEADO` publica 5 e acerta **5**. Os três erros são todos do caminho
+antigo, e o que mudou nele foi a saída da janela de anos para trás — custou um acerto e devolveu os
+dois casos que ela apagava. Cinco em cinco é amostra pequena demais para virar número de propaganda;
+o que ela sustenta é que a marca com guarda não é a parte frágil desta regra.
+
+**Duas marcas não se desempatam.** A linha de 91,4% acima é a tentação, e ela cai por um caso que
+não tem conserto por heurística: **NAZLI SETTON FILIPPINI** e **JAIDIR ALVES COSTA DOS SANTOS**
+foram os dois para a Receita, e nos dois a **RFB estava marcada de azul**, ao lado de outra marca
+que o desempate por colocação preferiu (ISS Guarulhos 1º sobre RFB 6º; Senado 64º sobre RFB 87º).
+Com duas marcas o site está dizendo que a pessoa foi nomeada nos dois lugares, e qual ela foi
+exercer é justamente o que ele não sabe.
+
+#### O preço, e por que ele é aceito
+
+Dois dos seis casos conferidos à mão **continuam indo para a pauta**, e nos dois a guarda parece
+estar certa contra a leitura manual:
+
+| | colocação no órgão cego | marca azul em |
+|---|---|---|
+| ALAOR ANTONIO RODRIGUES VILELA JUNIOR | **10º** Câmara dos Deputados Consultor | SEFAZ AM (92º) |
+| DANIEL LIMA OLIVEIRA | **4º** Câmara dos Deputados | SEFAZ RN (135º) |
+
+Uma colocação dessas é destino plausível demais para a máquina decidir contra ela. Os dois entram na
+pauta **com a marca à vista** (`marca:` no relatório da execução), que é uma conferência de um olhar.
+Busca por nome no DOU para DANIEL: nenhum ato de nomeação, nem no TCU nem em lugar nenhum — o DOU
+não desempata este caso, e por isso ele é de gente.
+
+#### Resultado
+
+| | antes | depois |
+|---|---|---|
+| Destino identificado (vai à tela) | 9 | **18** |
+| ...destes, pela marca "Nomeado" | 0 | **9** |
+| Aguardando curadoria | 22 | 14 |
+| Precisão contra o gabarito do DOU | 95,8% | **94,3%** |
+| `testar_ranking.py` | 55 invariantes | **79 invariantes** |
+
+Casos do usuário resolvidos automaticamente: ROSICLEIDE (TCM SP, pela marca do "Fez tb:"), BRUNO
+(SEFAZ SP), ANDRE LUIZ (SEFAZ RS, pela janela removida), MATHEUS KLOTZ — este último **não**, por
+ter duas marcas; ficou na pauta com as duas à vista.
 
 ---
 
