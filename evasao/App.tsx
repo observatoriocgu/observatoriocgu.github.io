@@ -470,7 +470,7 @@ const App: React.FC = () => {
 
             <CounterCard
               value={numero(saidasNoPeriodo)}
-              label="Auditores que saíram da CGU"
+              label="Auditores (veteranos + concurso de 2021) saíram da CGU"
               icon={icone(faUserMinus)}
               footer={
                 <div className="space-y-2">
@@ -495,7 +495,7 @@ const App: React.FC = () => {
 
             <CounterCard
               value={percentual(concurso2021.percentual)}
-              label="Evasão de quem entrou depois de jun/2022"
+              label="Evasão de quem entrou após jun/2022"
               icon={icone(faArrowTrendDown)}
               footer={
                 <div className="space-y-1">
@@ -518,8 +518,9 @@ const App: React.FC = () => {
           <section className="mb-8 rounded-xl border border-gray-800 p-4">
             <h2 className="mb-1 text-lg font-semibold text-red-300">Saídas mês a mês</h2>
             <p className="mb-3 text-sm text-gray-400">
-              Quantos Auditores deixaram a CGU em cada competência, no recorte escolhido abaixo. A série começa em
-              agosto de 2022, primeira competência em que alguém do concurso de 2022 poderia aparecer ausente.
+              Quantos auditores deixaram a CGU em cada competência? O recorte mostrado filtra concurso de 2021 +
+              exonerações e vacâncias, mas é possível filtrar. A série começa em agosto de 2022, primeira competência
+              em que alguém do concurso de 2021 poderia aparecer ausente.
               {!carregando && (
                 <>
                   {' '}
