@@ -1086,6 +1086,53 @@ def nome_do_ato_bate(texto: str, nome: str) -> bool:
     return bool(lido) and normalizar(lido) == normalizar(nome)
 
 
+# Quantos caracteres de diferença ainda podem ser erro de digitação do DOU, e
+# não outra pessoa. DOIS, e o número não é palpite — foi medido nesta base:
+#
+#   O DOU ERRA POUCO, E ERRA POR UM. Dos 270 atos já casados cujo texto tem nome
+#   legível, 268 escrevem exatamente o que o SIAPE escreve. Os 2 que divergem
+#   divergem por UM caractere: "KRANZFIELD" onde o SIAPE diz "KRANZFELD", e
+#   "PAGLIONE" onde diz "PAGLIONI" (este é o caso da D25).
+#
+#   A BASE NÃO TEM NOMES PARECIDOS. Entre os 2.009 nomes, há ZERO pares a
+#   distância 1 e ZERO a distância 2. A 3 aparecem três pares, e um deles é
+#   "FABIO PEREIRA CARDOSO" x "LUCIO PEREIRA CARDOSO" — duas pessoas diferentes.
+#   Por isso 2 é o teto: em 3 a régua passaria a fundir gente.
+#
+# E ISTO NÃO DECIDE NADA SOZINHO. Serve para ACHAR candidatos quando a grafia do
+# DOU não bate letra a letra; quem decide de quem é o ato continua sendo
+# `identidade_no_ato`, lendo o documento. É o mesmo princípio do encurtamento do
+# nome na busca: afrouxa a BUSCA, nunca a IDENTIFICAÇÃO.
+TETO_ERRO_DE_GRAFIA = 2
+
+
+def distancia_entre_nomes(a: str, b: str, teto: int = TETO_ERRO_DE_GRAFIA) -> int:
+    """
+    Distância de edição (Levenshtein) entre dois nomes já normalizados.
+
+    Devolve `teto + 1` assim que passa do teto — não interessa quão diferentes
+    são dois nomes que já se sabe que são de pessoas diferentes, e cortar cedo
+    evita percorrer a matriz inteira 2.009 vezes por ato.
+    """
+    a, b = normalizar(a), normalizar(b)
+    if abs(len(a) - len(b)) > teto:
+        return teto + 1
+
+    anterior = list(range(len(b) + 1))
+    for i, letra_a in enumerate(a, 1):
+        atual = [i]
+        for j, letra_b in enumerate(b, 1):
+            atual.append(min(
+                anterior[j] + 1,           # remoção
+                atual[j - 1] + 1,          # inserção
+                anterior[j - 1] + (letra_a != letra_b),  # troca
+            ))
+        if min(atual) > teto:
+            return teto + 1
+        anterior = atual
+    return anterior[-1]
+
+
 def identidade_no_ato(texto: str, nome: str, matricula_mascarada: str) -> str:
     """
     Como este ato prova ser DESTA pessoa. `""` quando não prova.

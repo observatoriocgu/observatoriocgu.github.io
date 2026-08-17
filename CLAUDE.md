@@ -171,6 +171,7 @@ Edital CGU nº 5 de 13/06/2022, publicado no DOU (D17).
 - varrer_dou.py        varre o DOU por FRASE e registra toda saída de AFFC
 - resumir_dou.py       o resumo do DOU para o site (card + saídas recentes),
                        derivado do índice de saídas. Era gerar_card_dou.py
+                       NÃO tem regra de identidade própria (D31)
 - arquivar_destinos.py alcança para trás: arquiva o ato de nomeação de quem já
                        tinha destino do DOU e só tinha a URL (D30)
 - filtrar_affc.py      reduz o CSV bruto do Portal aos AFFC
@@ -251,6 +252,27 @@ Edital CGU nº 5 de 13/06/2022, publicado no DOU (D17).
   falecimento, e era classificado como falecimento — mas o ato é sobre o
   pensionista, sai muito depois do óbito e o instituidor pode ser aposentado ou
   TFFC (fora do escopo, D7). Ver dou.PADROES_PENSAO
+
+## Uma regra só para "de quem é o ato" (D31, 17/08/2026)
+- Quem responde é `atos.dono_do_ato` (ato -> pessoa) e `dou.identidade_no_ato`
+  (pessoa -> ato), e as duas rodam a MESMA decisão: ler o texto do ato. O resumo
+  do DOU NÃO tem mais regra própria — tinha, decidia pela ficha do índice (nome
+  idêntico + matrícula que não conflitasse) e CONTRARIAVA a D25, vetando por
+  matrícula divergente onde a decisão manda rebaixar
+- Isso só é possível porque a CÓPIA do ato está em disco (`atos.texto_arquivado`).
+  Nenhuma requisição de rede: o arquivo foi baixado quando o ato entrou no índice
+- LEVENSHTEIN ACHA CANDIDATO, NÃO DECIDE NADA (`dou.distancia_entre_nomes`, teto
+  `dou.TETO_ERRO_DE_GRAFIA` = 2). É o mesmo princípio do encurtamento do nome na
+  busca: afrouxa a BUSCA, nunca a IDENTIFICAÇÃO. Quem decide continua sendo
+  `identidade_no_ato`, lendo o documento
+- O TETO É 2 E FOI MEDIDO, dos dois lados: o DOU erra o nome em 2 de 270 atos e
+  erra sempre por UM caractere (KRANZFIELD/KRANZFELD, PAGLIONE/PAGLIONI); e entre
+  os 2.009 nomes da base há ZERO pares a distância 1 ou 2. A 3 aparece FABIO
+  PEREIRA CARDOSO x LUCIO PEREIRA CARDOSO — duas pessoas. NÃO subir para 3
+- A EXIGÊNCIA DO CARGO acompanha o nível da prova nos dois lados: identidade
+  provada pela matrícula dispensa o cargo (a demissão e a cessão não o citam);
+  prova mais fraca, não
+- Dois donos provados = VAZIO. Ambiguidade não é escolha
 
 ## Dois DOUs, dois índices (D30, 16/08/2026)
 - A camada do DOU mora em `data/dou/`, e cada nome diz de que GRÃO é e de que

@@ -204,6 +204,91 @@ def registrar(
     return linha
 
 
+# ------------------------------------------------------------- de quem é o ato
+
+
+def candidatos_por_nome(nome_do_ato: str, por_nome: dict[str, list[dict]]) -> list[dict]:
+    """
+    Quem, na base, pode ser a pessoa que o ato nomeia. NÃO decide nada.
+
+    Primeiro a grafia exata. Só quando ela não acha ninguém é que se aceita
+    diferença de até `dou.TETO_ERRO_DE_GRAFIA` caracteres — porque o DOU erra a
+    digitação, e foi medido quanto: 2 em 270 atos, sempre por UM caractere.
+
+    Devolver mais de um candidato é resultado válido: quem chama tem de exigir
+    que exatamente UM prove ser o dono, e desistir quando dois provarem.
+    """
+    alvo = dou.normalizar(nome_do_ato)
+    if not alvo:
+        return []
+    if alvo in por_nome:
+        return list(por_nome[alvo])
+    return [
+        pessoa
+        for nome, lista in por_nome.items()
+        if dou.distancia_entre_nomes(alvo, nome) <= dou.TETO_ERRO_DE_GRAFIA
+        for pessoa in lista
+    ]
+
+
+def dono_do_ato(linha: dict, por_nome: dict[str, list[dict]]) -> str:
+    """
+    O `ID_SERVIDOR_PORTAL` de quem o ato trata. Vazio quando não dá para provar.
+
+    UMA REGRA SÓ, NAS DUAS DIREÇÕES (D31, 17/08/2026). Antes havia duas: o
+    `enriquecer_saidas.py` parte da PESSOA, acha o ato no DOU e decide lendo o
+    texto inteiro (`dou.identidade_no_ato`, D25); o resumo do DOU partia do ATO e
+    decidia olhando só a ficha do índice — nome igual e matrícula que não
+    conflitasse. As duas discordavam num ponto que estava escrito na D25: em ato
+    da CGU, a matrícula divergente REBAIXA, não veta. A regra fraca vetava.
+
+    O que desfaz a divergência é que a cópia do ato está em disco: dá para ler o
+    documento e chamar a MESMA função. Nenhuma requisição de rede — o arquivo já
+    foi baixado quando o ato entrou no índice.
+
+    A EXIGÊNCIA DO CARGO acompanha o nível da prova, como no outro lado: quando a
+    identidade não veio da matrícula, o ato tem de citar o cargo de AFFC para
+    valer. É `dou.classificar(exigir_cargo=...)` quem responde isso.
+
+    Na dúvida, VAZIO. O efeito de não casar é a saída aparecer sem pessoa; o
+    efeito de casar errado é publicar que uma pessoa real saiu quando não saiu.
+    """
+    if linha.get("ID_SERVIDOR_PORTAL"):
+        return linha["ID_SERVIDOR_PORTAL"]
+
+    texto = texto_arquivado(linha.get("ARQUIVO", ""))
+    if not texto:
+        # Sem o documento não há decisão. Decidir pela ficha do índice é
+        # exatamente a regra que a D31 removeu.
+        return ""
+
+    return dono_do_texto(texto, linha.get("NOME", ""), por_nome)
+
+
+def dono_do_texto(texto: str, nome_no_ato: str, por_nome: dict[str, list[dict]]) -> str:
+    """
+    A DECISÃO, separada da leitura do arquivo — e é por isso que ela é testável.
+
+    `nome_no_ato` só serve para levantar candidatos; a prova vem do TEXTO, por
+    `dou.identidade_no_ato`, contra o nome e a matrícula que o SIAPE registra.
+    """
+    provados = []
+    for pessoa in candidatos_por_nome(nome_no_ato, por_nome):
+        identidade = dou.identidade_no_ato(texto, pessoa["NOME"], pessoa.get("MATRICULA", ""))
+        if not identidade:
+            continue
+        # A exigência do cargo acompanha o nível da prova, como no
+        # `enriquecer_saidas.py`: quem se provou pela matrícula dispensa o cargo
+        # (a demissão e a cessão não o citam); os níveis mais fracos, não.
+        if not dou.classificar(texto, exigir_cargo=identidade != dou.IDENTIDADE_SIAPE):
+            continue
+        provados.append(pessoa["ID_SERVIDOR_PORTAL"])
+
+    # Dois donos provados é ambiguidade, não escolha. Não acontece hoje — a base
+    # não tem homônimo —, e a guarda existe para o dia em que tiver.
+    return provados[0] if len(provados) == 1 else ""
+
+
 # ------------------------------------------------- releitura das cópias em disco
 
 # O texto na cópia arquivada por `dou.salvar_ato`. É `<div class="texto">…</div>`

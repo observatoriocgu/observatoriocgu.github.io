@@ -40,13 +40,18 @@ ainda não entregou a competência que mostraria a ausência. São elas que faze
 lista de últimas saídas do painel chegar até hoje, em vez de parar dois meses
 atrás.
 
-Cada uma leva `idServidor` quando dá para casar o ato com alguém do `dados.csv`
-— por nome, e só quando a matrícula do ato não CONFLITA com a máscara do Portal.
-O casamento é feito aqui, e não no navegador, por dois motivos: é aqui que a
-matrícula existe, e é aqui que dá para descartar homônimo (D12). Com o id, a
-interface sabe que aquela saída já está na lista do SIAPE e não a mostra duas
-vezes — foi o que aconteceu com as saídas provisórias de 202606, que o crawler
-por nome pula de propósito e a varredura por frase acha assim mesmo.
+Cada uma leva `idServidor` quando dá para provar de quem é o ato. Quem prova é
+`atos.dono_do_ato`, que LÊ A CÓPIA ARQUIVADA e chama `dou.identidade_no_ato` — a
+mesma função, a mesma regra e os mesmos testes que o `enriquecer_saidas.py` usa
+na direção contrária (D31). Este script não tem mais regra própria de identidade:
+tinha, e ela contradizia a D25 ao VETAR por matrícula divergente onde a decisão
+manda apenas rebaixar.
+
+O casamento é feito aqui, e não no navegador, porque é aqui que existem a
+matrícula e o texto do ato. Com o id, a interface sabe que aquela saída já está
+na lista do SIAPE e não a mostra duas vezes — foi o que aconteceu com as saídas
+provisórias de 202606, que o crawler por nome pula de propósito e a varredura por
+frase acha assim mesmo.
 
 O QUE NÃO ACONTECE AQUI: contar. Nenhum número de evasão sai deste arquivo —
 contar ATO dobraria quem tem dois e incluiria quem já estava fora do quadro. Quem
@@ -64,7 +69,6 @@ from __future__ import annotations
 import argparse
 import csv
 import json
-import re
 from pathlib import Path
 
 import atos
@@ -111,31 +115,6 @@ def recuar_meses(mes: str, quantidade: int) -> str:
     return f"{total // 12:04d}{total % 12 + 1:02d}"
 
 
-def casar_com_pessoa(linha: dict, por_nome: dict[str, list[dict]]) -> str:
-    """
-    O `ID_SERVIDOR_PORTAL` de quem o ato trata, quando dá para saber. Vazio se não.
-
-    Nome NÃO é chave (D12), então duas guardas: nome que casa com mais de uma
-    pessoa é descartado, e matrícula do ato que conflita com a máscara do Portal
-    elimina o casamento. Na dúvida, vazio — o efeito de errar aqui é mostrar a
-    mesma saída duas vezes na lista, o que é bem menos grave que colar o ato de
-    uma pessoa no nome de outra.
-    """
-    if linha.get("ID_SERVIDOR_PORTAL"):
-        return linha["ID_SERVIDOR_PORTAL"]
-
-    candidatos = por_nome.get(dou.normalizar(linha.get("NOME", "")), [])
-    if len(candidatos) != 1:
-        return ""
-
-    pessoa = candidatos[0]
-    matricula_ato = linha.get("MATRICULA_SIAPE", "")
-    mascara = re.sub(r"\D", "", pessoa.get("MATRICULA", ""))
-    if matricula_ato and mascara and not matricula_ato.startswith(mascara):
-        return ""
-    return pessoa["ID_SERVIDOR_PORTAL"]
-
-
 def main() -> int:
     parser = argparse.ArgumentParser(description="Gera o JSON do card a partir do índice de atos.")
     parser.add_argument("--diagnostico", action="store_true", help="Imprime o JSON, sem gravar.")
@@ -178,7 +157,7 @@ def main() -> int:
     corte = recuar_meses(mes_siape, MESES_DE_SAIDA_RECENTE)
     saidas_recentes = []
     for linha in atos.posteriores_a_competencia(indice, corte):
-        identificador = casar_com_pessoa(linha, por_nome)
+        identificador = atos.dono_do_ato(linha, por_nome)
         ja_no_siape = identificador in ja_saiu
         if ja_no_siape and identificador not in sem_motivo:
             continue

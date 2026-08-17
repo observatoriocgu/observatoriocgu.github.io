@@ -561,6 +561,79 @@ def conferir_nomes_do_corpus() -> tuple[int, str]:
     return len(divergentes), f"{exato} de {total} atos reais com o nome exato"
 
 
+def casos_de_quem_e_o_ato() -> list[tuple[str, bool]]:
+    """
+    O casamento ato → pessoa, agora com a MESMA regra da direção contrária (D31).
+
+    O que aqui se protege: a regra antiga exigia grafia exata e VETAVA por
+    matrícula divergente, contrariando a D25. Os dois erros de grafia que o DOU
+    cometeu na vida deste observatório — "PAGLIONE" por "PAGLIONI" e "KRANZFIELD"
+    por "KRANZFELD" — são de UM caractere, e ambos foram perdidos pela regra
+    antiga quando o ato chegava sem dono.
+
+    O teto de 2 também é medido, e do outro lado: entre os 2.009 nomes da base há
+    ZERO pares a distância 1 ou 2, e a 3 aparece "FABIO PEREIRA CARDOSO" x "LUCIO
+    PEREIRA CARDOSO" — duas pessoas. Por isso 3 não pode passar.
+    """
+    def pessoa(identificador, nome, matricula=""):
+        return {"ID_SERVIDOR_PORTAL": identificador, "NOME": nome, "MATRICULA": matricula}
+
+    base = [
+        pessoa("1", "LUIS PAULO PAGLIONI MARCONDES", "166****"),
+        pessoa("2", "FABIO PEREIRA CARDOSO", "220****"),
+        pessoa("3", "MARIA DAS DORES SOUZA", "331****"),
+    ]
+    por_nome = {}
+    for p in base:
+        por_nome.setdefault(dou.normalizar(p["NOME"]), []).append(p)
+
+    ato_paglioni = (
+        f"Declarar vago o cargo de {CARGO} ocupado pelo servidor LUIS PAULO PAGLIONE "
+        f"MARCONDES, matricula SIAPE no 1669999, por motivo de posse em outro cargo "
+        f"inacumulavel"
+    )
+    ato_sem_cargo = (
+        "EXONERAR, a pedido, MARIA DAS DORES SOUZA do cargo que ocupa, "
+        "ficando vago o cargo"
+    )
+
+    return [
+        ("distância entre nomes iguais é zero",
+         dou.distancia_entre_nomes("JOAO DA SILVA", "JOAO DA SILVA") == 0),
+        ("acento e caixa não contam como diferença",
+         dou.distancia_entre_nomes("JOÃO DA SILVA", "joao da silva") == 0),
+        ("o erro de digitação do DOU é de UM caractere",
+         dou.distancia_entre_nomes("PAGLIONE MARCONDES", "PAGLIONI MARCONDES") == 1),
+        ("acima do teto devolve teto+1, sem calcular o resto",
+         dou.distancia_entre_nomes("FABIO PEREIRA CARDOSO", "LUCIO PEREIRA CARDOSO") == 3),
+        ("grafia exata acha o candidato",
+         [p["ID_SERVIDOR_PORTAL"] for p in
+          atos.candidatos_por_nome("FABIO PEREIRA CARDOSO", por_nome)] == ["2"]),
+        ("grafia errada em 1 caractere ainda acha",
+         [p["ID_SERVIDOR_PORTAL"] for p in
+          atos.candidatos_por_nome("LUIS PAULO PAGLIONE MARCONDES", por_nome)] == ["1"]),
+        ("diferença de 3 NÃO acha — é onde a base tem duas pessoas",
+         atos.candidatos_por_nome("LUCIO PEREIRA CARDOSO", por_nome) == []),
+        ("nome vazio não levanta candidato nenhum",
+         atos.candidatos_por_nome("", por_nome) == []),
+        ("o ato com nome errado e matrícula certa é dela (D25: rebaixa, não veta)",
+         atos.dono_do_texto(ato_paglioni, "LUIS PAULO PAGLIONE MARCONDES", por_nome) == "1"),
+        ("...e a regra ANTIGA a perdia, porque exigia grafia exata",
+         dou.normalizar("LUIS PAULO PAGLIONE MARCONDES") not in por_nome),
+        ("sem prova de identidade no texto, ninguém é dono",
+         atos.dono_do_texto(f"Declarar vago o cargo de {CARGO} ocupado por OUTRA PESSOA "
+                            f"QUALQUER, por motivo de posse em outro cargo", "OUTRA PESSOA "
+                            "QUALQUER", por_nome) == ""),
+        ("prova fraca sem o cargo no ato não basta",
+         atos.dono_do_texto(ato_sem_cargo, "MARIA DAS DORES SOUZA", por_nome) == ""),
+        ("ato que o índice já casou não é redecidido",
+         atos.dono_do_ato({"ID_SERVIDOR_PORTAL": "9", "NOME": "X"}, por_nome) == "9"),
+        ("sem cópia arquivada não há decisão — a ficha do índice não decide",
+         atos.dono_do_ato({"ID_SERVIDOR_PORTAL": "", "NOME": "FABIO PEREIRA CARDOSO",
+                           "ARQUIVO": "nao-existe.html"}, por_nome) == ""),
+    ]
+
+
 def casos_do_indice_de_destino() -> list[tuple[str, bool]]:
     """
     O índice dos atos de chegada (D30). Sem rede: `registrar` não baixa nada.
@@ -716,6 +789,11 @@ def main() -> int:
         if not ok:
             print(f"        esperado {esperado!r}, obtido {obtido[:60]!r}")
 
+    print("— de quem é o ato: uma regra só nas duas direções (D31) —")
+    for descricao, ok in casos_de_quem_e_o_ato():
+        falhas += not ok
+        print(f"  {'ok  ' if ok else 'FALHA'} {descricao}")
+
     print("— índice dos atos de destino (D30) —")
     for descricao, ok in casos_do_indice_de_destino():
         falhas += not ok
@@ -725,6 +803,7 @@ def main() -> int:
         len(CLASSIFICACAO) + len(CLASSIFICACAO_SEM_CARGO) + len(RETIFICACAO) + len(IDENTIDADE)
         + len(DESTINO) + len(MATRICULA) + len(EXTRACAO) + len(ORGAO)
         + len(NOME_NO_ATO) + len(casos_do_indice_de_destino())
+        + len(casos_de_quem_e_o_ato())
         + 1  # +1: a conferência do corpus inteiro conta como uma
     )
     print()
