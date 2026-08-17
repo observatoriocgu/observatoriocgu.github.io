@@ -31,7 +31,7 @@ flowchart TD
         CONC --> CCSV
     end
 
-    subgraph MENSAL["Etapa mensal — dia 15"]
+    subgraph MENSAL["Etapa mensal — do dia 15 ao 28, até o mês sair"]
         AT["atualizar.py --baixar<br/>baixa o snapshot e filtra os AFFC da CGU"]
         SNAP["data/siape/AAAAMM.csv.gz<br/>um snapshot versionado por mês"]
         CP["construir_painel.py<br/>compara os snapshots mês a mês"]
@@ -83,7 +83,9 @@ Etapa por etapa (caminhos relativos a `evasao/`; scripts em `evasao/scripts/`):
   mesclando `data/concurso_2021_subjudice.csv`, que é mantido **à mão**. É de
   lá que `construir_painel.py` tira CONCURSO e AREA de cada Auditor. Quando
   houver outro concurso, é aqui que ele entra.
-- **Etapa mensal** (`atualizar-siape.yml`, local ou CI no dia 15) —
+- **Etapa mensal** (`atualizar-siape.yml`, local ou CI — o Portal publica sem
+  dia fixo, então o CI tenta do dia 15 ao 28: um `--dry-run` pergunta em
+  segundos se o mês saiu e, sem mês novo, o job termina ali) —
   `atualizar.py --baixar` orquestra: baixa o snapshot do mês do Portal
   (`baixar_transparencia.py`), reduz aos AFFC lotados na CGU
   (`filtrar_affc.py`), versiona em `data/siape/AAAAMM.csv.gz` e

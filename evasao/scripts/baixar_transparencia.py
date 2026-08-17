@@ -476,6 +476,10 @@ def main() -> int:
                 print(f"  {comp}: não deu para consultar.")
                 indisponiveis.append(comp)
         print()
+        # Esta linha é CONTRATO: o atualizar-siape.yml faz grep em
+        # "A baixar: 0 |" para decidir se pula o resto do job (janela 15-28).
+        # Mudar o texto sem mudar o grep faria o CI rodar o ciclo inteiro todo
+        # dia, em silêncio.
         print(f"A baixar: {len(disponiveis)} | Aguardando publicação: {len(aguardando)} "
               f"| Sem resposta: {len(indisponiveis)}")
         # Um buraco que o portal diz não ter publicado não se resolve esperando.
