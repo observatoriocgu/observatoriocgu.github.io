@@ -150,21 +150,33 @@ export const listarCompetencias = (de: string, ate: string): string[] => {
 /**
  * Caminhos em que um arquivo de `evasao/data/` pode estar.
  *
- * A lista existe porque o mesmo bundle roda em três lugares: no `vite dev`
- * (base `/evasao/`, arquivo servido da raiz do projeto), no Pages
- * (`/evasao/data/...`, copiado pelo deploy-pages.yml) e em qualquer preview
- * estático servido de dentro da pasta. Uma lista só, aqui — antes eram quatro,
- * com até dez candidatos cada.
+ * A lista existe porque o mesmo bundle roda em lugares diferentes: no `vite dev`,
+ * no Pages sob `/evasao/` e em qualquer preview estático servido de outra raiz.
+ * Uma lista só, aqui — antes eram quatro, com até dez candidatos cada.
+ *
+ * SÃO TRÊS, E CADA UM COBRE UM CENÁRIO DE FATO DIFERENTE:
+ *
+ *   1. o `base` do Vite      — a publicação normal, e é sempre este que acerta;
+ *   2. relativo à página     — socorre um fork servido sob outro prefixo, em que
+ *                              o `base` compilado apontaria para o lugar errado;
+ *   3. a raiz do domínio     — publicação sem prefixo nenhum.
+ *
+ * Eram cinco até 17/08/2026, e dois eram cópia: `/evasao/data/...` escrito à mão
+ * é idêntico ao candidato 1 (e, se algum dia diferir, é porque alguém mudou o
+ * `base` — caso em que ele CONTRADIZ a configuração em vez de socorrê-la), e
+ * `./data/...` resolve exatamente como `data/...`. Resolvidos como o navegador
+ * resolve, os cinco davam DOIS endereços distintos: quando o arquivo faltava, a
+ * página fazia quatro requisições idênticas antes de tentar o único diferente.
  */
 const caminhosPossiveis = (arquivo: string): string[] => {
   const base = (import.meta as any).env?.BASE_URL ?? './';
-  return [`${base}data/${arquivo}`, `data/${arquivo}`, `./data/${arquivo}`, `/evasao/data/${arquivo}`, `/data/${arquivo}`];
+  return [`${base}data/${arquivo}`, `data/${arquivo}`, `/data/${arquivo}`];
 };
 
 /** Caminhos de um arquivo de `evasao/public/`, que o Vite copia para a raiz do build. */
 const caminhosPublicos = (arquivo: string): string[] => {
   const base = (import.meta as any).env?.BASE_URL ?? './';
-  return [`${base}${arquivo}`, arquivo, `./${arquivo}`, `/evasao/${arquivo}`, `/${arquivo}`];
+  return [`${base}${arquivo}`, arquivo, `/${arquivo}`];
 };
 
 /**

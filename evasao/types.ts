@@ -17,8 +17,8 @@
  *
  * Todo campo é string porque vem do parser de CSV; campo ausente é `''`, nunca
  * `null`. Datas em `DD/MM/AAAA` quando vêm do SIAPE (`DATA_POSSE`) e em
- * `AAAA-MM-DD` quando vêm do DOU (`DATA_SAIDA`, `DATA_PUBLICACAO_SAIDA`,
- * `DATA_DESTINO`) — o crawler grava o que o ato traz, sem reformatar.
+ * `AAAA-MM-DD` quando vêm do DOU (`DATA_PUBLICACAO_SAIDA`, `DATA_DESTINO`) —
+ * o crawler grava o que o ato traz, sem reformatar.
  *
  * Regras de preenchimento (D11-D14):
  * - `CONCURSO = 'VETERANO'` → `INSCRICAO`, `POSICAO_CONCURSO`, `NOTA`,
@@ -80,7 +80,6 @@ export interface RegistroAuditor {
   MOTIVO_SAIDA: string;
   /** `SIAPE` | `DOU` | `MANUAL`. Selo de procedência do motivo (D14). */
   FONTE_MOTIVO: string;
-  DATA_SAIDA: string;
   DATA_PUBLICACAO_SAIDA: string;
   ATO_SAIDA_TITULO: string;
   ATO_SAIDA_URL: string;
@@ -89,7 +88,6 @@ export interface RegistroAuditor {
 
   /** Para onde a pessoa foi. `''` = desconhecido — nunca chutar (D14). */
   ORGAO_DESTINO: string;
-  CARGO_DESTINO: string;
   DATA_DESTINO: string;
   /** `SIAPE` | `DOU` | `BUSCA` | `MANUAL`. Selo de procedência do destino (D14). */
   FONTE_DESTINO: string;

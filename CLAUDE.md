@@ -209,6 +209,14 @@ Edital CGU nº 5 de 13/06/2022, publicado no DOU (D17).
   que a PORTARIA-TCU nº 117 de 04/08/2026, que nomeia três Auditores da CGU
   para o TCU, ficou fora do observatório estando a uma busca de distância
   (~2 meses de atraso). É quem preenche o ID_SERVIDOR_PORTAL da linha
+- SÃO DOIS ARQUIVOS PORQUE SÃO DUAS PERGUNTAS, e isso NÃO é dívida (medido em
+  17/08/2026). `atos_saida.csv` responde "que atos existem"; `por_pessoa.csv`
+  responde "o que eu já perguntei sobre cada pessoa". A segunda não cabe num
+  índice de atos: das 277 linhas do por_pessoa, 10 são pessoas CONSULTADAS E SEM
+  NADA ACHADO e 3 carregam OBSERVACAO (pauta de conferência). Um índice só sabe
+  falar de ato que existe — não tem como registrar ausência, que é justamente o
+  que impede o crawler de reconsultar as mesmas 10 em toda execução. Mesmo
+  desenho do `destinos_ranking.csv`. NÃO tentar derivar um do outro
 - Por FRASE (`varrer_dou.py`): lê o DOU do dia e não sabe de quem é o ato.
   É incremental — `data/dou/varredura.txt` guarda até onde já cobriu, e a
   execução seguinte volta 21 dias, porque o DOU reindexa com atraso

@@ -103,9 +103,9 @@ COLUNA_NOME_NO_DOU = "NOME_NO_DOU"
 
 COLUNAS = (
     "ID_SERVIDOR_PORTAL", "NOME", "SITUACAO",
-    "MOTIVO_SAIDA", "FONTE_MOTIVO", "DATA_SAIDA", "DATA_PUBLICACAO_SAIDA",
+    "MOTIVO_SAIDA", "FONTE_MOTIVO", "DATA_PUBLICACAO_SAIDA",
     "ATO_SAIDA_TITULO", "ATO_SAIDA_URL", "ATO_SAIDA_ARQUIVO",
-    "ORGAO_DESTINO", "CARGO_DESTINO", "DATA_DESTINO", "FONTE_DESTINO", "URL_DESTINO",
+    "ORGAO_DESTINO", "DATA_DESTINO", "FONTE_DESTINO", "URL_DESTINO",
     # A cópia arquivada do ato de NOMEAÇÃO (D30), irmã de ATO_SAIDA_ARQUIVO. Sem
     # ela o destino — que é inferência, e menos confiável que o motivo — era a
     # única afirmação do site sem lastro próprio: só uma URL que o in.gov.br pode
@@ -220,7 +220,7 @@ def somente_destino(registro: dict) -> dict:
     entra o que lá não existe: o órgão de chegada.
     """
     preservar = ("ID_SERVIDOR_PORTAL", "NOME",
-                 "ORGAO_DESTINO", "CARGO_DESTINO", "DATA_DESTINO",
+                 "ORGAO_DESTINO", "DATA_DESTINO",
                  "FONTE_DESTINO", "URL_DESTINO")
     return {campo: (valor if campo in preservar else "") for campo, valor in registro.items()}
 

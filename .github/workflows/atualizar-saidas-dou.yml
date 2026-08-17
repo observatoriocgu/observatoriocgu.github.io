@@ -40,6 +40,23 @@ jobs:
         with:
           python-version: '3.12'
 
+      # ANTES do crawler, e pela mesma razão escrita no workflow de destinos:
+      # melhor falhar aqui do que gravar afirmação errada sobre pessoa nomeada e
+      # commitar. Vale em dobro para este workflow, que desde a D31 não só
+      # classifica o ato ("houve uma vacância em 11/08") como decide DE QUEM ele
+      # é — todo dia, às 6h, sem ninguém olhando. Os 87 casos de `testar_dou.py`
+      # cobrem exatamente essas duas decisões, e custam 0,3s sem rede.
+      - name: Testar a leitura de atos do DOU
+        run: python scripts/testar_dou.py
+        working-directory: evasao
+
+      # O `resumir_dou.py` grava as `saidasRecentes`, que a publicação sobrepõe
+      # ao dados.csv (D22/D29). Se a mescla quebrar, o erro aparece na tela como
+      # saída a mais ou a menos — não como falha.
+      - name: Testar a mescla das fontes externas
+        run: python scripts/testar_publicacao.py
+        working-directory: evasao
+
       - name: Varrer o DOU e registrar os atos
         run: python scripts/varrer_dou.py
         working-directory: evasao
