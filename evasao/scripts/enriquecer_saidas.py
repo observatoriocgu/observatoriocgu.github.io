@@ -4,16 +4,16 @@ Para cada saída da CGU detectada no SIAPE, busca no DOU o ato que diz POR QUE a
 pessoa saiu e, quando dá, PARA ONDE foi.
 
 Entrada : data/dados.csv (as linhas com MES_SAIDA preenchido)
-Saída   : data/saidas_dou.csv        — acumulativo, uma linha por PESSOA
-          data/atos_dou.csv          — o índice único, uma linha por ATO
-          data/saidas_dou/*.html     — cópia arquivada do ato
+Saída   : data/dou/por_pessoa.csv        — acumulativo, uma linha por PESSOA
+          data/dou/atos_saida.csv          — o índice único, uma linha por ATO
+          data/dou/atos_saida/*.html     — cópia arquivada do ato
 
 O arquivo de saída é uma camada separada de propósito: `construir_painel.py`
 regenera o dados.csv do zero a cada execução, e se este script escrevesse lá
 direto, reconstruir o painel apagaria ~50 minutos de crawl.
 
-DUAS SAÍDAS, DUAS CHAVES, E ISSO NÃO É DUPLICAÇÃO. O `saidas_dou.csv` é indexado
-por PESSOA e é o que o painel mescla no `dados.csv`. O `atos_dou.csv` é indexado
+DUAS SAÍDAS, DUAS CHAVES, E ISSO NÃO É DUPLICAÇÃO. O `por_pessoa.csv` é indexado
+por PESSOA e é o que o painel mescla no `dados.csv`. O `atos_saida.csv` é indexado
 por ATO e é o que o card lê — e é o mesmo índice que a varredura por frase
 (`varrer_dou.py`) alimenta, que é como o card enxerga o que o SIAPE ainda não
 mostrou. Este script preenche o `ID_SERVIDOR_PORTAL` da linha do índice: é o
@@ -76,9 +76,9 @@ import dou
 
 RAIZ = Path(__file__).resolve().parent.parent
 ARQ_DADOS = RAIZ / "data" / "dados.csv"
-ARQ_SAIDAS = RAIZ / "data" / "saidas_dou.csv"
+ARQ_POR_PESSOA = RAIZ / "data" / "dou" / "por_pessoa.csv"
 ARQ_CURADORIA = RAIZ / "data" / "curadoria.csv"
-ARQ_CARD = RAIZ / "public" / "atos_dou.json"
+ARQ_RESUMO = RAIZ / "public" / "dou.json"
 
 # Coluna OPCIONAL do `curadoria.csv`: o nome com que o DOU se refere a esta
 # pessoa, quando não é o do SIAPE.
@@ -175,10 +175,10 @@ def saidas_so_do_dou(pessoas: list[dict]) -> list[dict]:
     O mês de referência da janela [-6, +6] é o da PUBLICAÇÃO do ato de saída, que
     é o que `mesclarSaidasDoDou` usa como competência no navegador.
     """
-    if not ARQ_CARD.is_file():
+    if not ARQ_RESUMO.is_file():
         return []
     try:
-        card = json.loads(ARQ_CARD.read_text(encoding="utf-8"))
+        card = json.loads(ARQ_RESUMO.read_text(encoding="utf-8"))
     except (OSError, ValueError):
         return []
 
@@ -460,7 +460,7 @@ def analisar(
         # `atos.registrar` devolve None para ato não publicado (D18) e é o único
         # ponto que precisa decidir isso. Aqui basta respeitar: sem linha no
         # índice, sem título, sem URL e sem cópia arquivada — o índice e a pasta
-        # `saidas_dou/` vão inteiros para repositório público e para o site.
+        # `atos_saida/` vão inteiros para repositório público e para o site.
         linha = atos.registrar(
             indice, ato, tipo, texto, atos.FONTE_NOME,
             id_servidor=pessoa["ID_SERVIDOR_PORTAL"],
@@ -497,7 +497,7 @@ def main() -> int:
         print(f"{ARQ_DADOS} não existe. Rode `python construir_painel.py` antes.", file=sys.stderr)
         return 1
 
-    ja_feitas = {r["ID_SERVIDOR_PORTAL"]: r for r in ler_csv(ARQ_SAIDAS)}
+    ja_feitas = {r["ID_SERVIDOR_PORTAL"]: r for r in ler_csv(ARQ_POR_PESSOA)}
 
     # Nomes alternativos afirmados à mão. Coluna opcional: se ninguém a criou, o
     # dicionário fica vazio e nada muda.
@@ -567,8 +567,8 @@ def main() -> int:
         # Grava a cada pessoa: uma interrupção no meio de 268 nomes não pode
         # jogar fora o que já foi baixado. O índice de atos vai junto, pelo
         # mesmo motivo — e para os dois arquivos nunca discordarem.
-        ARQ_SAIDAS.parent.mkdir(parents=True, exist_ok=True)
-        with open(ARQ_SAIDAS, "w", encoding="utf-8", newline="") as fh:
+        ARQ_POR_PESSOA.parent.mkdir(parents=True, exist_ok=True)
+        with open(ARQ_POR_PESSOA, "w", encoding="utf-8", newline="") as fh:
             escritor = csv.DictWriter(fh, fieldnames=list(COLUNAS), delimiter=";",
                                       extrasaction="ignore")
             escritor.writeheader()
@@ -578,7 +578,7 @@ def main() -> int:
     print()
     print(f"Motivo identificado : {achou_motivo} de {len(fila)}")
     print(f"Destino identificado: {achou_destino} de {len(fila)}")
-    print(f"Gravado: {ARQ_SAIDAS.relative_to(RAIZ)} ({len(resultados)} linhas)")
+    print(f"Gravado: {ARQ_POR_PESSOA.relative_to(RAIZ)} ({len(resultados)} linhas)")
     print(f"Gravado: {atos.ARQ_INDICE.relative_to(RAIZ)} ({len(indice)} atos)")
     print()
     print("CONFIRA À MÃO uma amostra dos atos antes de publicar: abra o ATO_SAIDA_URL,")

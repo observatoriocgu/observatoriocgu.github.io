@@ -1,16 +1,34 @@
 #!/usr/bin/env python3
 """
-O índice único dos atos de saída publicados no DOU.
+O índice dos atos de SAÍDA da CGU publicados no DOU.
 
 Este módulo NÃO é executável: é a biblioteca que dá aos dois crawlers um lugar
 só para gravar o que acharam.
+
+DOIS DOUS, DOIS ÍNDICES (D30, 16/08/2026)
+-----------------------------------------
+O observatório lê dois tipos de ato, e eles não são o mesmo objeto:
+
+  SAÍDA    — publicado pela CGU, diz que alguém deixou o quadro. É este módulo.
+  DESTINO  — publicado pelo órgão de CHEGADA, diz que alguém tomou posse lá.
+             É o `atos_destino.py`, e mora em `data/dou/atos_destino*`.
+
+Eles ficam separados porque o card e as saídas recentes são DERIVADOS deste
+índice: se um ato de nomeação em outro órgão entrasse aqui, toda derivação
+passaria a depender de lembrar de filtrar por tipo, e a que esquecesse contaria
+uma CHEGADA em outro órgão como uma PERDA da CGU. Com dois arquivos, esse erro
+não tem como ser escrito.
+
+Isso não contradiz a D19, que juntou o que era duplicado: lá era o MESMO ato em
+duas pastas. Aqui são atos diferentes, e um ato da CGU sobre alguém saindo nunca
+é um ato do TCU sobre alguém entrando — não há sobreposição possível.
 
 POR QUE ELE EXISTE
 ------------------
 Até 15/08/2026 havia DUAS estruturas paralelas guardando a mesma coisa:
 
   varredura por FRASE  -> data/dias_sem_perder_AFFC/*.html + o JSON do card
-  varredura por NOME   -> data/saidas_dou/*.html          + saidas_dou.csv
+  varredura por NOME   -> data/saidas_dou/*.html           + saidas_dou.csv
 
 O mesmo ato chegava a ser arquivado nas duas pastas (a exoneração de 25/02/2026
 estava em ambas), e as duas discordavam sobre qual era a última saída — porque
@@ -22,9 +40,8 @@ elas não podem concordar por construção:
   - a varredura por FRASE lê o DOU direto, então enxerga — mas parava no
     primeiro ato de cada tipo e não guardava mais nada.
 
-Agora as duas escrevem AQUI, e o card é DERIVADO deste índice
-(`gerar_card_dou.py`), não de uma varredura própria. A pasta `saidas_dou/` passa
-a ser o arquivo único das cópias dos atos.
+Agora as duas escrevem AQUI, e o resumo do site é DERIVADO deste índice
+(`resumir_dou.py`), não de uma varredura própria.
 
 O QUE É CHAVE
 -------------
@@ -37,7 +54,7 @@ coluna vazia não é falha: é exatamente a medida de quanto o DOU está à fren
 D18 — O QUE NÃO ENTRA
 ---------------------
 Ato de DEMISSÃO não é registrado aqui, em nenhuma hipótese. Este índice e a
-pasta `saidas_dou/` vão para repositório público e para o site; gravar a linha
+pasta `atos_saida/` vão para repositório público e para o site; gravar a linha
 já publicaria o link. `registrar` devolve `None` nesse caso, e é o único ponto
 do pipeline que precisa lembrar disso.
 """
@@ -55,14 +72,23 @@ import dou
 RAIZ = Path(__file__).resolve().parent.parent
 DIR_DADOS = RAIZ / "data"
 
-ARQ_INDICE = DIR_DADOS / "atos_dou.csv"
-DIR_ATOS = DIR_DADOS / "saidas_dou"
-ARQ_SAIDAS = DIR_DADOS / "saidas_dou.csv"
+DIR_DOU = DIR_DADOS / "dou"
+
+# O índice dos atos de SAÍDA e a pasta com as cópias deles. O nome se repete de
+# propósito: são as duas metades da mesma coisa — a linha e o documento a que ela
+# se refere. Não confundir com a colisão que a D30 desfez, em que uma pasta de
+# ATOS e um CSV de PESSOAS dividiam o nome `saidas_dou`.
+ARQ_INDICE = DIR_DOU / "atos_saida.csv"
+DIR_ATOS = DIR_DOU / "atos_saida"
+
+# Uma linha por PESSOA: o motivo lido do ato de saída e o destino, quando houve.
+# Grão diferente do índice, e por isso nome diferente (D30).
+ARQ_POR_PESSOA = DIR_DOU / "por_pessoa.csv"
 
 # Até onde a varredura por frase já chegou. Guardado à parte porque "último ato
 # encontrado" não serve de marca: três meses sem nenhuma saída fariam a
 # varredura refazer três meses todo dia, sem nada de novo para achar.
-ARQ_VARREDURA = DIR_DADOS / "varredura_dou.txt"
+ARQ_VARREDURA = DIR_DOU / "varredura.txt"
 
 COLUNAS = (
     "URL_TITLE",
@@ -178,70 +204,6 @@ def registrar(
     return linha
 
 
-def _url_title(url: str) -> str:
-    return url[len(dou.BASE_ATO):] if url.startswith(dou.BASE_ATO) else ""
-
-
-_TIPO_POR_ROTULO = {rotulo: tipo for tipo, rotulo in dou.ROTULOS.items()}
-
-
-def importar_de_saidas_dou(indice: dict[str, dict]) -> int:
-    """
-    Traz para o índice os atos que a varredura por nome já tinha achado.
-
-    Existe por duas razões. A primeira é histórica: quando o índice nasceu, o
-    `saidas_dou.csv` já trazia 251 atos, e recrawlá-los seria jogar fora ~50
-    minutos de rede por nada. A segunda é permanente: reconciliar as duas
-    varreduras é barato e mantém o índice inteiro mesmo se alguém rodar só um
-    dos crawlers.
-
-    Linha sem `ATO_SAIDA_URL` é pulada — é o caso de quem saiu sem ato
-    identificado e, de propósito, o de quem tem motivo não publicado (D18).
-    """
-    if not ARQ_SAIDAS.is_file():
-        return 0
-
-    with open(ARQ_SAIDAS, encoding="utf-8-sig", newline="") as fh:
-        saidas = [
-            {(k or "").strip(): (v or "").strip() for k, v in linha.items()}
-            for linha in csv.DictReader(fh, delimiter=";")
-        ]
-
-    novos = 0
-    for saida in saidas:
-        chave = _url_title(saida.get("ATO_SAIDA_URL", ""))
-        tipo = _TIPO_POR_ROTULO.get(saida.get("MOTIVO_SAIDA", ""))
-        if not chave or not tipo or tipo in dou.MOTIVOS_NAO_PUBLICADOS:
-            continue
-
-        anterior = indice.get(chave, {})
-        if not anterior:
-            novos += 1
-        indice[chave] = {
-            "URL_TITLE": chave,
-            "TIPO": tipo,
-            "ROTULO": dou.ROTULOS[tipo],
-            "DATA_PUBLICACAO": saida.get("DATA_PUBLICACAO_SAIDA", "") or anterior.get("DATA_PUBLICACAO", ""),
-            "TITULO": saida.get("ATO_SAIDA_TITULO", "") or anterior.get("TITULO", ""),
-            # Aqui o nome vem do SIAPE, não do ato: é a grafia oficial.
-            "NOME": saida.get("NOME", "") or anterior.get("NOME", ""),
-            "MATRICULA_SIAPE": anterior.get("MATRICULA_SIAPE", ""),
-            # Seção, edição e página não estão no saidas_dou.csv. Ficam vazias:
-            # o card não as usa, e a cópia arquivada do ato traz todas.
-            "SECAO": anterior.get("SECAO", ""),
-            "EDICAO": anterior.get("EDICAO", ""),
-            "PAGINA": anterior.get("PAGINA", ""),
-            "ORGAO": anterior.get("ORGAO", ""),
-            "URL": saida["ATO_SAIDA_URL"],
-            "ARQUIVO": saida.get("ATO_SAIDA_ARQUIVO", "") or anterior.get("ARQUIVO", ""),
-            "ID_SERVIDOR_PORTAL": saida.get("ID_SERVIDOR_PORTAL", "")
-            or anterior.get("ID_SERVIDOR_PORTAL", ""),
-            "FONTE_VARREDURA": _juntar_fontes(anterior.get("FONTE_VARREDURA", ""), FONTE_NOME),
-        }
-
-    return novos
-
-
 # ------------------------------------------------- releitura das cópias em disco
 
 # O texto na cópia arquivada por `dou.salvar_ato`. É `<div class="texto">…</div>`
@@ -251,7 +213,7 @@ _PADRAO_TEXTO_ARQUIVADO = re.compile(r'<div class="texto">(.*?)</div>', re.S)
 
 
 def texto_arquivado(arquivo: str) -> str:
-    """O texto do ato a partir da cópia em `saidas_dou/`. Vazio se não der."""
+    """O texto do ato a partir da cópia em `atos_saida/`. Vazio se não der."""
     caminho = DIR_ATOS / (arquivo or "")
     if not arquivo or not caminho.is_file():
         return ""

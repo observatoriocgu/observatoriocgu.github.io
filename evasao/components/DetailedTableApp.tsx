@@ -195,7 +195,7 @@ const COLUNAS: readonly Coluna[] = [
     // e o link é a única coisa da tabela que não dá para reconstruir de fora.
     //
     // ABSOLUTO, e não o que a tela usa. `urlDoAto` prefere a cópia arquivada em
-    // `data/saidas_dou/`, e a devolve como caminho RELATIVO — o que na página
+    // `data/dou/atos_saida/`, e a devolve como caminho RELATIVO — o que na página
     // resolve sozinho e, numa planilha aberta fora do navegador, não leva a lugar
     // nenhum. `new URL(..., location.href)` completa o relativo e deixa o
     // absoluto (o `in.gov.br` de quem não tem cópia local) como está.

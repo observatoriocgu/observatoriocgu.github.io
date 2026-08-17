@@ -4,7 +4,7 @@ name: Atualizar saídas do DOU (AFFC)
 # e regera o card "dias sem perder um Auditor" a partir dele.
 #
 # São dois passos porque um tem rede e o outro não: `varrer_dou.py` busca no
-# in.gov.br, `gerar_card_dou.py` só relê arquivo. O segundo NÃO depende dos
+# in.gov.br, `resumir_dou.py` só relê arquivo. O segundo NÃO depende dos
 # snapshots do Portal da Transparência, que não estão no Git — é por isso que o
 # card pode ser regerado aqui, enquanto o `construir_painel.py` só roda na
 # máquina de quem tem os snapshots.
@@ -45,17 +45,17 @@ jobs:
         working-directory: evasao
 
       - name: Regerar o card a partir do índice
-        run: python scripts/gerar_card_dou.py
+        run: python scripts/resumir_dou.py
         working-directory: evasao
 
       - name: Commit e push do que mudou
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add evasao/public/atos_dou.json \
-                  evasao/data/atos_dou.csv \
-                  evasao/data/varredura_dou.txt \
-                  evasao/data/saidas_dou
+          # A camada inteira do DOU, e não arquivo por arquivo: desde a D30 ela
+          # tem dois índices e duas pastas de cópias, e listar caminho a caminho
+          # é como se esquece de commitar o que passou a existir.
+          git add evasao/data/dou evasao/public/dou.json
           if ! git diff --cached --quiet; then
             git commit -m "Atualiza saídas de AFFC publicadas no DOU"
             git push

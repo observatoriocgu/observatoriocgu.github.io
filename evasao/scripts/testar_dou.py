@@ -21,8 +21,8 @@ from pathlib import Path
 import dou
 
 RAIZ = Path(__file__).resolve().parent.parent
-ARQ_SAIDAS = RAIZ / "data" / "saidas_dou.csv"
-DIR_ATOS = RAIZ / "data" / "saidas_dou"
+ARQ_POR_PESSOA = RAIZ / "data" / "dou" / "por_pessoa.csv"
+DIR_ATOS = RAIZ / "data" / "dou" / "atos_saida"
 
 CARGO = "Auditor Federal de Financas e Controle"
 
@@ -507,8 +507,8 @@ def conferir_nomes_do_corpus() -> tuple[int, str]:
     """
     Refaz a leitura do nome nos atos já arquivados e compara com o SIAPE.
 
-    Não é teste sintético: usa os atos de verdade em `data/saidas_dou/` e o nome
-    que a busca por nome já casou com uma pessoa no `data/saidas_dou.csv`. É a
+    Não é teste sintético: usa os atos de verdade em `data/dou/atos_saida/` e o nome
+    que a busca por nome já casou com uma pessoa no `data/dou/por_pessoa.csv`. É a
     única maneira honesta de medir um extrator de nome — as fórmulas do DOU
     variam mais do que se consegue imaginar de cabeça, e foi assim que
     apareceram a aposentadoria compulsória, a exoneração de ofício e o
@@ -517,10 +517,10 @@ def conferir_nomes_do_corpus() -> tuple[int, str]:
     Sem rede: só relê arquivo. Devolve (falhas, resumo). Se os dados não
     estiverem à mão, não falha — apenas avisa que não conferiu.
     """
-    if not ARQ_SAIDAS.is_file() or not DIR_ATOS.is_dir():
+    if not ARQ_POR_PESSOA.is_file() or not DIR_ATOS.is_dir():
         return 0, "sem corpus local — conferência do nome não rodou"
 
-    with open(ARQ_SAIDAS, encoding="utf-8-sig", newline="") as fh:
+    with open(ARQ_POR_PESSOA, encoding="utf-8-sig", newline="") as fh:
         linhas = list(csv.DictReader(fh, delimiter=";"))
 
     exato = vazio = grafia_do_dou = 0

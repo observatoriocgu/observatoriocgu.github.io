@@ -4,7 +4,7 @@ Constrói os arquivos de dado do observatório a partir dos snapshots do SIAPE.
 
     historico_transparencia_cgu/*.csv   (fonte bruta, fora do git)
     concurso_2021.csv                   (enriquecido — concurso.py, D17)
-    saidas_dou.csv                      (enriquecido — enriquecer_saidas.py)
+    dou/por_pessoa.csv                  (enriquecido — enriquecer_saidas.py)
     curadoria.csv                       (curado à mão)
               |
               v
@@ -49,7 +49,7 @@ ARQ_HISTORICO = painel.PASTA_SNAPSHOTS / "historico_mensal.csv"
 ARQ_DADOS = DIR_DADOS / "dados.csv"
 ARQ_SERIE = DIR_DADOS / "serie_mensal.csv"
 ARQ_CONCURSO = DIR_DADOS / "concurso_2021.csv"
-ARQ_SAIDAS = DIR_DADOS / "saidas_dou.csv"
+ARQ_POR_PESSOA = DIR_DADOS / "dou" / "por_pessoa.csv"
 ARQ_CURADORIA = DIR_DADOS / "curadoria.csv"
 ARQ_SUGESTOES = DIR_DADOS / "curadoria_sugestoes.csv"
 ARQ_ALTERACOES = RAIZ / "public" / "alteracoes-registros.json"
@@ -180,7 +180,7 @@ def aplicar_concurso(pessoas: list[dict], registros: list[dict]) -> dict:
     return relatorio
 
 
-def aplicar_saidas_dou(pessoas: list[dict], saidas: list[dict]) -> int:
+def aplicar_dou_por_pessoa(pessoas: list[dict], saidas: list[dict]) -> int:
     por_id = {s["ID_SERVIDOR_PORTAL"]: s for s in saidas}
     aplicadas = 0
     for pessoa in pessoas:
@@ -270,11 +270,11 @@ def main() -> int:
         rel = {"sugestoes": []}
         print(f"\n! {ARQ_CONCURSO.name} não existe — rode `python concurso.py` para preencher a área.")
 
-    saidas_dou = ler_csv(ARQ_SAIDAS)
-    if saidas_dou:
-        print(f"DOU       : {aplicar_saidas_dou(pessoas, saidas_dou)} saída(s) enriquecida(s)")
+    dou_por_pessoa = ler_csv(ARQ_POR_PESSOA)
+    if dou_por_pessoa:
+        print(f"DOU       : {aplicar_dou_por_pessoa(pessoas, dou_por_pessoa)} saída(s) enriquecida(s)")
     else:
-        print(f"! {ARQ_SAIDAS.name} não existe — rode `python enriquecer_saidas.py` para o motivo.")
+        print(f"! {ARQ_POR_PESSOA.name} não existe — rode `python enriquecer_saidas.py` para o motivo.")
 
     curadoria = ler_csv(ARQ_CURADORIA)
     if curadoria:

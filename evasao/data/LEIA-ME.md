@@ -14,10 +14,10 @@
 | `serie_mensal.csv` | `construir_painel.py` — uma linha por competência | **não** |
 | `concurso_2021.csv` | `concurso.py` — resultado final do DOU (D17) + os sub judice | **não** |
 | **`concurso_2021_subjudice.csv`** | **você** — aprovados por decisão judicial | **sim** |
-| `saidas_dou.csv` | `enriquecer_saidas.py` — motivo e destino, uma linha por **pessoa** | **não** |
-| `atos_dou.csv` | as duas varreduras do DOU — o índice único, uma linha por **ato** | **não** |
-| `saidas_dou/*.html` | as duas varreduras do DOU — cópia do ato | **não** |
-| `varredura_dou.txt` | `varrer_dou.py` — até que dia o DOU já foi varrido | **não** |
+| `por_pessoa.csv` | `enriquecer_saidas.py` — motivo e destino, uma linha por **pessoa** | **não** |
+| `atos_saida.csv` | as duas varreduras do DOU — o índice único, uma linha por **ato** | **não** |
+| `dou/atos_saida/*.html` | as duas varreduras do DOU — cópia do ato | **não** |
+| `varredura.txt` | `varrer_dou.py` — até que dia o DOU já foi varrido | **não** |
 | `destinos_ranking.csv` | `enriquecer_destinos_ranking.py` — para onde foi quem o DOU não disse (D24) | **não** |
 | **`curadoria.csv`** | **você** | **sim** |
 | `curadoria_sugestoes.csv` | `construir_painel.py` — pauta para você conferir | não (é saída) |
@@ -35,7 +35,7 @@ cada competência e ainda subia para o site publicado.
 
 ## O `dados.csv` não é o que o site lê (D29)
 
-O `destinos_ranking.csv` e as saídas do `atos_dou.json` **não entram** no
+O `destinos_ranking.csv` e as saídas do `dou.json` **não entram** no
 `dados.csv`, e nunca entrarão: quem escreve o `dados.csv` é o `construir_painel.py`,
 que precisa dos snapshots do Portal — fora do Git, ~70 MB — e por isso só roda na
 máquina de quem os tem. Quem roda todo dia é a varredura do DOU, no CI.
@@ -44,7 +44,7 @@ A junção acontece **na hora de publicar o site**, em `gerar_publicacao.py`, e 
 resultado é o `painel.csv`:
 
 ```
-dados.csv  +  atos_dou.json  +  destinos_ranking.csv   ->   painel.csv
+dados.csv  +  dou.json  +  destinos_ranking.csv   ->   painel.csv
 (SIAPE)       (D22)             (D24, D27, D28)             (o que o site lê)
 
 alteracoes-registros.json  +  as saídas que só o DOU conhece  ->  alteracoes.json
@@ -176,7 +176,7 @@ n-1 e não consta no mês n. É a definição da **D13**, não uma checagem à p
 Não é erro de nenhum dos dois. São dois relógios:
 
 - o **DOU** publica o ato no dia. `varrer_dou.py` varre por frase e registra
-  tudo em `atos_dou.csv`. É daí que sai o card "dias sem perder um Auditor";
+  tudo em `atos_saida.csv`. É daí que sai o card "dias sem perder um Auditor";
 - o **SIAPE** chega ao Portal da Transparência com ~2 meses de atraso, e é ele
   quem diz **quem** saiu, pela ausência a partir da última presença (D13). É daí
   que sai a lista de últimas saídas, o gráfico e todas as contagens.

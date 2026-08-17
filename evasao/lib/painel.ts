@@ -100,12 +100,12 @@ export const areaDe = (registro: RegistroAuditor): string => {
 /**
  * Link para o ato que explica a saída.
  *
- * Prefere o HTML arquivado em `data/saidas_dou/` ao `in.gov.br`: o arquivo local
+ * Prefere o HTML arquivado em `data/dou/atos_saida/` ao `in.gov.br`: o arquivo local
  * é o que o observatório leu, e continua respondendo se a página original sair
  * do ar. `''` quando não há ato — e aí não se exibe link nenhum.
  */
 export const urlDoAto = (registro: RegistroAuditor): string => {
-  if (registro.ATO_SAIDA_ARQUIVO) return `${baseDoSite()}data/saidas_dou/${registro.ATO_SAIDA_ARQUIVO}`;
+  if (registro.ATO_SAIDA_ARQUIVO) return `${baseDoSite()}data/dou/atos_saida/${registro.ATO_SAIDA_ARQUIVO}`;
   return registro.ATO_SAIDA_URL;
 };
 

@@ -22,7 +22,7 @@ import {
   areasDoConcurso,
   rotuloDoConcurso,
 } from './constants';
-import { PontoSerieMensal, RegistroAuditor, SaidasDou } from './types';
+import { PontoSerieMensal, RegistroAuditor, ResumoDoDou } from './types';
 import {
   LinhaCsv,
   baseDoSite,
@@ -49,7 +49,7 @@ import {
   serieDeSaidasPorMotivo,
 } from './lib/painel';
 
-const TIPOS_SAIDA_DOU: Array<{ tipo: SaidasDou['eventos'][number]['tipo']; rotuloCurto: string }> = [
+const TIPOS_SAIDA_DOU: Array<{ tipo: ResumoDoDou['eventos'][number]['tipo']; rotuloCurto: string }> = [
   { tipo: 'vacancia', rotuloCurto: 'Vacância' },
   { tipo: 'aposentadoria', rotuloCurto: 'Aposentadoria' },
   { tipo: 'exoneracao', rotuloCurto: 'Exoneração' },
@@ -61,11 +61,11 @@ const percentual = (valor: number) => `${valor.toFixed(1).replace('.', ',')}%`;
 const App: React.FC = () => {
   const [registros, setRegistros] = useState<RegistroAuditor[]>([]);
   const [serie, setSerie] = useState<PontoSerieMensal[]>([]);
-  const [saidasDou, setSaidasDou] = useState<SaidasDou | null>(null);
+  const [resumoDoDou, setResumoDoDou] = useState<ResumoDoDou | null>(null);
   const [aprovados, setAprovados] = useState<LinhaCsv[]>([]);
 
   const [erroDados, setErroDados] = useState<string | null>(null);
-  const [erroSaidasDou, setErroSaidasDou] = useState<string | null>(null);
+  const [erroResumoDoDou, setErroResumoDoDou] = useState<string | null>(null);
   const [carregando, setCarregando] = useState(true);
 
   useEffect(() => {
@@ -130,13 +130,13 @@ const App: React.FC = () => {
 
     (async () => {
       try {
-        const dados = await carregarJsonPublico<SaidasDou>('atos_dou.json');
+        const dados = await carregarJsonPublico<ResumoDoDou>('dou.json');
         if (!montado) return;
         if (!dados?.dataMaisRecente) throw new Error('JSON sem data mais recente.');
-        setSaidasDou(dados);
-        setErroSaidasDou(null);
+        setResumoDoDou(dados);
+        setErroResumoDoDou(null);
       } catch {
-        if (montado) setErroSaidasDou('Não foi possível carregar as saídas do DOU.');
+        if (montado) setErroResumoDoDou('Não foi possível carregar as saídas do DOU.');
       }
     })();
 
@@ -191,10 +191,10 @@ const App: React.FC = () => {
     return doDou > doSiape ? doDou : doSiape;
   }, [registros, ultimoMes]);
 
-  const diasSemPerderAuditor = saidasDou ? diasDesde(saidasDou.dataMaisRecente) : null;
+  const diasSemPerderAuditor = resumoDoDou ? diasDesde(resumoDoDou.dataMaisRecente) : null;
   const eventosDouPorTipo = useMemo(
-    () => new Map((saidasDou?.eventos ?? []).map((evento) => [evento.tipo, evento])),
-    [saidasDou]
+    () => new Map((resumoDoDou?.eventos ?? []).map((evento) => [evento.tipo, evento])),
+    [resumoDoDou]
   );
   /**
    * Até que dia o painel enxerga. É a data da varredura do DOU, não a última
@@ -202,13 +202,13 @@ const App: React.FC = () => {
    * está atualizado até o dia em que o crawler rodou — e é isso que o rótulo
    * precisa dizer, senão "desde ago/2022" sugere um recorte que acaba em junho.
    */
-  const atualizadoAte = saidasDou?.varreduraAte
-    ? formatarDataIsoParaBr(saidasDou.varreduraAte)
+  const atualizadoAte = resumoDoDou?.varreduraAte
+    ? formatarDataIsoParaBr(resumoDoDou.varreduraAte)
     : '';
 
   /**
    * Quantas saídas o painel conhece só pelo ato — as que ainda não têm selo do
-   * SIAPE. Conta-se sobre os registros, e não sobre o `atos_dou.json`: assim o
+   * SIAPE. Conta-se sobre os registros, e não sobre o `dou.json`: assim o
    * número é o das linhas que a tela de fato mostra, e não o dos atos que o
    * crawler achou. Um ato que não casou com ninguém do quadro não vira saída
    * (D22), e portanto não pode aparecer nesta conta.
@@ -218,8 +218,8 @@ const App: React.FC = () => {
     [registros]
   );
 
-  const eventoMaisRecente = saidasDou
-    ? (saidasDou.eventos ?? []).find((evento) => evento.dataPublicacao === saidasDou.dataMaisRecente)
+  const eventoMaisRecente = resumoDoDou
+    ? (resumoDoDou.eventos ?? []).find((evento) => evento.dataPublicacao === resumoDoDou.dataMaisRecente)
     : undefined;
 
   // === Gráfico principal: saídas mês a mês ===
@@ -406,8 +406,8 @@ const App: React.FC = () => {
               icon={icone(faCalendarAlt)}
               footer={
                 <div className="space-y-2">
-                  {erroSaidasDou ? (
-                    <div className="text-gray-500">{erroSaidasDou}</div>
+                  {erroResumoDoDou ? (
+                    <div className="text-gray-500">{erroResumoDoDou}</div>
                   ) : (
                     <>
                       <div>Por data de publicação no Diário Oficial da União.</div>
@@ -426,7 +426,7 @@ const App: React.FC = () => {
                           {saidasSoDoDou === 1 ? '' : 's'} já{' '}
                           {saidasSoDoDou === 1 ? 'contabilizada' : 'contabilizadas'} aqui só pelo ato do
                           DOU, publicad{saidasSoDoDou === 1 ? 'o' : 'os'} depois de{' '}
-                          {saidasDou ? formatarCompetenciaLonga(saidasDou.ultimaCompetenciaSiape) : ''}, última
+                          {resumoDoDou ? formatarCompetenciaLonga(resumoDoDou.ultimaCompetenciaSiape) : ''}, última
                           competência do SIAPE. Elas ganham o selo do cadastro quando o Portal alcançar o mês.
                         </div>
                       )}
@@ -445,7 +445,7 @@ const App: React.FC = () => {
                             );
                           }
                           const href = evento.arquivo
-                            ? `${base}data/saidas_dou/${evento.arquivo}`
+                            ? `${base}data/dou/atos_saida/${evento.arquivo}`
                             : evento.urlDou;
                           return (
                             <a
@@ -465,7 +465,7 @@ const App: React.FC = () => {
                   )}
                 </div>
               }
-              estaCarregando={!saidasDou && !erroSaidasDou}
+              estaCarregando={!resumoDoDou && !erroResumoDoDou}
             />
 
             <CounterCard
@@ -593,7 +593,7 @@ const App: React.FC = () => {
             <p className="mb-3 text-sm text-gray-500">
               Os selos dizem quem atesta cada saída.{' '}
               <span className="text-sky-300">SIAPE</span> é o cadastro de pessoal do Portal da Transparência, que vai
-              até {saidasDou ? formatarCompetenciaLonga(saidasDou.ultimaCompetenciaSiape) : 'a última competência'} e
+              até {resumoDoDou ? formatarCompetenciaLonga(resumoDoDou.ultimaCompetenciaSiape) : 'a última competência'} e
               mostra a pessoa presente num mês e ausente no seguinte.{' '}
               <span className="text-amber-300">DOU</span> é o ato publicado no Diário Oficial, que sai no dia. Saída
               recente costuma ter só o selo do DOU: o ato já existe e o Portal, que atrasa cerca de dois meses, ainda

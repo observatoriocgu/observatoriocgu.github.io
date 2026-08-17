@@ -10,7 +10,8 @@ Encadeia o pipeline inteiro:
     enriquecer_saidas motivo e destino de cada saída nova, buscando por NOME
     varrer_dou        o que o DOU publicou desde a última varredura, por FRASE
     construir_painel  de novo, agora com o que o DOU achou
-    gerar_card_dou    o card "dias sem perder um Auditor", a partir do índice
+    resumir_dou       o resumo do DOU para o site (card + saídas recentes),
+                      a partir do índice
     enriquecer_destinos_ranking  destino de quem o DOU não disse para onde foi
 
 O segundo `construir_painel` não é engano: o primeiro descobre QUEM saiu, o
@@ -20,7 +21,7 @@ AS DUAS VARREDURAS DO DOU FAZEM COISAS DIFERENTES. A busca por NOME parte de
 quem o SIAPE mostra que saiu, e por isso nunca alcança o que foi publicado
 depois da última competência do Portal (~2 meses de atraso). A busca por FRASE
 lê o DOU do dia e não sabe de quem é o ato. As duas gravam no mesmo índice
-(`data/atos_dou.csv`), e é dele que o card sai — não de uma varredura própria,
+(`data/dou/atos_saida.csv`), e é dele que o card sai — não de uma varredura própria,
 como era até 15/08/2026, quando o card e a lista de saídas do painel podiam
 discordar sem que nenhum dos dois estivesse errado.
 
@@ -101,10 +102,10 @@ def main() -> int:
         return 1
 
     if args.sem_dou:
-        # O card ainda é regerado: `gerar_card_dou.py` não tem rede, só relê o
+        # O resumo ainda é regerado: `resumir_dou.py` não tem rede, só relê o
         # índice. Sem isto, `--sem-dou` deixaria o JSON apontando para um índice
         # que pode ter mudado por outro caminho.
-        rodar("Regerando o card a partir do índice", ["gerar_card_dou.py"], passo)
+        rodar("Regerando o resumo do DOU a partir do índice", ["resumir_dou.py"], passo)
         print("\n--sem-dou: motivo e destino das saídas não foram atualizados.")
         return 0
 
@@ -121,10 +122,10 @@ def main() -> int:
     if not rodar("Reconstruindo o painel com o que o DOU achou", ["construir_painel.py"], passo):
         return 1
 
-    if not rodar("Gerando o card a partir do índice de atos", ["gerar_card_dou.py"], passo):
+    if not rodar("Resumindo o índice de atos para o site", ["resumir_dou.py"], passo):
         return 1
 
-    # Por último, e depois do card: este crawler lê o `atos_dou.json` que o
+    # Por último, e depois do resumo: este crawler lê o `dou.json` que o
     # passo anterior acabou de gerar — é de lá que saem as saídas que só o DOU
     # conhece. Uma falha aqui não invalida nada do que veio antes: o painel
     # apenas segue com menos destino identificado.

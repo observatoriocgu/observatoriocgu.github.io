@@ -446,7 +446,7 @@ SITUACAO_POR_TIPO = {
 # observatório existe para medir evasão — quem é demitido não escolheu sair —, e
 # repetir a penalidade numa página que agrega e ranqueia pessoas nomeadas é outra
 # coisa, com outro efeito sobre a vida de alguém. Por isso o ato não entra no
-# índice, não é arquivado em `saidas_dou/` e não recebe link em tela nenhuma.
+# índice, não é arquivado em `atos_saida/` e não recebe link em tela nenhuma.
 #
 # O tipo continua sendo RECONHECIDO pelo classificador, de propósito: sem isso a
 # pessoa cairia em "saída sem ato identificado", o crawler tentaria de novo todo

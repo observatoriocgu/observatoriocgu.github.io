@@ -3,7 +3,7 @@
 Gera os arquivos FINAIS que o site lê (D29).
 
 Entrada : data/dados.csv                  — o derivado do SIAPE (construir_painel.py)
-          public/atos_dou.json             — as saídas que só o DOU conhece (D22)
+          public/dou.json             — as saídas que só o DOU conhece (D22)
           data/destinos_ranking.csv        — o destino de quem saiu (D24, D27, D28)
           public/alteracoes-registros.json — o log do diff mensal do SIAPE
 Saída   : data/painel.csv                  — dados.csv + DOU + ranking, mesclado
@@ -43,7 +43,7 @@ import publicacao
 RAIZ = Path(__file__).resolve().parent.parent
 ARQ_DADOS = RAIZ / "data" / "dados.csv"
 ARQ_DESTINOS = RAIZ / "data" / "destinos_ranking.csv"
-ARQ_ATOS = RAIZ / "public" / "atos_dou.json"
+ARQ_ATOS = RAIZ / "public" / "dou.json"
 ARQ_LOG = RAIZ / "public" / "alteracoes-registros.json"
 
 ARQ_PAINEL = RAIZ / "data" / "painel.csv"

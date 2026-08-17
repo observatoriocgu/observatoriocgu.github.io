@@ -59,7 +59,7 @@ Todas as decisões abaixo estão **fechadas**. As fases podem ser executadas sem
 | D20 | Procedência na tela | Fase 3 | **`VERIFICADO` sai** — da UI e do `dados.csv`. Como quase nada passa por conferência humana individual, o selo aparecia como "não conferido" ao lado de dado correto lido do ato oficial, e **gerava desconfiança em vez de qualificar**. No lugar, mostram-se **as fontes que atestam o fato**, uma ao lado da outra: `SIAPE` + `DOU` é saída confirmada pelo cadastro e pelo ato; `DOU` sozinho é ato que o cadastro ainda não alcançou. O selo `SIAPE` numa saída significa "consta no mês n-1, não consta no mês n" — a própria **D13**. **Revisa a D14**, que fica só com a parte do `FONTE_*` |
 | D21 | Últimas saídas | Fase 3 | a lista **mistura as duas fontes** e mostra o mais recente que existir. Saída que só o DOU conhece entra com o **nome lido do texto do ato** (`dou.nome_do_ato`) e selo `DOU` sozinho. *(A parte que a mantinha fora de contagens, gráficos e filtros foi **revogada pela D22** — ver abaixo.)* |
 | D22 | Alcance das saídas do DOU | Fase 3 | **revoga o recorte da D21.** A saída que só o DOU conhece passa a contar **em tudo** — cards, gráficos, curva, destinos, tabela detalhada, histórico e relatório impresso. Ela não vira linha nova: é **sobreposta** ao registro da pessoa, que já está no `dados.csv` como ativa, e por isso chega à tela com concurso, área e unidade e responde aos filtros. A sobreposição acontece **no navegador** (`mesclarSaidasDoDou`), porque o `construir_painel.py` depende dos snapshots, que não existem no CI, e quem roda todo dia é a varredura do DOU |
-| D19 | Entrada dos atos do DOU | Fase 2.5 + Fase 2 (v2) | **um índice único de atos**, `data/atos_dou.csv`, com chave no ato (`URL_TITLE`), alimentado pelas **duas** varreduras — a por frase (`varrer_dou.py`) e a por nome (`enriquecer_saidas.py`) — e uma pasta única de cópias, `data/saidas_dou/`. O card deixa de ter crawler próprio e passa a ser **derivado** do índice (`gerar_card_dou.py`). Some a pasta `data/dias_sem_perder_AFFC/`. **Ajusta a delimitação da D10**: a varredura por frase continua não sendo fonte de contagem, mas passa a registrar **tudo** o que encontra, em vez de parar no primeiro ato de cada tipo |
+| D19 | Entrada dos atos do DOU | Fase 2.5 + Fase 2 (v2) | **um índice único de atos**, `data/dou/atos_saida.csv`, com chave no ato (`URL_TITLE`), alimentado pelas **duas** varreduras — a por frase (`varrer_dou.py`) e a por nome (`enriquecer_saidas.py`) — e uma pasta única de cópias, `data/dou/atos_saida/`. O card deixa de ter crawler próprio e passa a ser **derivado** do índice (`resumir_dou.py`). Some a pasta `data/dias_sem_perder_AFFC/`. **Ajusta a delimitação da D10**: a varredura por frase continua não sendo fonte de contagem, mas passa a registrar **tudo** o que encontra, em vez de parar no primeiro ato de cada tipo |
 | D25 | Identidade do ato e motivos que faltavam | Fase 2 (v2) | **a identidade deixa de ser um portão e passa a ser um nível**: `SIAPE` (matrícula bate), `NOME` (a fórmula do ato nomeia exatamente a pessoa) ou `CITACAO` (só o nome solto). A matrícula divergente **rebaixa** em vez de vetar, porque o DOU erra os dois lados — erra o nome (`PAGLIONE` por `PAGLIONI`) e erra a matrícula (três vacâncias reais). O classificador ganha o **motivo da vacância** (posse em outro cargo → vacância; desistência do estágio probatório → exoneração; inciso do art. 33 quando o ato só cita a lei), a **retificação** (que leva ao ato original em vez de virar o ato) e a **cessão**. Ganha também três recusas: ato **normativo**, **ajustamento de conduta** e **reversão de aposentadoria** — esta última publicava como saída cinco Auditores que estavam **voltando** |
 | D24 | Destino pelo Ranking dos Concursos | Fase 2 (v2) | **um crawler por PESSOA**, `rankingdosconcursos.com.br`, que só é consultado para quem **já saiu** (SIAPE ou DOU) e está sem `ORGAO_DESTINO`. Publica **só quando sobra um órgão candidato**; ambíguo vira pauta humana. O nome do órgão vem de um **catálogo explícito**, nunca do rótulo do site. `FONTE_DESTINO = RANKING` — que é o que a **D14** sempre reservou para esta fonte. Mescla no **navegador**, como a D22, e só sobre destino vazio |
 | D26 | A marca azul desempata | Fase 2 (v2) | **revê a D24 na parte do desempate.** A marca "Nomeado" do ranking passa a decidir (`UNICO_NOMEADO`), porque ela **afirma um fato** — a pessoa foi nomeada naquele concurso — e não é heurística como colocação ou ano. Mas a **ausência** de marca não afirma nada: o site não anota nomeação de todo concurso (**TCU: 0 marca azul em 38 linhas; CGU: 0 em 84**), então a guarda `ORGAOS_CEGOS_A_TAG` impede que a marca decida contra TCU, Senado ou Câmara não marcados. **Duas marcas não se desempatam.** Some a **janela de anos para trás**, que apagava a resposta certa de quem passou em concurso antigo e foi nomeado anos depois. Passa-se a ler a coluna **"Fez tb:"**, que traz marca que a linha própria perde e cita concurso que a tabela não lista. Medido contra os 123 destinos que o DOU conhece: **53 publicados, 50 certos (94,3%)**, contra 48 e 46 (95,8%) da regra antiga — 1,5 ponto de precisão pelo **dobro** da cobertura (9 → 18 saídas resolvidas) |
@@ -426,8 +426,8 @@ resolvendo para arquivo existente**.
 
 > **REVISADA EM 15/08/2026 PELA D19.** O `dou_saidas_affc.py` não existe mais. A varredura por frase
 > virou `varrer_dou.py`, deixou de parar no primeiro ato de cada tipo e passou a registrar tudo no
-> índice `data/atos_dou.csv`; o card virou `gerar_card_dou.py`, derivado do índice, sem rede. A pasta
-> `data/dias_sem_perder_AFFC/` foi removida — as cópias dos atos moram todas em `data/saidas_dou/`.
+> índice `data/dou/atos_saida.csv`; o card virou `resumir_dou.py`, derivado do índice, sem rede. A pasta
+> `data/dias_sem_perder_AFFC/` foi removida — as cópias dos atos moram todas em `data/dou/atos_saida/`.
 >
 > **O que motivou:** as duas estruturas guardavam o mesmo ato em pastas diferentes e discordavam
 > sobre qual era a última saída, sem que nenhuma estivesse errada — o card lia o DOU do dia
@@ -549,7 +549,7 @@ processo disciplinar; o observatório mede **evasão**, e quem é demitido não 
 classificador continua reconhecendo o tipo — sem isso a pessoa cairia em "saída sem ato
 identificado", o crawler tentaria de novo todo mês e o site afirmaria não saber o que sabe. O que
 muda é o que se **grava**: `SITUACAO = DESLIGADO`, sem motivo detalhado, **sem título, sem URL e sem
-cópia arquivada do ato** — porque `saidas_dou.csv` e a pasta `saidas_dou/` vão para o repositório
+cópia arquivada do ato** — porque `por_pessoa.csv` e a pasta `atos_saida/` vão para o repositório
 público e para o site. Implementado em `dou.MOTIVOS_NAO_PUBLICADOS`.
 > ⚠️ Efeito colateral a conhecer: `DESLIGADO` é a **única** linha nessa situação entre 268. Um
 > leitor atento nota que ela destoa das outras seis categorias. A alternativa — classificá-la como
@@ -561,8 +561,8 @@ nome do que aconteceu, e o dado passava a afirmar algo diferente do que o ato di
 `dados.csv` grava o motivo real (`SITUACAO = DEMITIDO`, `MOTIVO_SAIDA = Demissão`), como qualquer
 outra saída, e quem decide o que **mostrar** é a interface.
 
-O que continua igual: o **ato** não vai ao ar. Sem linha no `atos_dou.csv`, sem cópia em
-`saidas_dou/`, sem link em tela nenhuma. `dou.MOTIVOS_NAO_PUBLICADOS` não mudou.
+O que continua igual: o **ato** não vai ao ar. Sem linha no `atos_saida.csv`, sem cópia em
+`atos_saida/`, sem link em tela nenhuma. `dou.MOTIVOS_NAO_PUBLICADOS` não mudou.
 
 O que muda: `motivoDe` (lib/painel.ts) devolve `MOTIVO_OUTRO` — **"Outro motivo"** — no lugar da
 demissão, e é o **único** ponto que aplica a regra. Isso é deliberado: o rótulo neutro é o caminho
@@ -745,10 +745,10 @@ rodar o pipeline de novo apaga o trabalho do crawler e da curadoria.
 | **Derivado (D16)** | **`data/historico_mensal.csv`** — 88.421 linhas, ~21 MB | commitado | `construir_painel.py` — regenerável do zero, **jamais editado à mão** |
 | Derivado | `data/dados.csv` — 2.009 linhas, uma por pessoa | commitado | idem |
 | Derivado | `data/serie_mensal.csv` — 49 linhas, uma por mês | commitado | idem |
-| **Enriquecido** | `data/saidas_dou.csv` | commitado | `enriquecer_saidas.py` — acumulativo, só acrescenta |
+| **Enriquecido** | `data/dou/por_pessoa.csv` | commitado | `enriquecer_saidas.py` — acumulativo, só acrescenta |
 | **Enriquecido (D17)** | `data/concurso_2021.csv` — 488 linhas | commitado | `concurso.py` |
 | **Curado** | `data/curadoria.csv` | commitado | **humano**. Vence sobre todos os anteriores |
-| Atos | `data/saidas_dou/*.html` | commitado | cópia arquivada do ato de cada saída |
+| Atos | `data/dou/atos_saida/*.html` | commitado | cópia arquivada do ato de cada saída |
 | Cache | `data/cache_dou/` | **ignorado** | páginas do DOU (imutáveis depois de publicadas) |
 
 Precedência do merge: **curadoria > DOU > SIAPE**.
@@ -897,7 +897,7 @@ máquina. Os dois crawlers atuais já são stdlib pura (urllib + fallback `curl`
      > ⚠️ **Risco conhecido:** o site tem "Busca por Nome", mas o endpoint **não é descobrível** pela
      > página renderizada. **Fazer um spike antes de programar esse estágio**; se não render, ele
      > fica de fora e o destino segue "não identificado". O resto da fase **não depende dele**.
-  6. Gravar em `saidas_dou.csv` + arquivar o HTML do ato em `data/saidas_dou/`.
+  6. Gravar em `por_pessoa.csv` + arquivar o HTML do ato em `data/dou/atos_saida/`.
 - [ ] **`scripts/atualizar.py`** (CLI) — o comando único da **D15**: `filtrar_affc` →
       `construir_painel` → `enriquecer_saidas` → `construir_painel`.
 
@@ -1153,7 +1153,7 @@ tabela racharia pela outra ponta. Casos reais que o catálogo funde: `TCU` / `TC
 *(Números da D24, superados pela **2.6.1** abaixo.)*
 
 Automação: `.github/workflows/atualizar-destinos-ranking.yml`, **semanal**, roda no CI porque as duas
-entradas (`dados.csv` e `atos_dou.json`) estão no Git. Incremental — quem já foi resolvido não é
+entradas (`dados.csv` e `dou.json`) estão no Git. Incremental — quem já foi resolvido não é
 reconsultado, e quem ficou sem resposta volta à fila depois de 30 dias. A mescla é no **navegador**
 (`mesclarDestinosDoRanking`), como a D22, e só sobre destino **vazio**: DOU e curadoria continuam
 vencendo.
@@ -1392,7 +1392,7 @@ apresentacional.
 ### 3.6 Deploy
 
 - [ ] `deploy-pages.yml` copia `evasao/data/*.csv` com glob **raso** — subpasta não entra.
-      Acrescentar `data/saidas_dou/` do mesmo jeito que já se fez com `dias_sem_perder_AFFC/`,
+      Acrescentar `data/dou/atos_saida/` do mesmo jeito que já se fez com `dias_sem_perder_AFFC/`,
       senão os links dos atos dão 404.
 - [ ] Remover o `workflow_run` de `update-alteracoes.yml` junto com o workflow.
 

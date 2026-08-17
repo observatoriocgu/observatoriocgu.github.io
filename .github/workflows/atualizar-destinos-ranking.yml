@@ -10,7 +10,7 @@ name: Atualizar destinos de quem saiu da CGU (AFFC)
 # aparece em lugar nenhum do arquivo gerado.
 #
 # RODA NO CI, como a varredura do DOU e pelo mesmo motivo: as duas entradas
-# deste crawler — `data/dados.csv` e `public/atos_dou.json` — estão no Git. O
+# deste crawler — `data/dados.csv` e `public/dou.json` — estão no Git. O
 # `construir_painel.py` continua fora daqui, porque depende dos snapshots do
 # Portal da Transparência, que não estão. Quem mescla o destino ao painel é o
 # navegador (`mesclarDestinosDoRanking`), então o que este workflow commita já

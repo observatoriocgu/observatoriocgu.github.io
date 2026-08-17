@@ -78,7 +78,7 @@ Edital CGU nº 5 de 13/06/2022, publicado no DOU (D17).
 - Nenhum destino ("foi para o TCU") vai ao ar sem fonte registrada e link
 - O ATO DE DEMISSÃO NÃO VAI AO AR (D18, alcance revisto em 16/08/2026): é
   penalidade disciplinar, e o observatório mede evasão. O classificador
-  reconhece o tipo, e o ato NÃO entra no índice, NÃO é arquivado em saidas_dou/
+  reconhece o tipo, e o ato NÃO entra no índice, NÃO é arquivado em atos_saida/
   e NÃO ganha link em tela nenhuma — o índice e a pasta vão para repositório
   público e para o site. Ver dou.MOTIVOS_NAO_PUBLICADOS
 - O DADO grava o motivo real: MOTIVO_SAIDA=Demissão, SITUACAO=DEMITIDO. Até
@@ -149,7 +149,9 @@ Edital CGU nº 5 de 13/06/2022, publicado no DOU (D17).
                        filtro. NÃO é chamado pelo atualizar.py — roda à parte,
                        antes dele, no lugar dos passos 1-2 da rotina mensal
 - dou.py               biblioteca: rede, busca, cache, classificação de atos
-- atos.py              biblioteca: o índice único dos atos (data/atos_dou.csv)
+- atos.py              biblioteca: o índice dos atos de SAÍDA (data/dou/atos_saida.csv)
+- atos_destino.py      biblioteca: o índice dos atos de DESTINO, publicados pelo
+                       órgão de chegada (data/dou/atos_destino.csv) (D30)
 - painel.py            biblioteca: derivação dos snapshots (sem rede)
 - publicacao.py        biblioteca: a mescla das fontes externas sobre o dados.csv
                        (D29). Pura, sem I/O
@@ -163,7 +165,8 @@ Edital CGU nº 5 de 13/06/2022, publicado no DOU (D17).
 - concurso.py          resultado final do concurso, a partir de 1 ato do DOU
 - enriquecer_saidas.py motivo e destino de cada saída, buscando por NOME no DOU
 - varrer_dou.py        varre o DOU por FRASE e registra toda saída de AFFC
-- gerar_card_dou.py    card "dias sem perder um Auditor", derivado do índice
+- resumir_dou.py       o resumo do DOU para o site (card + saídas recentes),
+                       derivado do índice de saídas. Era gerar_card_dou.py
 - filtrar_affc.py      reduz o CSV bruto do Portal aos AFFC
 - ranking.py           biblioteca: rankingdosconcursos, catálogo de órgãos e a
                        regra de decisão do destino (D24)
@@ -185,13 +188,14 @@ Edital CGU nº 5 de 13/06/2022, publicado no DOU (D17).
                        sem rede. RODAR SEMPRE que mexer em ranking.py
 
 ## As duas varreduras do DOU escrevem no mesmo índice (D19, 15/08/2026)
-- `data/atos_dou.csv` é o índice ÚNICO dos atos de saída, com chave no ato
-  (URL_TITLE do in.gov.br), e `data/saidas_dou/` é a pasta única das cópias.
+- `data/dou/atos_saida.csv` é o índice ÚNICO dos atos de saída, com chave no ato
+  (URL_TITLE do in.gov.br), e `data/dou/atos_saida/` é a pasta única das cópias.
+  Ato de DESTINO tem índice e pasta próprios (D30) — não misturar.
   NÃO recriar uma segunda pasta nem um segundo JSON para o card: era assim
   antes, e o card e a lista de saídas divergiam sem que nenhum estivesse errado
 - Por NOME (`enriquecer_saidas.py`): parte do dados.csv, logo do SIAPE. Desde
   16/08/2026 a fila inclui TAMBÉM as saídas que só o DOU conhece (lidas do
-  `public/atos_dou.json`), e para ELAS grava só o DESTINO — motivo e situação
+  `public/dou.json`), e para ELAS grava só o DESTINO — motivo e situação
   quem põe é `publicacao.mesclar_saidas_do_dou`, na publicação, senão o dados.csv
   afirmaria que alguém saiu sem dizer quando. Antes disso essas pessoas NUNCA tinham o
   destino procurado no DOU: a busca não falhava, ela não era feita. Foi assim
@@ -199,9 +203,9 @@ Edital CGU nº 5 de 13/06/2022, publicado no DOU (D17).
   para o TCU, ficou fora do observatório estando a uma busca de distância
   (~2 meses de atraso). É quem preenche o ID_SERVIDOR_PORTAL da linha
 - Por FRASE (`varrer_dou.py`): lê o DOU do dia e não sabe de quem é o ato.
-  É incremental — `data/varredura_dou.txt` guarda até onde já cobriu, e a
+  É incremental — `data/dou/varredura.txt` guarda até onde já cobriu, e a
   execução seguinte volta 21 dias, porque o DOU reindexa com atraso
-- O card sai de `gerar_card_dou.py`, que só relê arquivo: sem rede, sem
+- O card sai de `resumir_dou.py`, que só relê arquivo: sem rede, sem
   snapshot do Portal, determinístico. É por isso que o workflow diário
   consegue rodá-lo — `construir_painel.py` não roda no CI, depende dos
   snapshots, que estão fora do Git
@@ -255,7 +259,7 @@ Edital CGU nº 5 de 13/06/2022, publicado no DOU (D17).
   esquecesse publicaria dado velho em silêncio. Gerados na publicação, eles saem
   sempre do que está commitado naquele instante
 - POR QUE ISTO PODE RODAR NO CI e o `construir_painel.py` não: as quatro entradas
-  da mescla (`dados.csv`, `atos_dou.json`, `destinos_ranking.csv`,
+  da mescla (`dados.csv`, `dou.json`, `destinos_ranking.csv`,
   `alteracoes-registros.json`) estão TODAS no Git. O construtor é que depende dos
   49 snapshots do Portal (~70 MB, fora do Git). A frase "a mescla tem de ser no
   navegador porque o Python não roda no CI" era verdadeira sobre o

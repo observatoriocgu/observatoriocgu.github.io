@@ -15,7 +15,7 @@ por competência, na máquina de quem tem os snapshots.
 
 Só que duas fontes mudam MUITO mais depressa que isso:
 
-  - `public/atos_dou.json`     — a varredura do DOU, todo dia, no CI
+  - `public/dou.json`     — a varredura do DOU, todo dia, no CI
   - `data/destinos_ranking.csv` — o crawler de destinos, toda semana, no CI
 
 Se a mescla morasse no `construir_painel.py`, uma saída publicada hoje no DOU
@@ -28,7 +28,7 @@ em `lib/painel.ts`). Funcionava, mas cobrava um preço: toda página que lesse o
 número desatualizado sem erro nenhum — falha silenciosa.
 
 A saída é que a mescla não precisa dos snapshots. Suas três entradas —
-`dados.csv`, `atos_dou.json` e `destinos_ranking.csv` — estão TODAS no Git. Logo
+`dados.csv`, `dou.json` e `destinos_ranking.csv` — estão TODAS no Git. Logo
 ela roda no CI, e roda no lugar mais tarde possível: na hora de publicar o site
 (`deploy-pages.yml`), que já dispara a cada push e ao fim da varredura do DOU. O
 frescor é o mesmo de antes, e o resultado é um arquivo pronto — o site deixa de
@@ -68,7 +68,7 @@ def mesclar_saidas_do_dou(registros: list[dict], saidas_recentes: list[dict]) ->
     TRÊS GUARDAS CONTRA CONTAR ERRADO, que era o motivo de estas saídas ficarem
     fora das contagens até 15/08/2026:
 
-      - sobrepõe-se por `ID_SERVIDOR_PORTAL`, que o `gerar_card_dou.py` casou por
+      - sobrepõe-se por `ID_SERVIDOR_PORTAL`, que o `resumir_dou.py` casou por
         nome MAIS matrícula (D12 — nome não é chave). Ato sem id casado não entra;
       - só se aplica a quem NÃO tem `MES_SAIDA`. Quem o SIAPE já mostrou saindo
         fica com a versão do SIAPE, e uma pessoa com dois atos não vira duas

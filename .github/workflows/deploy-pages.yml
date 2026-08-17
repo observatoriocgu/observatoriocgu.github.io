@@ -55,7 +55,7 @@ jobs:
 
       # A mescla das fontes externas roda aqui (D29). Ela é etapa de PUBLICAÇÃO:
       # o `prebuild` do npm chama `scripts/gerar_publicacao.py`, que lê quatro
-      # arquivos versionados (dados.csv, atos_dou.json, destinos_ranking.csv,
+      # arquivos versionados (dados.csv, dou.json, destinos_ranking.csv,
       # alteracoes-registros.json) e escreve os dois que o site de fato lê —
       # `data/painel.csv` e `public/alteracoes.json`.
       #
@@ -105,17 +105,18 @@ jobs:
           mkdir -p _site/evasao/data
           cp evasao/data/*.csv _site/evasao/data/
 
-          # Trechos do DOU arquivados. O `cp evasao/data/*.csv` acima é um glob
-          # RASO: subpasta não entra sozinha, e sem esta cópia os links dos atos
-          # dão 404.
-          #
-          # `saidas_dou/` é a pasta ÚNICA desde 15/08/2026: os links do card de
-          # dias e os da tabela de saídas apontam todos para cá. Antes havia uma
-          # segunda pasta, `dias_sem_perder_AFFC/`, com cópias dos mesmos atos.
-          if [ -d evasao/data/saidas_dou ]; then
-            mkdir -p _site/evasao/data/saidas_dou
-            cp evasao/data/saidas_dou/*.html _site/evasao/data/saidas_dou/ 2>/dev/null || true
-          fi
+          # A camada do DOU mora em data/dou/ desde a D30, e o glob acima é RASO:
+          # subpasta não entra sozinha. São dois índices (saída da CGU e destino
+          # em outro órgão) e duas pastas de cópias — sem estas linhas, os links
+          # dos atos dão 404.
+          mkdir -p _site/evasao/data/dou
+          cp evasao/data/dou/*.csv _site/evasao/data/dou/ 2>/dev/null || true
+          for pasta in atos_saida atos_destino; do
+            if [ -d "evasao/data/dou/$pasta" ]; then
+              mkdir -p "_site/evasao/data/dou/$pasta"
+              cp evasao/data/dou/$pasta/*.html "_site/evasao/data/dou/$pasta/" 2>/dev/null || true
+            fi
+          done
 
           echo "--- conteúdo publicado ---"
           find _site -maxdepth 2 -mindepth 1 | sort

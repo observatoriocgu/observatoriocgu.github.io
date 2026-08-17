@@ -3,7 +3,7 @@
 Procura o DESTINO de quem já saiu — e só dele — em três fontes.
 
 Entrada : data/dados.csv        — quem o SIAPE mostra que saiu
-          public/atos_dou.json  — as saídas que só o DOU conhece ainda (D22)
+          public/dou.json  — as saídas que só o DOU conhece ainda (D22)
 Saída   : data/destinos_ranking.csv
 
 A ordem é sempre esta, e é o que separa este crawler de uma máquina de fofoca:
@@ -78,7 +78,7 @@ import ranking
 RAIZ = Path(__file__).resolve().parent.parent
 ARQ_DADOS = RAIZ / "data" / "dados.csv"
 ARQ_DESTINOS = RAIZ / "data" / "destinos_ranking.csv"
-ARQ_CARD = RAIZ / "public" / "atos_dou.json"
+ARQ_RESUMO = RAIZ / "public" / "dou.json"
 
 COLUNAS = (
     "ID_SERVIDOR_PORTAL", "NOME", "MES_SAIDA", "DECISAO",
@@ -141,18 +141,18 @@ def saidas_so_do_dou() -> list[dict]:
     """
     As saídas que o DOU já anunciou e o SIAPE ainda não confirmou (D22).
 
-    Vêm de `public/atos_dou.json`, e não do `atos_dou.csv`, por um motivo
+    Vêm de `public/dou.json`, e não do `atos_saida.csv`, por um motivo
     concreto: o `ID_SERVIDOR_PORTAL` do índice é preenchido pelo
     `enriquecer_saidas.py`, que parte do `dados.csv` — logo, só existe para quem
     o SIAPE JÁ mostrou saindo. Quem casa o ato recente com uma pessoa é o
-    `gerar_card_dou.py`, na hora de montar o JSON, e o resultado desse
+    `resumir_dou.py`, na hora de montar o JSON, e o resultado desse
     casamento mora só nele. Ler o mesmo arquivo que o navegador lê é também o
     que garante que esta fila seja exatamente a lista de saídas que está na tela.
     """
-    if not ARQ_CARD.is_file():
+    if not ARQ_RESUMO.is_file():
         return []
     try:
-        card = json.loads(ARQ_CARD.read_text(encoding="utf-8"))
+        card = json.loads(ARQ_RESUMO.read_text(encoding="utf-8"))
     except (OSError, ValueError):
         return []
     return [s for s in card.get("saidasRecentes", []) if s.get("idServidor")]

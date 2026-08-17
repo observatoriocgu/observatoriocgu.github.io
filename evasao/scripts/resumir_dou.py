@@ -1,13 +1,26 @@
 #!/usr/bin/env python3
 """
-Gera o JSON do card "dias sem perder um Auditor" a partir do índice de atos.
+Resume o índice de atos de saída no JSON que o site e a publicação leem.
 
-Entrada : data/atos_dou.csv       — o índice único (`atos.py`, alimentado pelos
-                                    dois crawlers)
-          data/dados.csv          — para saber quais atos o SIAPE já confirmou
-          data/serie_mensal.csv   — só para saber a última competência do SIAPE
-          data/varredura_dou.txt  — até que dia o DOU já foi varrido
-Saída   : public/atos_dou.json
+Entrada : data/dou/atos_saida.csv  — o índice (`atos.py`, alimentado pelos dois
+                                     crawlers)
+          data/dados.csv           — para saber quais atos o SIAPE já confirmou
+          data/serie_mensal.csv    — só para saber a última competência do SIAPE
+          data/dou/varredura.txt   — até que dia o DOU já foi varrido
+Saída   : public/dou.json
+
+DUAS METADES, DOIS LEITORES, UM ARQUIVO SÓ. Até 16/08/2026 este script se chamava
+`gerar_card_dou.py`, e o nome descrevia metade do que ele faz:
+
+  o CARD      (`eventos`, `dataMaisRecente`, `varreduraAte`,
+              `ultimaCompetenciaSiape`) — lido pelo NAVEGADOR, alimenta o
+              "dias sem perder um Auditor";
+  as SAÍDAS   (`saidasRecentes`) — lidas pelo PYTHON, em `publicacao.py`, que as
+              sobrepõe ao `dados.csv` antes de o site subir (D22, D29).
+
+As duas continuam no MESMO arquivo de propósito: separá-las recriaria o defeito
+que a D19 corrigiu, em que dois JSONs derivados dos mesmos atos discordavam sem
+que nenhum estivesse errado. O que mudou foi o nome, que agora diz o todo.
 
 SEM REDE E DETERMINÍSTICO. Este script só derruba dado de arquivo em arquivo:
 rodar duas vezes seguidas produz byte a byte o mesmo JSON. Foi por isso que ele
@@ -35,13 +48,15 @@ interface sabe que aquela saída já está na lista do SIAPE e não a mostra dua
 vezes — foi o que aconteceu com as saídas provisórias de 202606, que o crawler
 por nome pula de propósito e a varredura por frase acha assim mesmo.
 
-O que NÃO acontece aqui: nada disso entra em contagem de evasão. Quem conta é o
-SIAPE, pela ausência a partir da última presença (D11, D13). Contar ato dobraria
-quem tem dois atos e incluiria quem já estava fora do quadro.
+O QUE NÃO ACONTECE AQUI: contar. Nenhum número de evasão sai deste arquivo —
+contar ATO dobraria quem tem dois e incluiria quem já estava fora do quadro. Quem
+conta é o SIAPE, pela ausência a partir da última presença (D11, D13), e as
+saídas daqui só passam a contar depois de `publicacao.py` casá-las com a PESSOA
+que já está no `dados.csv` (D22). A unidade de contagem é gente, não papel.
 
 Uso:
-    python gerar_card_dou.py
-    python gerar_card_dou.py --diagnostico   # imprime, não grava
+    python resumir_dou.py
+    python resumir_dou.py --diagnostico   # imprime, não grava
 """
 
 from __future__ import annotations
@@ -58,7 +73,7 @@ import dou
 RAIZ = Path(__file__).resolve().parent.parent
 ARQ_SERIE = RAIZ / "data" / "serie_mensal.csv"
 ARQ_DADOS = RAIZ / "data" / "dados.csv"
-ARQ_JSON = RAIZ / "public" / "atos_dou.json"
+ARQ_JSON = RAIZ / "public" / "dou.json"
 
 # O card mostra três tipos. `dou.classificar` também reconhece falecimento, que
 # entra no `dados.csv` pelo `enriquecer_saidas.py`; aqui ele é deixado de fora de

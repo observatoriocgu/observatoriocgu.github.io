@@ -84,7 +84,7 @@ export interface RegistroAuditor {
   DATA_PUBLICACAO_SAIDA: string;
   ATO_SAIDA_TITULO: string;
   ATO_SAIDA_URL: string;
-  /** Nome do HTML arquivado em `data/saidas_dou/`. */
+  /** Nome do HTML arquivado em `data/dou/atos_saida/`. */
   ATO_SAIDA_ARQUIVO: string;
 
   /** Para onde a pessoa foi. `''` = desconhecido — nunca chutar (D14). */
@@ -101,7 +101,7 @@ export interface RegistroAuditor {
    * mostrou a ausência (D22).
    *
    * É a única coluna que existe no `painel.csv` e não no `dados.csv`: quem a
-   * escreve é `scripts/publicacao.py`, ao sobrepor o `atos_dou.json` ao CSV do
+   * escreve é `scripts/publicacao.py`, ao sobrepor o `dou.json` ao CSV do
    * SIAPE (D29). Vazio significa "o SIAPE confirmou" — porque no `dados.csv`
    * toda saída nasce do diff mensal (D13).
    */
@@ -208,8 +208,8 @@ export interface DetalheSaida {
 
 /**
  * Saídas de AFFC da CGU publicadas no DOU, geradas por
- * `evasao/scripts/gerar_card_dou.py` a partir do índice único de atos
- * (`data/atos_dou.csv`), que as duas varreduras do DOU alimentam — a por frase
+ * `evasao/scripts/resumir_dou.py` a partir do índice único de atos
+ * (`data/dou/atos_saida.csv`), que as duas varreduras do DOU alimentam — a por frase
  * e a por nome. Até 15/08/2026 este JSON vinha de um crawler só dele, e por
  * isso podia discordar do resto do painel.
  *
@@ -264,14 +264,14 @@ export interface SaidaRecenteDou {
 }
 
 /**
- * O `atos_dou.json`.
+ * O `dou.json`.
  *
  * A interface consome daqui só o CARD de "dias sem perder um Auditor"
  * (`eventos`, `dataMaisRecente`, `varreduraAte`, `ultimaCompetenciaSiape`).
  * `saidasRecentes` continua no arquivo, mas quem a lê é `scripts/publicacao.py`,
  * que a aplica ao `dados.csv` antes de o site subir (D29).
  */
-export interface SaidasDou {
+export interface ResumoDoDou {
   /** `AAAA-MM-DD` até onde a varredura do DOU já cobriu. */
   varreduraAte: string;
   /** `AAAAMM` — a competência mais nova que o SIAPE entregou. */

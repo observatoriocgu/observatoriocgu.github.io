@@ -3,9 +3,9 @@
 Varre o Diário Oficial da União por FRASE e registra toda saída de AFFC da CGU.
 
 Entrada : in.gov.br, busca pela frase "Auditor Federal de Finanças e Controle"
-Saída   : data/atos_dou.csv       — o índice único dos atos (ver `atos.py`)
-          data/saidas_dou/*.html  — cópia arquivada de cada ato
-          data/varredura_dou.txt  — até que dia esta varredura já cobriu
+Saída   : data/dou/atos_saida.csv       — o índice único dos atos (ver `atos.py`)
+          data/dou/atos_saida/*.html  — cópia arquivada de cada ato
+          data/dou/varredura.txt  — até que dia esta varredura já cobriu
 
 É o sucessor do `dou_saidas_affc.py` — que a D19 removeu em 15/08/2026, então não
 procure o arquivo —, e a diferença está em duas linhas do
@@ -121,14 +121,12 @@ def main() -> int:
         origem = "primeira varredura"
 
     indice = atos.ler()
-    importados = atos.importar_de_saidas_dou(indice)
     completados = atos.completar_do_arquivo(indice)
 
     print(f"Frase   : {FRASE_BUSCA}")
     print(f"Órgão   : {dou.ORGAO_CGU}")
     print(f"Período : {desde:%d/%m/%Y} a {hoje:%d/%m/%Y}  ({origem})")
     print(f"Índice  : {len(indice)} ato(s)"
-          f"{f', {importados} vindo(s) do saidas_dou.csv' if importados else ''}"
           f"{f', {completados} relido(s) da cópia em disco' if completados else ''}")
     if args.diagnostico:
         print("Modo    : DIAGNÓSTICO — nada será gravado.")
@@ -203,7 +201,7 @@ def main() -> int:
     print(f"  gravado: {atos.ARQ_VARREDURA.relative_to(atos.RAIZ)} ({hoje:%Y-%m-%d})")
     print(f"  atos em: {atos.DIR_ATOS.relative_to(atos.RAIZ)}/")
     print()
-    print("Rode `python gerar_card_dou.py` para o card refletir o que foi achado.")
+    print("Rode `python resumir_dou.py` para o card refletir o que foi achado.")
     return 0
 
 
