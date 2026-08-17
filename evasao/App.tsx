@@ -470,10 +470,13 @@ const App: React.FC = () => {
 
             <CounterCard
               value={numero(saidasNoPeriodo)}
-              label="Auditores (veteranos + concurso de 2021) saíram da CGU"
+              label="Auditores saíram da CGU"
               icon={icone(faUserMinus)}
               footer={
                 <div className="space-y-2">
+                  <div>
+                    Veteranos + concurso de 2021.
+                  </div>
                   <div>
                     Desde {formatarCompetenciaLonga(MES_INICIO_GRAFICO_SAIDAS)}
                     {atualizadoAte ? ` até ${atualizadoAte}` : ''}.

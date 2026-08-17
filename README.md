@@ -112,7 +112,7 @@ Etapa por etapa (caminhos relativos a `evasao/`; scripts em `evasao/scripts/`):
 O detalhe (regras de dados, decisões e histórico) mora no
 [CLAUDE.md](CLAUDE.md) e no [PLANO.md](PLANO.md).
 
-
+ 
 --> ATUALIZACAO DE DADOS MANUAL
 - arquivo curadoria.csv
 - rodar construir_painel.py
