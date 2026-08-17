@@ -25,6 +25,12 @@ flowchart TD
     PISTAS["Ranking dos Concursos ·<br/>Querido Diário · busca web<br/>pistas de destino"]
     CUR["data/curadoria.csv<br/>correção humana — vence sobre tudo"]
 
+    subgraph CONCURSO["Uma vez por concurso"]
+        CONC["concurso.py<br/>lê o resultado final no DOU<br/>(Edital CGU nº 5/2022)"]
+        CCSV["data/concurso_2021.csv<br/>área, inscrição, nota, classificação<br/>+ concurso_2021_subjudice.csv, mantido à mão"]
+        CONC --> CCSV
+    end
+
     subgraph MENSAL["Etapa mensal — dia 15"]
         AT["atualizar.py --baixar<br/>baixa o snapshot e filtra os AFFC da CGU"]
         SNAP["data/siape/AAAAMM.csv.gz<br/>um snapshot versionado por mês"]
@@ -55,6 +61,8 @@ flowchart TD
     end
 
     SIAPE --> AT
+    DOU --> CONC
+    CCSV --> CP
     DOU --> VD
     PISTAS --> ER
     DADOS --> GP
@@ -69,6 +77,12 @@ Etapa por etapa (caminhos relativos a `evasao/`; scripts em `evasao/scripts/`):
   (os atos oficiais), e Ranking dos Concursos / Querido Diário / busca web
   (pistas de para onde a pessoa foi). `data/curadoria.csv` é a correção
   humana, que vence sobre todas.
+- **Uma vez por concurso** (`atualizar.py --concurso`) — `concurso.py` lê o
+  resultado final no DOU (Edital CGU nº 5, de 13/06/2022) e grava
+  `data/concurso_2021.csv` (área, inscrição, nota, classificação, modalidade),
+  mesclando `data/concurso_2021_subjudice.csv`, que é mantido **à mão**. É de
+  lá que `construir_painel.py` tira CONCURSO e AREA de cada Auditor. Quando
+  houver outro concurso, é aqui que ele entra.
 - **Etapa mensal** (`atualizar-siape.yml`, local ou CI no dia 15) —
   `atualizar.py --baixar` orquestra: baixa o snapshot do mês do Portal
   (`baixar_transparencia.py`), reduz aos AFFC lotados na CGU
