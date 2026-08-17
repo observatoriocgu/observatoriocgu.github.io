@@ -167,15 +167,35 @@ const caminhosPublicos = (arquivo: string): string[] => {
   return [`${base}${arquivo}`, arquivo, `./${arquivo}`, `/evasao/${arquivo}`, `/${arquivo}`];
 };
 
-const semCache = (url: string) => `${url}${url.includes('?') ? '&' : '?'}v=${Date.now()}`;
-
+/**
+ * `no-cache` NÃO é "não use cache": é "use, mas **pergunte antes**".
+ *
+ * O navegador guarda a cópia e, no carregamento seguinte, manda a etiqueta que
+ * o servidor deu (`ETag`) junto do pedido. O GitHub Pages responde `304 Não
+ * Modificado` com o corpo VAZIO quando nada mudou, e o arquivo inteiro quando
+ * mudou. A pergunta é feita SEMPRE, então não existe janela em que a tela mostre
+ * dado velho achando que é novo — o frescor é o mesmo de baixar tudo de novo.
+ *
+ * Antes daqui havia duas travas dizendo a mesma coisa: `cache: 'no-store'` e um
+ * `?v=${Date.now()}` colado na URL, que fazia de cada carregamento um endereço
+ * novo e portanto impossível de reaproveitar. Era herança do projeto original
+ * (commit "forçar reload", 11/2025), da época em que o site era servido direto
+ * da branch com o `dist/` commitado — remendo para outra arquitetura.
+ *
+ * O que custava, medido no ar com o conteúdo já comprimido pelo Pages: o
+ * `painel.csv` são 69,7 KB, e as três telas o baixavam INTEIRO cada uma, mais
+ * `alteracoes.json` (18,4 KB) e `concurso_2021.csv` (11,3 KB). Visitar as três
+ * dava 241 KB; agora dá 83 KB, e revisitar qualquer uma dá ~0.
+ *
+ * NÃO trocar por `cache: 'default'` para economizar a pergunta: o Pages manda
+ * `Cache-Control: max-age=600`, e aí o navegador reusaria por 10 minutos SEM
+ * perguntar. Seria aceitar dado velho na tela logo depois de um deploy —
+ * exatamente o que a D29 existe para evitar.
+ */
 const buscarTexto = async (caminhos: string[], arquivo: string): Promise<string> => {
   for (const caminho of caminhos) {
     try {
-      const resposta = await fetch(semCache(caminho), {
-        cache: 'no-store',
-        headers: { 'cache-control': 'no-cache' },
-      });
+      const resposta = await fetch(caminho, { cache: 'no-cache' });
       if (!resposta.ok) continue;
       const texto = await resposta.text();
       if (texto.trim() === '') continue;
