@@ -427,6 +427,11 @@ ROTULOS = {
     "aposentadoria": "Aposentadoria",
     "exoneracao": "Exoneração",
     "cessao": "Cessão a outro órgão",
+    # Ato de CHEGADA, publicado pelo órgão de destino (D30). `classificar` NUNCA
+    # o devolve — ele não é motivo de saída da CGU, e por isso não pode virar
+    # `MOTIVO_SAIDA`. Está aqui só para a cópia arquivada sair com um rótulo
+    # legível no cabeçalho, via `salvar_ato`.
+    "nomeacao": "Nomeação ou posse em outro órgão",
 }
 
 # Situação correspondente na coluna SITUACAO do dados.csv.

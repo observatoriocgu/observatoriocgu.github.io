@@ -16,7 +16,9 @@
 | **`concurso_2021_subjudice.csv`** | **você** — aprovados por decisão judicial | **sim** |
 | `por_pessoa.csv` | `enriquecer_saidas.py` — motivo e destino, uma linha por **pessoa** | **não** |
 | `atos_saida.csv` | as duas varreduras do DOU — o índice único, uma linha por **ato** | **não** |
-| `dou/atos_saida/*.html` | as duas varreduras do DOU — cópia do ato | **não** |
+| `dou/atos_saida/*.html` | as duas varreduras do DOU — cópia do ato de SAÍDA | **não** |
+| `dou/atos_destino.csv` | `enriquecer_saidas.py` e `arquivar_destinos.py` — o índice dos atos de CHEGADA, uma linha por **ato** (D30) | **não** |
+| `dou/atos_destino/*.html` | os mesmos — cópia do ato de nomeação no órgão de destino | **não** |
 | `varredura.txt` | `varrer_dou.py` — até que dia o DOU já foi varrido | **não** |
 | `destinos_ranking.csv` | `enriquecer_destinos_ranking.py` — para onde foi quem o DOU não disse (D24) | **não** |
 | **`curadoria.csv`** | **você** | **sim** |

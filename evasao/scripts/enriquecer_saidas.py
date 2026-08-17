@@ -72,6 +72,7 @@ from datetime import datetime
 from pathlib import Path
 
 import atos
+import atos_destino
 import dou
 
 RAIZ = Path(__file__).resolve().parent.parent
@@ -105,6 +106,11 @@ COLUNAS = (
     "MOTIVO_SAIDA", "FONTE_MOTIVO", "DATA_SAIDA", "DATA_PUBLICACAO_SAIDA",
     "ATO_SAIDA_TITULO", "ATO_SAIDA_URL", "ATO_SAIDA_ARQUIVO",
     "ORGAO_DESTINO", "CARGO_DESTINO", "DATA_DESTINO", "FONTE_DESTINO", "URL_DESTINO",
+    # A cópia arquivada do ato de NOMEAÇÃO (D30), irmã de ATO_SAIDA_ARQUIVO. Sem
+    # ela o destino — que é inferência, e menos confiável que o motivo — era a
+    # única afirmação do site sem lastro próprio: só uma URL que o in.gov.br pode
+    # mudar. Vazia para destino que não veio do DOU.
+    "ATO_DESTINO_ARQUIVO",
     "OBSERVACAO",
 )
 
@@ -370,7 +376,8 @@ def procurar_ato_de_saida(
 
 
 def analisar(
-    pessoa: dict, indice: dict, usar_cache: bool, verboso: bool = False, nome_no_dou: str = ""
+    pessoa: dict, indice: dict, indice_destino: dict, usar_cache: bool,
+    verboso: bool = False, nome_no_dou: str = ""
 ) -> dict:
     """Motivo e destino de uma saída, a partir dos atos do DOU que citam a pessoa."""
     nome, mes_saida = pessoa["NOME"], pessoa["MES_SAIDA"]
@@ -474,11 +481,22 @@ def analisar(
     if candidatos_destino:
         # O mais próximo da saída, em qualquer direção. Se a pessoa tomou posse
         # em outro órgão, o ato sai perto da saída — não anos depois.
-        _, ato, _ = min(candidatos_destino, key=lambda c: abs(c[0]))
+        _, ato, texto_destino = min(candidatos_destino, key=lambda c: abs(c[0]))
         registro["ORGAO_DESTINO"] = dou.orgao_do_ato(ato)
         registro["DATA_DESTINO"] = dou.data_iso(ato)
         registro["FONTE_DESTINO"] = "DOU"
         registro["URL_DESTINO"] = dou.BASE_ATO + ato["urlTitle"]
+
+        # O ato de chegada vai para o índice PRÓPRIO dele e ganha cópia
+        # arquivada (D30). Não custa requisição: o texto já está em mãos, lido
+        # nesta mesma busca — antes ele era usado e jogado fora.
+        linha_destino = atos_destino.registrar(
+            indice_destino, ato, texto_destino,
+            id_servidor=pessoa["ID_SERVIDOR_PORTAL"],
+            nome=nome,
+        )
+        if linha_destino is not None:
+            registro["ATO_DESTINO_ARQUIVO"] = linha_destino["ARQUIVO"]
 
     return registro
 
@@ -507,11 +525,11 @@ def main() -> int:
         if c.get("ID_SERVIDOR_PORTAL") and c.get(COLUNA_NOME_NO_DOU)
     }
 
-    # O índice de atos é compartilhado com a varredura por frase. Ler antes e
-    # reconciliar com o que já está no saidas_dou.csv mantém as duas metades
-    # coerentes mesmo quando só um dos crawlers roda.
+    # O índice de atos de SAÍDA é compartilhado com a varredura por frase; o de
+    # DESTINO (D30) é só deste crawler e do `arquivar_destinos.py`. São dois
+    # porque são atos de assuntos diferentes — ver o cabeçalho de `atos_destino`.
     indice = atos.ler()
-    atos.importar_de_saidas_dou(indice)
+    indice_destino = atos_destino.ler()
 
     fila = [p for p in pessoas if p.get("MES_SAIDA")] + saidas_so_do_dou(pessoas)
     if args.nome:
@@ -534,6 +552,7 @@ def main() -> int:
         # Nada a buscar não quer dizer nada a gravar: a reconciliação acima pode
         # ter trazido atos que faltavam ao índice.
         atos.gravar(indice)
+        atos_destino.gravar(indice_destino)
         print("Nada a fazer.")
         return 0
     print(f"Pausa entre requisições: {dou.PAUSA_SEGUNDOS}s | cache: "
@@ -546,7 +565,7 @@ def main() -> int:
     for numero, pessoa in enumerate(fila, start=1):
         print(f"[{numero}/{len(fila)}] {pessoa['NOME'][:44]:<44} saiu em {pessoa['MES_SAIDA']}")
         registro = analisar(
-            pessoa, indice, usar_cache, verboso=bool(args.nome),
+            pessoa, indice, indice_destino, usar_cache, verboso=bool(args.nome),
             nome_no_dou=nomes_no_dou.get(pessoa["ID_SERVIDOR_PORTAL"], ""),
         )
         if pessoa.get(CHAVE_SO_DO_DOU):
@@ -574,12 +593,14 @@ def main() -> int:
             escritor.writeheader()
             escritor.writerows(resultados[k] for k in sorted(resultados))
         atos.gravar(indice)
+        atos_destino.gravar(indice_destino)
 
     print()
     print(f"Motivo identificado : {achou_motivo} de {len(fila)}")
     print(f"Destino identificado: {achou_destino} de {len(fila)}")
     print(f"Gravado: {ARQ_POR_PESSOA.relative_to(RAIZ)} ({len(resultados)} linhas)")
-    print(f"Gravado: {atos.ARQ_INDICE.relative_to(RAIZ)} ({len(indice)} atos)")
+    print(f"Gravado: {atos.ARQ_INDICE.relative_to(RAIZ)} ({len(indice)} atos de saída)")
+    print(f"Gravado: {atos_destino.ARQ_INDICE.relative_to(RAIZ)} ({len(indice_destino)} atos de destino)")
     print()
     print("CONFIRA À MÃO uma amostra dos atos antes de publicar: abra o ATO_SAIDA_URL,")
     print("veja se cita a pessoa e se o motivo classificado é o que o texto diz.")

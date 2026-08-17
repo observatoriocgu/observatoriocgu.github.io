@@ -66,6 +66,9 @@ COLUNAS_DADOS = (
     "DATA_SAIDA", "DATA_PUBLICACAO_SAIDA",
     "ATO_SAIDA_TITULO", "ATO_SAIDA_URL", "ATO_SAIDA_ARQUIVO",
     "ORGAO_DESTINO", "CARGO_DESTINO", "DATA_DESTINO", "FONTE_DESTINO", "URL_DESTINO",
+    # A cópia arquivada do ato de nomeação no órgão de chegada (D30), irmã de
+    # ATO_SAIDA_ARQUIVO. Vazia para destino que não veio do DOU.
+    "ATO_DESTINO_ARQUIVO",
     "OBSERVACAO",
 )
 

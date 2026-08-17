@@ -18,6 +18,8 @@ import re
 import sys
 from pathlib import Path
 
+import atos
+import atos_destino
 import dou
 
 RAIZ = Path(__file__).resolve().parent.parent
@@ -559,6 +561,71 @@ def conferir_nomes_do_corpus() -> tuple[int, str]:
     return len(divergentes), f"{exato} de {total} atos reais com o nome exato"
 
 
+def casos_do_indice_de_destino() -> list[tuple[str, bool]]:
+    """
+    O índice dos atos de chegada (D30). Sem rede: `registrar` não baixa nada.
+
+    O que se testa aqui não é a busca — é que o índice de DESTINO não se comporta
+    como o de SAÍDA em três pontos onde a diferença importa, e que o título é lido
+    da página quando quem chama não tem o resultado da busca (o backfill).
+    """
+    pagina = (
+        '<html><body><p class="identifica">PORTARIA-TCU N&ordm; 181, DE 22 '
+        'DE NOVEMBRO DE 2023</p></body></html>'
+    )
+    resultado = {
+        "urlTitle": "portaria-tcu-n-181-2023",
+        "pubDate": "23/11/2023",
+        "hierarchyStr": "Poder Legislativo/Tribunal de Contas da União",
+    }
+
+    indice: dict[str, dict] = {}
+    linha = atos_destino.registrar(
+        indice, resultado, "texto do ato", id_servidor="123", nome="FULANA DE TAL",
+        pagina_html=pagina, arquivar=False,
+    )
+
+    # Um ato de chegada de quem também aparece em ato de demissão: a D18 é sobre
+    # o ato DISCIPLINAR publicado pela CGU, e não pode vetar a nomeação em outro
+    # órgão — que é justamente a informação de destino.
+    so_com_url = atos_destino.registrar(
+        {}, {"urlTitle": "portaria-x"}, "", id_servidor="1", nome="X", arquivar=False
+    )
+
+    sem_chave = atos_destino.registrar(
+        {}, {"pubDate": "01/01/2026"}, "texto", id_servidor="1", nome="X", arquivar=False
+    )
+
+    # Caminho do backfill: sem `hierarchyStr` e sem `title`, o órgão vem de fora
+    # (do por_pessoa.csv) e o título sai da página baixada.
+    do_backfill = atos_destino.registrar(
+        {}, {"urlTitle": "portaria-y", "pubDate": "23/11/2023"}, "texto",
+        id_servidor="1", nome="X", pagina_html=pagina,
+        orgao_destino="Tribunal de Contas da União", arquivar=False,
+    )
+
+    return [
+        ("o título é lido da página quando não veio da busca",
+         linha["TITULO"] == "PORTARIA-TCU Nº 181, DE 22 DE NOVEMBRO DE 2023"),
+        ("o órgão sai da hierarquia, pulando o nível guarda-chuva",
+         linha["ORGAO_DESTINO"] == "Tribunal de Contas da União"),
+        ("a hierarquia crua é guardada para conferência",
+         linha["ORGAO_HIERARQUIA"] == "Poder Legislativo/Tribunal de Contas da União"),
+        ("o nome vem do SIAPE, não do texto do ato",
+         linha["NOME"] == "FULANA DE TAL"),
+        ("a chave é o ato, e não a pessoa",
+         list(indice) == ["portaria-tcu-n-181-2023"]),
+        ("ato sem urlTitle não entra no índice", sem_chave is None),
+        ("ato sem texto ainda entra — a D18 não vale aqui", so_com_url is not None),
+        ("no backfill o órgão vem de fora quando não há hierarquia",
+         do_backfill["ORGAO_DESTINO"] == "Tribunal de Contas da União"),
+        ("...e a hierarquia crua fica VAZIA em vez de repetir a resposta",
+         do_backfill["ORGAO_HIERARQUIA"] == ""),
+        ("o índice de destino não é o de saída",
+         atos_destino.ARQ_INDICE != atos.ARQ_INDICE and atos_destino.DIR_ATOS != atos.DIR_ATOS),
+    ]
+
+
 def main() -> int:
     falhas = 0
 
@@ -649,10 +716,16 @@ def main() -> int:
         if not ok:
             print(f"        esperado {esperado!r}, obtido {obtido[:60]!r}")
 
+    print("— índice dos atos de destino (D30) —")
+    for descricao, ok in casos_do_indice_de_destino():
+        falhas += not ok
+        print(f"  {'ok  ' if ok else 'FALHA'} {descricao}")
+
     total = (
         len(CLASSIFICACAO) + len(CLASSIFICACAO_SEM_CARGO) + len(RETIFICACAO) + len(IDENTIDADE)
         + len(DESTINO) + len(MATRICULA) + len(EXTRACAO) + len(ORGAO)
-        + len(NOME_NO_ATO) + 1  # +1: a conferência do corpus inteiro conta como uma
+        + len(NOME_NO_ATO) + len(casos_do_indice_de_destino())
+        + 1  # +1: a conferência do corpus inteiro conta como uma
     )
     print()
     print(f"{total - falhas} de {total} invariantes OK")

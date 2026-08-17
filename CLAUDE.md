@@ -167,6 +167,8 @@ Edital CGU nº 5 de 13/06/2022, publicado no DOU (D17).
 - varrer_dou.py        varre o DOU por FRASE e registra toda saída de AFFC
 - resumir_dou.py       o resumo do DOU para o site (card + saídas recentes),
                        derivado do índice de saídas. Era gerar_card_dou.py
+- arquivar_destinos.py alcança para trás: arquiva o ato de nomeação de quem já
+                       tinha destino do DOU e só tinha a URL (D30)
 - filtrar_affc.py      reduz o CSV bruto do Portal aos AFFC
 - ranking.py           biblioteca: rankingdosconcursos, catálogo de órgãos e a
                        regra de decisão do destino (D24)
@@ -245,6 +247,38 @@ Edital CGU nº 5 de 13/06/2022, publicado no DOU (D17).
   falecimento, e era classificado como falecimento — mas o ato é sobre o
   pensionista, sai muito depois do óbito e o instituidor pode ser aposentado ou
   TFFC (fora do escopo, D7). Ver dou.PADROES_PENSAO
+
+## Dois DOUs, dois índices (D30, 16/08/2026)
+- A camada do DOU mora em `data/dou/`, e cada nome diz de que GRÃO é e de que
+  ASSUNTO: `atos_saida.csv` + `atos_saida/` (índice e cópias dos atos de saída da
+  CGU), `atos_destino.csv` + `atos_destino/` (os atos de chegada, publicados pelo
+  órgão de destino), `por_pessoa.csv` (motivo e destino, uma linha por PESSOA) e
+  `varredura.txt`. O resumo para o site é `public/dou.json`
+- ANTES HAVIA DUAS COLISÕES: `saidas_dou/` guardava ATOS e `saidas_dou.csv`
+  guardava PESSOAS; `atos_dou.csv` era a fonte e `atos_dou.json` um resumo dela.
+  Nome igual, coisa diferente, nos dois casos
+- POR QUE DOIS ÍNDICES E NÃO UMA COLUNA `TIPO`: o resumo do site é DERIVADO do
+  índice de saídas (card, saídas recentes). Se o ato de nomeação em outro órgão
+  morasse lá, toda derivação dependeria de lembrar de filtrar, e a que esquecesse
+  contaria CHEGADA em outro órgão como PERDA da CGU. Isso NÃO contradiz a D19:
+  lá era o MESMO ato em duas pastas; aqui um ato da CGU sobre alguém saindo nunca
+  é um ato do TCU sobre alguém entrando
+- O ATO DE DESTINO PASSA A TER CÓPIA ARQUIVADA, e a razão é que a assimetria
+  estava invertida em relação à confiança: motivo é leitura direta do ato (95%),
+  destino é INFERÊNCIA — e era o destino que não tinha lastro, só uma URL que o
+  in.gov.br pode mudar. Arquivar não custa requisição nova: o `enriquecer_saidas`
+  já baixa o ato, lia e jogava fora
+- `arquivar_destinos.py` é o alcance para trás: uma requisição por ATO, direto na
+  página, sem busca. Foi assim que os 130 destinos antigos ganharam cópia — e são
+  34 atos, porque uma mesma portaria nomeia várias pessoas. A linha do índice é do
+  ATO; o par pessoa×ato mora no `por_pessoa.csv`
+- `ATO_DESTINO_ARQUIVO` é a coluna que liga os dois, e ela só chega ao
+  `dados.csv` quando o `construir_painel.py` roda (local, com snapshots). Até lá
+  `urlDoDestino` devolve a URL do in.gov.br — degrada, não quebra
+- `dou.ROTULOS["nomeacao"]` NÃO é motivo de saída: `classificar` nunca o devolve,
+  e ele existe só para a cópia arquivada sair com rótulo legível
+- SAIU `atos.importar_de_saidas_dou`: migrava as linhas antigas para o índice
+  quando ele nasceu (D19) e há muito importava zero
 
 ## O site lê arquivo FINAL, não monta dado (D29, 16/08/2026)
 - A interface NÃO lê mais o `dados.csv`. Ela lê `data/painel.csv` e

@@ -110,6 +110,22 @@ export const urlDoAto = (registro: RegistroAuditor): string => {
 };
 
 /**
+ * Link para o ato que atesta o DESTINO, com a mesma preferência de `urlDoAto`:
+ * a cópia arquivada antes do link externo (D30).
+ *
+ * Só existe cópia quando o destino veio do DOU — o do ranking é uma ficha de
+ * aprovações, o do diário municipal é uma busca no Querido Diário, e nenhum dos
+ * dois é uma página de ato que se possa arquivar. Nesses casos, e enquanto o
+ * `arquivar_destinos.py` não tiver alcançado a linha, devolve a URL de sempre.
+ */
+export const urlDoDestino = (registro: RegistroAuditor): string => {
+  if (registro.ATO_DESTINO_ARQUIVO) {
+    return `${baseDoSite()}data/dou/atos_destino/${registro.ATO_DESTINO_ARQUIVO}`;
+  }
+  return registro.URL_DESTINO;
+};
+
+/**
  * As fontes que atestam que a pessoa saiu (D20).
  *
  * `SIAPE` sai de graça para toda saída que veio do cadastro: a competência da
@@ -141,7 +157,7 @@ export const detalharSaida = (registro: RegistroAuditor): DetalheSaida => ({
   destino: registro.ORGAO_DESTINO,
   fonteDestino: registro.FONTE_DESTINO,
   dataDestino: registro.DATA_DESTINO,
-  urlDestino: registro.URL_DESTINO,
+  urlDestino: urlDoDestino(registro),
   dataPublicacao: registro.DATA_PUBLICACAO_SAIDA,
   atoTitulo: registro.ATO_SAIDA_TITULO,
   atoUrl: urlDoAto(registro),

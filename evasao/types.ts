@@ -94,6 +94,12 @@ export interface RegistroAuditor {
   /** `SIAPE` | `DOU` | `BUSCA` | `MANUAL`. Selo de procedência do destino (D14). */
   FONTE_DESTINO: string;
   URL_DESTINO: string;
+  /**
+   * Nome do HTML arquivado em `data/dou/atos_destino/` — o ato de nomeação
+   * publicado pelo órgão de chegada (D30). Vazio quando o destino não veio do
+   * DOU, ou quando o ato ainda não foi arquivado.
+   */
+  ATO_DESTINO_ARQUIVO?: string;
   OBSERVACAO: string;
 
   /**

@@ -21,6 +21,7 @@ import {
   motivoDetalhado,
   saiuDaCgu,
   urlDoAto,
+  urlDoDestino,
 } from '../lib/painel';
 import {
   SeloFonte,
@@ -232,7 +233,9 @@ const COLUNAS: readonly Coluna[] = [
     celula: (r) =>
       r.ORGAO_DESTINO && r.URL_DESTINO ? (
         <a
-          href={r.URL_DESTINO}
+          // `urlDoDestino` prefere a cópia arquivada do ato à página do
+          // in.gov.br (D30), como `urlDoAto` já fazia do lado da saída.
+          href={urlDoDestino(r)}
           target="_blank"
           rel="noopener noreferrer"
           title={tituloDoLinkDeDestino(r.FONTE_DESTINO, r.NOME, r.ORGAO_DESTINO)}
