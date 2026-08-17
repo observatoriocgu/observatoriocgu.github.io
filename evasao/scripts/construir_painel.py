@@ -201,6 +201,39 @@ def aplicar_dou_por_pessoa(pessoas: list[dict], saidas: list[dict]) -> int:
     return aplicadas
 
 
+def conferir_colunas(pessoas: list[dict]) -> None:
+    """
+    Toda coluna do `dados.csv` tem de existir na pessoa ANTES das camadas.
+
+    Isto não é zelo: é a guarda contra um defeito que já aconteceu, em
+    16/08/2026, com a coluna `ATO_DESTINO_ARQUIVO` (D30). Ela foi acrescentada a
+    `COLUNAS_DADOS` e esquecida em `painel.derivar_pessoas`, e as três camadas que
+    preenchem o `dados.csv` — concurso, DOU e curadoria — copiam campo a campo
+    com a guarda `if campo in pessoa`. Coluna que não existe na pessoa não é
+    preenchida por nenhuma delas.
+
+    O resultado é o pior tipo de falha: nada quebra. O `DictWriter` escreve a
+    coluna com o `restval` vazio, o arquivo sai com o cabeçalho certo, o pipeline
+    termina com sucesso — e a coluna nasce vazia para sempre. Foi assim que 130
+    atos de destino arquivados ficaram sem chegar à tela.
+
+    Falha ALTO e para tudo: o `dados.csv` é a base de que sai o site, e gravá-lo
+    incompleto é pior que não gravá-lo.
+    """
+    if not pessoas:
+        return
+    faltando = [coluna for coluna in COLUNAS_DADOS if coluna not in pessoas[0]]
+    if faltando:
+        raise SystemExit(
+            f"! {', '.join(faltando)} está em COLUNAS_DADOS e não em "
+            f"painel.derivar_pessoas.\n"
+            f"  Nenhuma camada consegue preencher coluna que a pessoa não tem — "
+            f"ela sairia vazia sem erro nenhum.\n"
+            f"  Acrescente a chave (com valor vazio) ao dicionário de "
+            f"`derivar_pessoas` e rode de novo."
+        )
+
+
 def aplicar_curadoria(pessoas: list[dict], curadoria: list[dict]) -> int:
     """
     A camada humana vence todas as outras. Só toca no que estiver preenchido.
@@ -254,6 +287,8 @@ def main() -> int:
         saidas = sum(1 for p in grupo if p["MES_SAIDA"])
         pct = 100 * saidas / len(grupo) if grupo else 0
         print(f"  {rotulo:<28} {len(grupo):5d} | saíram {saidas:4d} ({pct:.1f}%)")
+
+    conferir_colunas(pessoas)
 
     registros_concurso = ler_csv(ARQ_CONCURSO)
     if registros_concurso:
