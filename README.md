@@ -111,3 +111,22 @@ Etapa por etapa (caminhos relativos a `evasao/`; scripts em `evasao/scripts/`):
 
 O detalhe (regras de dados, decisões e histórico) mora no
 [CLAUDE.md](CLAUDE.md) e no [PLANO.md](PLANO.md).
+
+
+--> ATUALIZACAO DE DADOS MANUAL
+- arquivo curadoria.csv
+- rodar construir_painel.py
+
+- para mudar o destino (se tiver em exercicio), precisa de MES_SAIDA de gatilho:
+
+┌──────────────┬─────────────────────────────────┬────────────────────────────────────────────────────────────────────────┐
+│    coluna    │              valor              │                                por quê                                 │
+├──────────────┼─────────────────────────────────┼────────────────────────────────────────────────────────────────────────┤
+│ MES_SAIDA    │ 202607 (ex.)                    │ é O gatilho de tudo                                                    │
+├──────────────┼─────────────────────────────────┼────────────────────────────────────────────────────────────────────────┤
+│ SITUACAO     │ VACÂNCIA                        │ rótulo (vocabulário real: VACÂNCIA, APOSENTADO, EXONERADO...)          │
+├──────────────┼─────────────────────────────────┼────────────────────────────────────────────────────────────────────────┤
+│ MOTIVO_SAIDA │ Vacância (posse em outro cargo) │ grafia exata — qualquer variação cria um balde novo no card de motivos │
+├──────────────┼─────────────────────────────────┼────────────────────────────────────────────────────────────────────────┤
+│ FONTE_MOTIVO │ MANUAL                          │ selo de origem (D14)                                                   │
+└──────────────┴─────────────────────────────────┴────────────────────────────────────────────────────────────────────────┘
