@@ -10,6 +10,7 @@
 | `historico_transparencia_cgu/` | download do Portal + `filtrar_affc.py` | não (fora do git) |
 | `historico_transparencia_cgu/historico_mensal.csv` | `construir_painel.py` — os snapshots empilhados, 88.421 linhas | não (fora do git) |
 | `dados.csv` | `construir_painel.py` — uma linha por Auditor | **não** |
+| `painel.csv` | `gerar_publicacao.py` — o `dados.csv` **mesclado**, e é o que o site lê (D29) | não (fora do git) |
 | `serie_mensal.csv` | `construir_painel.py` — uma linha por competência | **não** |
 | `concurso_2021.csv` | `concurso.py` — resultado final do DOU (D17) + os sub judice | **não** |
 | **`concurso_2021_subjudice.csv`** | **você** — aprovados por decisão judicial | **sim** |
@@ -32,11 +33,30 @@ para auditar a série à mão, e é regenerável a qualquer momento com
 `python scripts/construir_painel.py`. Versionado, custava 20,7 MB reescritos a
 cada competência e ainda subia para o site publicado.
 
-O `destinos_ranking.csv` é o único destes que **não** entra no `dados.csv`: ele é
-lido direto pelo navegador, como o `atos_dou.json`, e pelo mesmo motivo (o
-`construir_painel.py` precisa dos snapshots do Portal, que não existem no CI, e
-quem roda sozinho é o crawler). Por isso o `dados.csv` publicado continua sem
-esses destinos, e a tela os tem.
+## O `dados.csv` não é o que o site lê (D29)
+
+O `destinos_ranking.csv` e as saídas do `atos_dou.json` **não entram** no
+`dados.csv`, e nunca entrarão: quem escreve o `dados.csv` é o `construir_painel.py`,
+que precisa dos snapshots do Portal — fora do Git, ~70 MB — e por isso só roda na
+máquina de quem os tem. Quem roda todo dia é a varredura do DOU, no CI.
+
+A junção acontece **na hora de publicar o site**, em `gerar_publicacao.py`, e o
+resultado é o `painel.csv`:
+
+```
+dados.csv  +  atos_dou.json  +  destinos_ranking.csv   ->   painel.csv
+(SIAPE)       (D22)             (D24, D27, D28)             (o que o site lê)
+
+alteracoes-registros.json  +  as saídas que só o DOU conhece  ->  alteracoes.json
+```
+
+Os dois arquivos gerados **não vão para o Git** — são artefato de publicação,
+como o `dist/`. Para tê-los na máquina, rode `python scripts/gerar_publicacao.py`
+(o `npm run dev` e o `npm run build` já o fazem sozinhos, pelo `prebuild`).
+
+Até 16/08/2026 essa junção acontecia no NAVEGADOR, e cada página do site tinha de
+lembrar de fazê-la — página que esquecesse publicava número desatualizado sem erro
+nenhum.
 
 ## Como corrigir alguma coisa
 

@@ -5,6 +5,16 @@ node_modules/
 # deploy-pages.yml, que builda no CI — a pasta não é mais versionada.
 evasao/dist/
 
+# Os arquivos FINAIS que o site lê (D29). São artefato de publicação, como o
+# dist/: `gerar_publicacao.py` os monta a partir de quatro arquivos versionados
+# (dados.csv, atos_dou.json, destinos_ranking.csv, alteracoes-registros.json)
+# na hora de montar o site, e o `prebuild` do npm faz o mesmo na máquina local.
+# Versioná-los custaria 425 KB reescritos a cada varredura do DOU e criaria uma
+# segunda verdade — alguém teria de LEMBRAR de regerá-los depois de mexer nas
+# entradas, e quem esquecesse publicaria dado velho em silêncio.
+evasao/data/painel.csv
+evasao/public/alteracoes.json
+
 # Logs
 logs/
 *.log

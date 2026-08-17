@@ -53,10 +53,29 @@ jobs:
           cache: npm
           cache-dependency-path: evasao/package-lock.json
 
+      # A mescla das fontes externas roda aqui (D29). Ela é etapa de PUBLICAÇÃO:
+      # o `prebuild` do npm chama `scripts/gerar_publicacao.py`, que lê quatro
+      # arquivos versionados (dados.csv, atos_dou.json, destinos_ranking.csv,
+      # alteracoes-registros.json) e escreve os dois que o site de fato lê —
+      # `data/painel.csv` e `public/alteracoes.json`.
+      #
+      # É possível porque a mescla NÃO depende dos snapshots do Portal, que estão
+      # fora do Git; quem depende é o `construir_painel.py`, e ele continua
+      # rodando só na máquina de quem os tem. Como este workflow dispara a cada
+      # push e ao fim da varredura do DOU, uma saída publicada hoje chega ao site
+      # hoje — o mesmo frescor de quando a mescla acontecia no navegador.
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
       - name: Instalar dependências
         run: npm ci
         working-directory: evasao
 
+      # O `prebuild` roda antes do `vite build`, e o resumo dele (quantas saídas
+      # o DOU acrescentou, quantos destinos o ranking preencheu) fica no log deste
+      # passo — é o registro do que foi ao ar.
       - name: Build
         run: npm run build
         working-directory: evasao
@@ -78,6 +97,11 @@ jobs:
 
           # Os CSVs são lidos em tempo de execução por /evasao/data/*.csv e não
           # passam pelo build (não estão em public/). Precisam ser copiados.
+          #
+          # O que a interface lê é o `painel.csv`, gerado no passo de build (D29).
+          # Os demais vão junto de propósito: são as FONTES daquele arquivo, e um
+          # observatório que não publica a própria fonte pede confiança em vez de
+          # oferecer conferência.
           mkdir -p _site/evasao/data
           cp evasao/data/*.csv _site/evasao/data/
 

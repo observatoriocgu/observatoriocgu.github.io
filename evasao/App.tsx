@@ -22,7 +22,7 @@ import {
   areasDoConcurso,
   rotuloDoConcurso,
 } from './constants';
-import { DestinoDoRanking, PontoSerieMensal, RegistroAuditor, SaidasDou } from './types';
+import { PontoSerieMensal, RegistroAuditor, SaidasDou } from './types';
 import {
   LinhaCsv,
   baseDoSite,
@@ -37,7 +37,6 @@ import {
 import {
   agregarPorMotivoResumido,
   agregarPorTipoDeSaida,
-  comoDestinosDoRanking,
   comoRegistros,
   comoSerie,
   curvaDePermanencia,
@@ -45,7 +44,6 @@ import {
   evasaoDoConcurso,
   evasaoDosPrimeirosColocados,
   filtrarSaidas,
-  mesclarFontesExternas,
   porSaidaMaisRecente,
   saidas,
   serieDeSaidasPorMotivo,
@@ -61,8 +59,7 @@ const numero = (valor: number) => valor.toLocaleString('pt-BR');
 const percentual = (valor: number) => `${valor.toFixed(1).replace('.', ',')}%`;
 
 const App: React.FC = () => {
-  const [registrosDoCsv, setRegistrosDoCsv] = useState<RegistroAuditor[]>([]);
-  const [destinosDoRanking, setDestinosDoRanking] = useState<DestinoDoRanking[]>([]);
+  const [registros, setRegistros] = useState<RegistroAuditor[]>([]);
   const [serie, setSerie] = useState<PontoSerieMensal[]>([]);
   const [saidasDou, setSaidasDou] = useState<SaidasDou | null>(null);
   const [aprovados, setAprovados] = useState<LinhaCsv[]>([]);
@@ -76,17 +73,13 @@ const App: React.FC = () => {
 
     (async () => {
       try {
-        const [linhasDados, linhasSerie, linhasDestinos] = await Promise.all([
-          carregarCsv('dados.csv'),
+        const [linhasPainel, linhasSerie] = await Promise.all([
+          carregarCsv('painel.csv'),
           carregarCsv('serie_mensal.csv'),
-          // O destino do ranking é acessório: sem ele a tela só mostra menos
-          // destino identificado. Por isso ele cai sozinho, sem derrubar o painel.
-          carregarCsv('destinos_ranking.csv').catch(() => []),
         ]);
         if (!montado) return;
-        setRegistrosDoCsv(comoRegistros(linhasDados));
+        setRegistros(comoRegistros(linhasPainel));
         setSerie(comoSerie(linhasSerie));
-        setDestinosDoRanking(comoDestinosDoRanking(linhasDestinos));
         setErroDados(null);
       } catch (erro) {
         if (montado) setErroDados(erro instanceof Error ? erro.message : 'Erro ao carregar os dados.');
@@ -103,7 +96,7 @@ const App: React.FC = () => {
   // A lista de aprovados do Edital CGU nº 5 (D17) — alimenta a tabela dos
   // primeiros colocados, e nada mais.
   //
-  // Carrega sozinha, e não junto do dados.csv, de propósito: é o único lugar da
+  // Carrega sozinha, e não junto do painel.csv, de propósito: é o único lugar da
   // página que precisa dela, e uma falha aqui tem de custar uma tabela, não o
   // painel inteiro.
   useEffect(() => {
@@ -123,11 +116,15 @@ const App: React.FC = () => {
     };
   }, []);
 
-  // Saídas de AFFC no DOU — alimenta o card "dias sem perder um Auditor" (D10).
-  // Vem do índice de atos do DOU, não do dados.csv: é o único número da tela que
-  // precisa estar certo no dia, e não no mês. Por isso ele fica à frente da
-  // lista de últimas saídas, que espera o SIAPE — `atosDepoisDaUltimaCompetencia`
-  // diz de quanto é essa distância, e o card mostra.
+  // Saídas de AFFC no DOU — alimenta o card "dias sem perder um Auditor" (D10),
+  // e SÓ ele. Vem do índice de atos do DOU: é o único número da tela que precisa
+  // estar certo no dia, e não no mês. Por isso ele fica à frente da lista de
+  // últimas saídas, que espera o SIAPE — `atosDepoisDaUltimaCompetencia` diz de
+  // quanto é essa distância, e o card mostra.
+  //
+  // As `saidasRecentes` deste mesmo JSON NÃO são lidas aqui: elas já foram
+  // aplicadas ao `painel.csv` por `scripts/publicacao.py`, antes de o site subir
+  // (D29).
   useEffect(() => {
     let montado = true;
 
@@ -147,16 +144,6 @@ const App: React.FC = () => {
       montado = false;
     };
   }, []);
-
-  // O painel inteiro — cards, gráficos, tabelas — trabalha sobre o CSV do SIAPE
-  // JÁ MESCLADO com as saídas que só o DOU conhece (D22) e com os destinos que o
-  // ranking identificou (D24). É uma linha só, e é o que faz o resto da tela
-  // chegar até hoje em vez de parar na última competência do Portal, dois meses
-  // atrás.
-  const registros = useMemo(
-    () => mesclarFontesExternas(registrosDoCsv, saidasDou?.saidasRecentes ?? [], destinosDoRanking),
-    [registrosDoCsv, saidasDou, destinosDoRanking]
-  );
 
   // === Recorte ===
   //
@@ -219,8 +206,17 @@ const App: React.FC = () => {
     ? formatarDataIsoParaBr(saidasDou.varreduraAte)
     : '';
 
-  /** Quantas saídas o painel conhece só pelo ato — as que ainda não têm selo do SIAPE. */
-  const saidasSoDoDou = (saidasDou?.saidasRecentes ?? []).filter((s) => !s.jaNoSiape).length;
+  /**
+   * Quantas saídas o painel conhece só pelo ato — as que ainda não têm selo do
+   * SIAPE. Conta-se sobre os registros, e não sobre o `atos_dou.json`: assim o
+   * número é o das linhas que a tela de fato mostra, e não o dos atos que o
+   * crawler achou. Um ato que não casou com ninguém do quadro não vira saída
+   * (D22), e portanto não pode aparecer nesta conta.
+   */
+  const saidasSoDoDou = useMemo(
+    () => registros.filter((registro) => registro.SAIDA_NO_SIAPE === 'NÃO').length,
+    [registros]
+  );
 
   const eventoMaisRecente = saidasDou
     ? (saidasDou.eventos ?? []).find((evento) => evento.dataPublicacao === saidasDou.dataMaisRecente)

@@ -6,18 +6,9 @@ import {
   LogDeAlteracoes,
   MesDeAlteracoes,
   RegistroAuditor,
-  SaidasDou,
 } from '../types';
 import { carregarCsv, carregarJsonPublico, formatarCompetenciaLonga } from '../lib/dados';
-import {
-  acrescentarSaidasDoDou,
-  areaDe,
-  comoRegistros,
-  comoDestinosDoRanking,
-  detalharSaida,
-  mesclarFontesExternas,
-  motivoDe,
-} from '../lib/painel';
+import { areaDe, comoRegistros, detalharSaida, motivoDe } from '../lib/painel';
 import CardDeFiltros, { resumirGrupo, useFiltrosEncadeados } from './CardDeFiltros';
 import FiltroMultiplo, { OpcaoFiltro } from './FiltroMultiplo';
 import { LinhasDeProcedencia } from './Selos';
@@ -59,25 +50,21 @@ const HistoryPage: React.FC = () => {
 
     (async () => {
       try {
+        // Os dois arquivos já vêm prontos (D29): o `alteracoes.json` é o log do
+        // diff mensal do SIAPE COM as saídas que só o DOU conhece dentro (D22) —
+        // sem elas, quem saiu em agosto não apareceria em bloco nenhum desta
+        // página —, e o `painel.csv` é o `dados.csv` mesclado. Quem junta os dois
+        // é `scripts/publicacao.py`, na publicação do site.
+        //
         // O CSV é opcional: sem ele o histórico ainda se lê, só perde o motivo e
         // o link do ato. O JSON, não — sem ele não há o que mostrar.
-        const [logCarregado, linhas, dou, destinos] = await Promise.all([
-          carregarJsonPublico<LogDeAlteracoes>('alteracoes-registros.json'),
-          carregarCsv('dados.csv').catch(() => []),
-          carregarJsonPublico<SaidasDou>('atos_dou.json').catch(() => null),
-          carregarCsv('destinos_ranking.csv').catch(() => []),
+        const [logCarregado, linhas] = await Promise.all([
+          carregarJsonPublico<LogDeAlteracoes>('alteracoes.json'),
+          carregarCsv('painel.csv').catch(() => []),
         ]);
         if (!montado) return;
-        // O log do SIAPE para na última competência do Portal. As saídas que só
-        // o DOU conhece entram aqui (D22) — sem isto, quem saiu em agosto não
-        // aparece em bloco nenhum desta página.
-        const mesclados = mesclarFontesExternas(
-          comoRegistros(linhas),
-          dou?.saidasRecentes ?? [],
-          comoDestinosDoRanking(destinos),
-        );
-        setRegistros(mesclados);
-        setLog(acrescentarSaidasDoDou(logCarregado, mesclados));
+        setRegistros(comoRegistros(linhas));
+        setLog(logCarregado);
       } catch (falha) {
         if (montado) setErro(falha instanceof Error ? falha.message : 'Erro ao carregar o histórico.');
       } finally {

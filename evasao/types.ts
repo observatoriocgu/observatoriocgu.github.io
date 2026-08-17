@@ -7,8 +7,13 @@
  */
 
 /**
- * Uma linha do `evasao/data/dados.csv`: uma pessoa que passou pela CGU como
+ * Uma linha do `evasao/data/painel.csv`: uma pessoa que passou pela CGU como
  * AFFC entre jun/2022 e a última competência publicada.
+ *
+ * O `painel.csv` é o `dados.csv` já mesclado com as saídas que só o DOU conhece
+ * (D22) e com os destinos do ranking (D24) — quem o gera é
+ * `scripts/gerar_publicacao.py`, na hora de publicar o site (D29). Todas as
+ * colunas do `dados.csv` estão aqui, mais `SAIDA_NO_SIAPE`.
  *
  * Todo campo é string porque vem do parser de CSV; campo ausente é `''`, nunca
  * `null`. Datas em `DD/MM/AAAA` quando vêm do SIAPE (`DATA_POSSE`) e em
@@ -95,10 +100,10 @@ export interface RegistroAuditor {
    * `NÃO` quando a saída veio só do ato do DOU e o cadastro do SIAPE ainda não
    * mostrou a ausência (D22).
    *
-   * NÃO existe coluna com este nome no `dados.csv`: quem preenche é
-   * `mesclarSaidasDoDou`, em memória, ao juntar o `atos_dou.json` ao CSV. Nas
-   * linhas que vêm do CSV o campo é `undefined`, e ausência aqui significa
-   * "o SIAPE confirmou" — porque no CSV toda saída nasce do diff mensal (D13).
+   * É a única coluna que existe no `painel.csv` e não no `dados.csv`: quem a
+   * escreve é `scripts/publicacao.py`, ao sobrepor o `atos_dou.json` ao CSV do
+   * SIAPE (D29). Vazio significa "o SIAPE confirmou" — porque no `dados.csv`
+   * toda saída nasce do diff mensal (D13).
    */
   SAIDA_NO_SIAPE?: string;
 }
@@ -226,9 +231,14 @@ export interface EventoSaidaDou {
  * entregou a competência que mostraria a ausência (~2 meses de atraso do
  * Portal). O nome vem lido do texto do próprio ato.
  *
- * Elas entram na lista de últimas saídas para que o painel mostre o que acabou
- * de acontecer, e NÃO entram em contagem de evasão — quem conta é o SIAPE
- * (D11, D13). Na tela, a diferença aparece sozinha: só carregam o selo `DOU`.
+ * Elas CONTAM EM TUDO (D22, que revogou o recorte da D21): cards, gráficos,
+ * curva, destinos, tabela detalhada e histórico. Não são linha nova — são
+ * sobrepostas ao registro da pessoa, que já está no `dados.csv` como ativa, e
+ * por isso chegam à tela com concurso, área e unidade. Na tela, a diferença
+ * aparece sozinha: só carregam o selo `DOU`, nunca o do SIAPE.
+ *
+ * Quem faz a sobreposição é `scripts/publicacao.py` (D29), e o resultado é o
+ * `painel.csv` — nenhuma página do site vê este tipo.
  */
 export interface SaidaRecenteDou {
   nome: string;
@@ -254,41 +264,13 @@ export interface SaidaRecenteDou {
 }
 
 /**
- * Uma linha de `data/destinos_ranking.csv` — o destino que o
- * rankingdosconcursos identificou para quem já saiu (D24).
+ * O `atos_dou.json`.
  *
- * O arquivo guarda TODAS as saídas sem destino que foram consultadas, inclusive
- * as que o ranking não resolveu, para que a próxima execução saiba o que já
- * perguntou. Só as linhas com `orgaoDestino` preenchido vão à tela — as demais
- * são pauta de curadoria. Quem aplica a regra é `mesclarDestinosDoRanking`.
+ * A interface consome daqui só o CARD de "dias sem perder um Auditor"
+ * (`eventos`, `dataMaisRecente`, `varreduraAte`, `ultimaCompetenciaSiape`).
+ * `saidasRecentes` continua no arquivo, mas quem a lê é `scripts/publicacao.py`,
+ * que a aplica ao `dados.csv` antes de o site subir (D29).
  */
-export interface DestinoDoRanking {
-  /** `ID_SERVIDOR_PORTAL`, a única chave de identidade (D12). */
-  idServidor: string;
-  nome: string;
-  /**
-   * Como o ranking chegou (ou não chegou) ao destino. Duas preenchem
-   * `orgaoDestino`: `UNICO` (sobrou um candidato só) e `UNICO_NOMEADO` (sobrou
-   * mais de um, e a marca azul "Nomeado" do site aponta um — D26). As demais
-   * são pauta: `AMBIGUO`, `SEM_ANCORA_CGU`, `SEM_FICHA`, `SEM_CANDIDATO`,
-   * `SEM_CATALOGO` ou `FALHA_NA_CONSULTA`.
-   */
-  decisao: string;
-  /** Vazio quando nem o ranking nem o diário municipal responderam. */
-  orgaoDestino: string;
-  /**
-   * Qual das duas fontes do arquivo respondeu: `RANKING` (aprovação em concurso
-   * mais a marca "Nomeado") ou `DIARIO` (ato de nomeação em diário municipal,
-   * D27). Vem do CSV — a mescla não pode fixá-la, ou o ranking levaria crédito
-   * por ato publicado.
-   */
-  fonteDestino: string;
-  /** A consulta que qualquer pessoa pode repetir no navegador. */
-  urlDestino: string;
-  /** Os órgãos possíveis, quando há mais de um. Só para a pauta de curadoria. */
-  candidatos: string[];
-}
-
 export interface SaidasDou {
   /** `AAAA-MM-DD` até onde a varredura do DOU já cobriu. */
   varreduraAte: string;

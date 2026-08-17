@@ -2,11 +2,18 @@
  * Regras de negócio do painel.
  *
  * Tudo aqui é função pura sobre `RegistroAuditor[]` — nenhuma faz rede, nenhuma
- * toca no DOM. As três páginas (dashboard, tabela detalhada, relatório) leem
+ * toca no DOM. As três páginas (dashboard, tabela detalhada, histórico) leem
  * daqui, para que "quem saiu" e "por qual motivo" tenham uma definição só.
  *
  * O equivalente em Python é `evasao/scripts/painel.py`, que produz os CSVs.
  * Este arquivo não recalcula nada que o Python já decidiu: ele agrupa.
+ *
+ * AQUI NÃO SE MESCLA FONTE NENHUMA (D29, 16/08/2026). Até 16/08/2026 este arquivo
+ * também juntava ao `dados.csv` as saídas que só o DOU conhece (D22) e os destinos
+ * do ranking (D24), e cada página tinha de LEMBRAR de chamar `mesclarFontesExternas`
+ * — página que esquecesse publicava número desatualizado sem erro nenhum. Isso
+ * agora é `scripts/publicacao.py`, que roda na hora de publicar o site e escreve
+ * o `data/painel.csv` já pronto. O navegador lê arquivo final; não o monta.
  */
 
 import {
@@ -21,42 +28,22 @@ import {
   MOTIVO_OUTRO,
   MOTIVO_SEM_ATO,
   MOTIVO_VACANCIA,
-  SITUACAO_EM_EXERCICIO,
   SITUACAO_MUDOU_ORGAO,
 } from '../constants';
 import {
-  DestinoDoRanking,
   DetalheSaida,
   LinhaSerieMensal,
-  LogDeAlteracoes,
   PontoSerieMensal,
   RegistroAuditor,
-  SaidaRecenteDou,
 } from '../types';
 import { LinhaCsv, baseDoSite } from './dados';
 
-/** Converte as linhas cruas do CSV no tipo do painel. Sem validação: o CSV é derivado. */
+/**
+ * Converte as linhas cruas do `painel.csv` no tipo do painel. Sem validação: o
+ * arquivo é derivado, e desde a D29 já chega mesclado com o DOU e o ranking.
+ */
 export const comoRegistros = (linhas: LinhaCsv[]): RegistroAuditor[] =>
   linhas as unknown as RegistroAuditor[];
-
-/**
- * `destinos_ranking.csv` como o navegador o consome (D24, ampliado pela D27).
- *
- * O arquivo carrega DUAS fontes desde a D27 — o ranking dos concursos e o ato em
- * diário municipal —, e por isso `fonteDestino` vem do próprio CSV em vez de ser
- * fixado aqui. Fixá-lo era o que existia antes, e creditaria ao ranking um
- * destino lido de um ato publicado.
- */
-export const comoDestinosDoRanking = (linhas: LinhaCsv[]): DestinoDoRanking[] =>
-  linhas.map((linha) => ({
-    idServidor: linha.ID_SERVIDOR_PORTAL,
-    nome: linha.NOME,
-    decisao: linha.DECISAO,
-    orgaoDestino: linha.ORGAO_DESTINO,
-    fonteDestino: linha.FONTE_DESTINO,
-    urlDestino: linha.URL_DESTINO,
-    candidatos: linha.CANDIDATOS ? linha.CANDIDATOS.split(' | ') : [],
-  }));
 
 export const comoSerie = (linhas: LinhaCsv[]): PontoSerieMensal[] =>
   (linhas as unknown as LinhaSerieMensal[]).map((linha) => ({
@@ -122,245 +109,18 @@ export const urlDoAto = (registro: RegistroAuditor): string => {
   return registro.ATO_SAIDA_URL;
 };
 
-/** `SITUACAO` correspondente a cada tipo de ato — o espelho de `dou.SITUACAO_POR_TIPO`. */
-const SITUACAO_POR_TIPO: Readonly<Record<string, string>> = {
-  vacancia: 'VACÂNCIA',
-  aposentadoria: 'APOSENTADO',
-  exoneracao: 'EXONERADO',
-  falecimento: 'FALECIDO',
-  cessao: 'CEDIDO',
-};
-
-/**
- * Traz para dentro do painel as saídas que só o DOU conhece (D22).
- *
- * O ato já foi publicado; o Portal da Transparência é que ainda não entregou a
- * competência que mostraria a ausência (~2 meses de atraso). A pessoa JÁ ESTÁ no
- * `dados.csv` — ativa —, então aqui não se cria linha nova: sobrepõe-se a saída
- * ao registro que já existe. É por isso que ela chega à tela com concurso, área e
- * unidade, e responde aos filtros como qualquer outra.
- *
- * POR QUE ISTO ACONTECE NO NAVEGADOR, e não no `construir_painel.py`. Porque o
- * `construir_painel.py` depende dos snapshots do Portal, que não estão no Git e
- * portanto não existem no CI. Quem roda todo dia é a varredura do DOU, que
- * atualiza o `atos_dou.json`. Se a mescla morasse só no Python, uma saída
- * descoberta hoje esperaria a próxima execução local para aparecer — que é
- * exatamente a defasagem que esta mescla existe para eliminar.
- *
- * TRÊS GUARDAS CONTRA CONTAR ERRADO, que era o motivo de estas saídas ficarem
- * fora das contagens até 15/08/2026:
- *
- *   - sobrepõe-se por `ID_SERVIDOR_PORTAL`, casado no Python por nome MAIS
- *     matrícula (D12 — nome não é chave). Ato sem id casado não entra;
- *   - só se aplica a quem NÃO tem `MES_SAIDA`. Quem o SIAPE já mostrou saindo
- *     fica com a versão do SIAPE, e uma pessoa com dois atos não vira duas
- *     saídas;
- *   - quem não está no `dados.csv` não entra de jeito nenhum — é o caso do ato
- *     sobre servidor de outro cargo ou já fora do quadro.
- */
-export const mesclarSaidasDoDou = (
-  registros: RegistroAuditor[],
-  saidasRecentes: SaidaRecenteDou[]
-): RegistroAuditor[] => {
-  const porId = new Map(saidasRecentes.filter((s) => s.idServidor).map((s) => [s.idServidor, s]));
-  if (porId.size === 0) return registros;
-
-  return registros.map((registro) => {
-    const saida = porId.get(registro.ID_SERVIDOR_PORTAL);
-    if (!saida) return registro;
-
-    // O SIAPE já mostrou esta pessoa sumindo, mas ninguém tinha achado o ato
-    // dela — ela aparecia como "saída sem ato identificado". O ato COMPLETA o
-    // motivo e não mexe na competência: quem sabe quando ela saiu é o cadastro,
-    // e o selo continua sendo SIAPE + DOU.
-    if (registro.MES_SAIDA) {
-      if (registro.MOTIVO_SAIDA || !saida.jaNoSiape) return registro;
-      return {
-        ...registro,
-        SITUACAO: SITUACAO_POR_TIPO[saida.tipo] ?? registro.SITUACAO,
-        MOTIVO_SAIDA: saida.rotulo,
-        FONTE_MOTIVO: 'DOU',
-        DATA_PUBLICACAO_SAIDA: saida.dataPublicacao,
-        ATO_SAIDA_TITULO: saida.titulo,
-        ATO_SAIDA_URL: saida.urlDou,
-        ATO_SAIDA_ARQUIVO: saida.arquivo ?? '',
-      };
-    }
-
-    return {
-      ...registro,
-      // A competência da PUBLICAÇÃO. Não é a data do fato — o ato costuma dizer
-      // "a contar de" alguns dias antes —, mas é a única que se tem antes de o
-      // SIAPE confirmar, e erra por dias, não por meses.
-      MES_SAIDA: saida.dataPublicacao.slice(0, 4) + saida.dataPublicacao.slice(5, 7),
-      SAIDA_NO_SIAPE: 'NÃO',
-      SITUACAO: SITUACAO_POR_TIPO[saida.tipo] ?? registro.SITUACAO,
-      MOTIVO_SAIDA: saida.rotulo,
-      FONTE_MOTIVO: 'DOU',
-      DATA_PUBLICACAO_SAIDA: saida.dataPublicacao,
-      ATO_SAIDA_TITULO: saida.titulo,
-      ATO_SAIDA_URL: saida.urlDou,
-      ATO_SAIDA_ARQUIVO: saida.arquivo ?? '',
-    };
-  });
-};
-
-/**
- * Preenche o órgão de destino que o rankingdosconcursos identificou (D24).
- *
- * O DOU responde "para onde" em 118 das 161 saídas por posse em outro cargo.
- * Nas outras, o ato de nomeação no órgão de chegada não foi achado — e a lacuna
- * não se fecha sozinha, porque a busca por nome no DOU parte de quem o SIAPE já
- * mostrou saindo. O ranking preenche parte dessa lacuna por outro caminho: ele
- * sabe em que concursos a pessoa foi aprovada.
- *
- * SÓ PREENCHE O QUE ESTÁ VAZIO. Quem já tem destino tem porque o DOU ou a
- * curadoria o deram, e essas duas fontes valem mais: o DOU é ato publicado, a
- * curadoria é gente que conferiu. O ranking nunca sobrepõe nem corrige nenhuma
- * das duas — é a camada de baixo, e a precedência do observatório continua
- * sendo CURADORIA > DOU > RANKING.
- *
- * O QUE O ARQUIVO JÁ RESOLVEU ANTES DE CHEGAR AQUI. O Python só escreve linha
- * com órgão em duas situações: sobrou UM candidato só, ou sobrou mais de um e a
- * marca azul "Nomeado" do site aponta exatamente um deles (D26). Aprovação em
- * concurso não é posse, e quem passou em cinco concursos foi exercer no máximo
- * um. Caso ambíguo fica no arquivo sem `ORGAO_DESTINO`, aguardando curadoria, e
- * a guarda `|| !destino.ORGAO_DESTINO` abaixo é o que garante que ele não vaze
- * para a tela por descuido. Medida da regra contra os 123 destinos que o DOU já
- * conhece: 50 acertos em 53 publicados (94,3%).
- *
- * POR QUE NO NAVEGADOR, e não no `construir_painel.py`: o mesmo motivo da D22 —
- * o construtor depende dos snapshots do Portal, que não existem no CI, e quem
- * roda sozinho é o crawler. A mescla no Python atrasaria cada descoberta até a
- * próxima execução local.
- *
- * Recebe os registros JÁ MESCLADOS por `mesclarSaidasDoDou`: quem saiu e só o
- * DOU sabe também merece destino, e só depois daquela mescla essa pessoa tem
- * `MES_SAIDA`.
- */
-export const mesclarDestinosDoRanking = (
-  registros: RegistroAuditor[],
-  destinos: DestinoDoRanking[]
-): RegistroAuditor[] => {
-  const porId = new Map(
-    destinos.filter((d) => d.idServidor && d.orgaoDestino).map((d) => [d.idServidor, d])
-  );
-  if (porId.size === 0) return registros;
-
-  return registros.map((registro) => {
-    const destino = porId.get(registro.ID_SERVIDOR_PORTAL);
-    if (!destino || !destino.orgaoDestino) return registro;
-    // Sem saída registrada não há destino a preencher, e destino já preenchido
-    // veio de fonte melhor.
-    if (!registro.MES_SAIDA || registro.ORGAO_DESTINO) return registro;
-
-    return {
-      ...registro,
-      ORGAO_DESTINO: destino.orgaoDestino,
-      // Vem do CSV: `RANKING` ou `DIARIO` (D27). Escrever a fonte aqui à mão
-      // creditaria ao ranking o que foi lido de um ato publicado em diário.
-      FONTE_DESTINO: destino.fonteDestino || 'RANKING',
-      URL_DESTINO: destino.urlDestino,
-    };
-  });
-};
-
-/**
- * O `dados.csv` mais tudo o que chegou depois dele. **É ESTA que as páginas
- * chamam** — nenhuma delas deve chamar as duas mescladas soltas.
- *
- * Existe porque a regra "toda página que lê o `dados.csv` tem de mesclar" já
- * valia para uma mescla e passou a valer para duas, e uma regra que depende de
- * quatro páginas lembrarem da mesma sequência é uma regra que a próxima página
- * quebra. Aqui a sequência é uma linha, e a ORDEM — DOU antes do ranking — fica
- * garantida: o ranking preenche o destino de quem tem saída, e quem só o DOU
- * conhece só ganha `MES_SAIDA` na mescla anterior.
- *
- * Os dois argumentos aceitam lista vazia: o painel funciona sem nenhum dos dois
- * arquivos, mostrando só o que o SIAPE sabe. Falta de arquivo externo degrada a
- * tela, não a derruba.
- */
-export const mesclarFontesExternas = (
-  registros: RegistroAuditor[],
-  saidasRecentes: SaidaRecenteDou[],
-  destinosDoRanking: DestinoDoRanking[]
-): RegistroAuditor[] =>
-  mesclarDestinosDoRanking(mesclarSaidasDoDou(registros, saidasRecentes), destinosDoRanking);
-
-/**
- * Põe no histórico de alterações as saídas que só o DOU conhece (D22).
- *
- * O `alteracoes-registros.json` nasce do diff mês a mês do SIAPE, no
- * `construir_painel.py`, e por isso vai só até a última competência do Portal.
- * Quem saiu depois disso não aparecia em lugar nenhum desta página — nem como
- * saída, nem como pendência. Aqui elas entram no bloco do mês correspondente,
- * criando o mês se ele ainda não existir.
- *
- * Recebe os registros JÁ MESCLADOS por `mesclarSaidasDoDou`: é de lá que vêm
- * `SAIDA_NO_SIAPE`, a situação e a unidade.
- */
-export const acrescentarSaidasDoDou = (
-  log: LogDeAlteracoes,
-  registros: RegistroAuditor[]
-): LogDeAlteracoes => {
-  const soDoDou = registros.filter((r) => r.SAIDA_NO_SIAPE === 'NÃO' && r.MES_SAIDA);
-  if (soDoDou.length === 0) return log;
-
-  const porMes = new Map(log.history.map((mes) => [mes.mes, { ...mes, changes: [...mes.changes] }]));
-
-  for (const registro of soDoDou) {
-    const mes = porMes.get(registro.MES_SAIDA) ?? {
-      mes: registro.MES_SAIDA,
-      data: `${registro.MES_SAIDA.slice(0, 4)}-${registro.MES_SAIDA.slice(4)}-01`,
-      changeCount: 0,
-      changes: [],
-    };
-    // Uma pessoa só aparece uma vez no mês: se o SIAPE já a tivesse registrado
-    // saindo, ela não teria sido mesclada — mas a guarda é barata e o efeito de
-    // errar seria a mesma saída contada duas vezes na tela.
-    if (!mes.changes.some((mudanca) => mudanca.id === registro.ID_SERVIDOR_PORTAL)) {
-      mes.changes.push({
-        id: registro.ID_SERVIDOR_PORTAL,
-        nome: registro.NOME,
-        tipo: 'saida',
-        fromSituacao: SITUACAO_EM_EXERCICIO,
-        toSituacao: registro.SITUACAO,
-        orgaoDestino: registro.ORGAO_DESTINO,
-        unidade: registro.UNIDADE,
-        concurso: registro.CONCURSO,
-      });
-    }
-    porMes.set(mes.mes, mes);
-  }
-
-  // O JSON vem do mês mais novo para o mais antigo, e a página conta com isso.
-  const history = [...porMes.values()]
-    .map((mes) => ({ ...mes, changeCount: mes.changes.length }))
-    .sort((a, b) => b.mes.localeCompare(a.mes));
-
-  return {
-    ...log,
-    // O log deixou de ser só do SIAPE: dizer que a fonte é uma só passaria a ser
-    // falso justamente nas linhas mais recentes da página.
-    fonte: `${log.fonte}, e Diário Oficial da União para as saídas que o cadastro ainda não registrou`,
-    ultimoMes: history[0]?.mes ?? log.ultimoMes,
-    totalChangeCount: history.reduce((soma, mes) => soma + mes.changeCount, 0),
-    history,
-  };
-};
-
 /**
  * As fontes que atestam que a pessoa saiu (D20).
  *
- * `SIAPE` sai de graça para toda linha do `dados.csv` com `MES_SAIDA`: a
- * competência da saída é justamente o mês em que a pessoa deixou de aparecer no
- * cadastro depois de aparecer no anterior — é a definição da D13, não uma
- * inferência à parte. `DOU` entra quando há ato publicado.
+ * `SIAPE` sai de graça para toda saída que veio do cadastro: a competência da
+ * saída é justamente o mês em que a pessoa deixou de aparecer no SIAPE depois de
+ * aparecer no anterior — é a definição da D13, não uma inferência à parte. `DOU`
+ * entra quando há ato publicado.
  */
 export const fontesDaSaida = (registro: RegistroAuditor): string[] => {
   const fontes: string[] = [];
-  // `SAIDA_NO_SIAPE = 'NÃO'` só existe nas linhas que `mesclarSaidasDoDou`
-  // sobrepôs: ali o ato saiu e o cadastro ainda não mostrou a ausência.
+  // `SAIDA_NO_SIAPE = 'NÃO'` marca as linhas que `publicacao.py` sobrepôs com um
+  // ato: ali o DOU já publicou e o cadastro ainda não mostrou a ausência.
   if (registro.MES_SAIDA && registro.SAIDA_NO_SIAPE !== 'NÃO') fontes.push('SIAPE');
   if (registro.FONTE_MOTIVO) fontes.push(registro.FONTE_MOTIVO);
   return [...new Set(fontes)];

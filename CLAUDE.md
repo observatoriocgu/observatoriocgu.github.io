@@ -151,6 +151,14 @@ Edital CGU nº 5 de 13/06/2022, publicado no DOU (D17).
 - dou.py               biblioteca: rede, busca, cache, classificação de atos
 - atos.py              biblioteca: o índice único dos atos (data/atos_dou.csv)
 - painel.py            biblioteca: derivação dos snapshots (sem rede)
+- publicacao.py        biblioteca: a mescla das fontes externas sobre o dados.csv
+                       (D29). Pura, sem I/O
+- gerar_publicacao.py  gera os arquivos FINAIS que o site lê: data/painel.csv e
+                       public/alteracoes.json. Roda na publicação, pelo `prebuild`
+                       do npm — não é commitado
+- testar_publicacao.py regressão da mescla, sem rede. RODAR SEMPRE que mexer em
+                       publicacao.py: cada caso ali decide, sobre pessoa nomeada,
+                       se ela saiu, quando, por quê e para onde
 - construir_painel.py  gera historico_mensal / dados / serie / alteracoes
 - concurso.py          resultado final do concurso, a partir de 1 ato do DOU
 - enriquecer_saidas.py motivo e destino de cada saída, buscando por NOME no DOU
@@ -184,8 +192,8 @@ Edital CGU nº 5 de 13/06/2022, publicado no DOU (D17).
 - Por NOME (`enriquecer_saidas.py`): parte do dados.csv, logo do SIAPE. Desde
   16/08/2026 a fila inclui TAMBÉM as saídas que só o DOU conhece (lidas do
   `public/atos_dou.json`), e para ELAS grava só o DESTINO — motivo e situação
-  quem põe é `mesclarSaidasDoDou`, no navegador, senão o dados.csv afirmaria
-  que alguém saiu sem dizer quando. Antes disso essas pessoas NUNCA tinham o
+  quem põe é `publicacao.mesclar_saidas_do_dou`, na publicação, senão o dados.csv
+  afirmaria que alguém saiu sem dizer quando. Antes disso essas pessoas NUNCA tinham o
   destino procurado no DOU: a busca não falhava, ela não era feita. Foi assim
   que a PORTARIA-TCU nº 117 de 04/08/2026, que nomeia três Auditores da CGU
   para o TCU, ficou fora do observatório estando a uma busca de distância
@@ -202,12 +210,13 @@ Edital CGU nº 5 de 13/06/2022, publicado no DOU (D17).
   detalhada e histórico. Ela não é linha nova — é
   SOBREPOSTA ao registro da pessoa, que já está no dados.csv como ativa, e por
   isso chega à tela com concurso, área e unidade e responde aos filtros
-- Quem faz a sobreposição é `mesclarSaidasDoDou` (lib/painel.ts), NO NAVEGADOR,
-  e não o construir_painel.py. Não é preferência: o construir_painel depende dos
-  snapshots do Portal, que estão fora do Git e não existem no CI. Quem roda todo
-  dia é a varredura do DOU. Se a mescla morasse no Python, uma saída descoberta
-  hoje esperaria a próxima execução local — a defasagem que ela existe para
-  eliminar. Toda página que lê dados.csv TEM de passar por ela
+- Quem faz a sobreposição é `publicacao.mesclar_saidas_do_dou`, e ela NÃO mora no
+  construir_painel.py: o construtor depende dos snapshots do Portal, que estão
+  fora do Git e não existem no CI, e quem roda todo dia é a varredura do DOU. A
+  mescla, essa, só lê arquivo versionado — por isso roda na PUBLICAÇÃO (D29), e
+  uma saída descoberta hoje vai ao ar hoje. Até 16/08/2026 ela rodava no
+  NAVEGADOR pela mesma razão, com o preço de toda página ter de lembrar de
+  chamá-la; ver a seção da D29
 - Três guardas contra contar errado, e nenhuma pode sair: casa por
   ID_SERVIDOR_PORTAL (nome + matrícula, no Python, D12); só se aplica a quem
   NÃO tem MES_SAIDA, senão quem tem dois atos vira duas saídas; quem não está no
@@ -232,6 +241,38 @@ Edital CGU nº 5 de 13/06/2022, publicado no DOU (D17).
   falecimento, e era classificado como falecimento — mas o ato é sobre o
   pensionista, sai muito depois do óbito e o instituidor pode ser aposentado ou
   TFFC (fora do escopo, D7). Ver dou.PADROES_PENSAO
+
+## O site lê arquivo FINAL, não monta dado (D29, 16/08/2026)
+- A interface NÃO lê mais o `dados.csv`. Ela lê `data/painel.csv` e
+  `public/alteracoes.json`, que já chegam mesclados. Quem os escreve é
+  `gerar_publicacao.py`, na hora de publicar o site. NÃO reintroduzir mescla no
+  navegador: `mesclarFontesExternas`, `mesclarSaidasDoDou`,
+  `mesclarDestinosDoRanking`, `acrescentarSaidasDoDou` e `comoDestinosDoRanking`
+  SAÍRAM do `lib/painel.ts` e não devem voltar
+- OS DOIS ARQUIVOS GERADOS NÃO VÃO PARA O GIT, e isso é a metade que importa da
+  decisão. Se fossem commitados, três produtores em ritmos diferentes (mensal
+  local, diário no CI, semanal no CI) teriam de LEMBRAR de regerá-los, e quem
+  esquecesse publicaria dado velho em silêncio. Gerados na publicação, eles saem
+  sempre do que está commitado naquele instante
+- POR QUE ISTO PODE RODAR NO CI e o `construir_painel.py` não: as quatro entradas
+  da mescla (`dados.csv`, `atos_dou.json`, `destinos_ranking.csv`,
+  `alteracoes-registros.json`) estão TODAS no Git. O construtor é que depende dos
+  49 snapshots do Portal (~70 MB, fora do Git). A frase "a mescla tem de ser no
+  navegador porque o Python não roda no CI" era verdadeira sobre o
+  `construir_painel.py`, e só sobre ele
+- O FRESCOR NÃO MUDOU: o `deploy-pages.yml` dispara a cada push na main E ao fim
+  do workflow do DOU, e é ele que regera. Saída publicada hoje vai ao ar hoje
+- `npm run dev`, `build` e `preview` chamam o gerador pelo `prebuild`/`predev` —
+  mexer no front passa a exigir Python instalado. Custo aceito pelo usuário em
+  16/08/2026, junto com o de o dado publicado não ser mais inspecionável por
+  `git diff`
+- A ÚNICA coluna que existe no `painel.csv` e não no `dados.csv` é
+  `SAIDA_NO_SIAPE`. Vazio = o cadastro confirmou; `NÃO` = só o ato do DOU
+  conhece a saída. É dela que `fontesDaSaida` tira o selo
+- O PORTE FOI PROVADO, não argumentado: o TypeScript da mescla foi compilado com
+  o esbuild e rodado sobre a base inteira, e as 2.009 linhas × 35 colunas e o log
+  de 729 mudanças em 48 competências saíram idênticos aos do Python. Se um dia a
+  mescla mudar de linguagem de novo, é assim que se confere
 
 ## O destino pelo Ranking dos Concursos (D24, 15/08/2026)
 - A ordem é SEMPRE `já sabendo que a pessoa saiu (SIAPE/DOU) -> procurar para
@@ -278,12 +319,12 @@ Edital CGU nº 5 de 13/06/2022, publicado no DOU (D17).
   primeira varredura. `pagina_respondeu_a_busca` exige que o formulário ecoe o
   nome consultado; sem eco, não é resposta. Pausa de 3s e `None` (nunca `[]`)
   quando não se consegue perguntar
-- O resultado NÃO entra no `dados.csv`: é mesclado no NAVEGADOR, por
-  `mesclarDestinosDoRanking`, pelo mesmo motivo da D22. Só preenche destino
-  VAZIO — a precedência é CURADORIA > DOU > RANKING
-- Toda página que lê `dados.csv` chama `mesclarFontesExternas`, e não as duas
-  mescladas soltas: são duas agora, e uma regra que depende de quatro páginas
-  lembrarem da mesma sequência é uma regra que a quinta página quebra
+- O resultado NÃO entra no `dados.csv`: é mesclado na PUBLICAÇÃO, por
+  `publicacao.mesclar_destinos_do_ranking`, pelo mesmo motivo da D22. Só preenche
+  destino VAZIO — a precedência é CURADORIA > DOU > RANKING
+- Chama-se `publicacao.mesclar_fontes_externas`, e não as duas mescladas soltas:
+  são duas, e a ORDEM importa — o ranking preenche destino de quem tem saída, e
+  quem só o DOU conhece só ganha MES_SAIDA na mescla anterior
 
 ## A marca azul do ranking desempata (D26, 16/08/2026)
 - A marca azul "Nomeado" AFIRMA UM FATO — a pessoa foi nomeada naquele concurso.

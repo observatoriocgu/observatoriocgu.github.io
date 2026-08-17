@@ -4,8 +4,12 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
+    "publicacao": "python scripts/gerar_publicacao.py",
+    "predev": "npm run publicacao",
     "dev": "vite",
+    "prebuild": "npm run publicacao",
     "build": "vite build",
+    "prepreview": "npm run publicacao",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit"
   },

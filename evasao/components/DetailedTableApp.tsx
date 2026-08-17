@@ -8,10 +8,9 @@ import {
   SITUACAO_EM_EXERCICIO,
   rotuloDoConcurso,
 } from '../constants';
-import { RegistroAuditor, SaidasDou } from '../types';
+import { RegistroAuditor } from '../types';
 import {
   carregarCsv,
-  carregarJsonPublico,
   formatarCompetenciaLonga,
   formatarDataIsoParaBr,
 } from '../lib/dados';
@@ -19,8 +18,6 @@ import {
   areaDe,
   comoRegistros,
   fontesDaSaida,
-  comoDestinosDoRanking,
-  mesclarFontesExternas,
   motivoDetalhado,
   saiuDaCgu,
   urlDoAto,
@@ -300,24 +297,15 @@ const DetailedTableApp: React.FC = () => {
     let montado = true;
     (async () => {
       try {
-        // O JSON do DOU é opcional: sem ele a tabela ainda se lê, só volta a
-        // parar na última competência do SIAPE. As saídas que só o DOU conhece
-        // são sobrepostas às linhas de quem ainda consta como em exercício
-        // (D22) — sem isto, quem saiu em agosto aparece aqui trabalhando.
-        const [linhas, dou, destinos] = await Promise.all([
-          carregarCsv('dados.csv'),
-          carregarJsonPublico<SaidasDou>('atos_dou.json').catch(() => null),
-          carregarCsv('destinos_ranking.csv').catch(() => []),
-        ]);
-        if (montado) {
-          setRegistros(mesclarFontesExternas(
-            comoRegistros(linhas),
-            dou?.saidasRecentes ?? [],
-            comoDestinosDoRanking(destinos),
-          ));
-        }
+        // Um arquivo só, e já pronto (D29): o `painel.csv` é o `dados.csv` com as
+        // saídas que só o DOU conhece sobrepostas (D22) e os destinos do ranking
+        // preenchidos (D24). Sem aquela sobreposição, quem saiu em agosto
+        // apareceria aqui trabalhando — mas quem a faz é o Python, na publicação,
+        // e não esta página.
+        const linhas = await carregarCsv('painel.csv');
+        if (montado) setRegistros(comoRegistros(linhas));
       } catch (falha) {
-        if (montado) setErro(falha instanceof Error ? falha.message : 'Erro ao carregar dados.csv.');
+        if (montado) setErro(falha instanceof Error ? falha.message : 'Erro ao carregar painel.csv.');
       } finally {
         if (montado) setCarregando(false);
       }
