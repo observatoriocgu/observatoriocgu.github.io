@@ -22,14 +22,19 @@ name: Atualizar o quadro de AFFC da CGU (SIAPE)
 # disco do runner; o que este workflow commita são os 89 KB do snapshot mais os
 # derivados que já eram versionados.
 #
-# MENSAL, dia 15. O Portal publica com ~2 meses de atraso e sem dia fixo; se a
-# competência ainda não saiu, o passo devolve "aguardando publicação" em segundos
-# e o resto do pipeline roda igual, sem gravar nada de novo.
+# MENSAL, insistindo do dia 15 ao 28. O Portal publica com ~2 meses de atraso e
+# SEM DIA FIXO — não há garantia nenhuma de que a competência esteja no ar no dia
+# 15. Por isso o cron tenta todo dia dessa janela, e quem torna isso barato é o
+# primeiro passo do job: um `--dry-run` que pergunta ao Portal, em segundos, se
+# há mês novo. Sem mês novo, o resto do job é pulado — nada de crawl do DOU
+# repetido (o workflow diário já o faz) nem commit vazio.
 
 on:
   schedule:
-    # 06:00 UTC do dia 15 = 03:00 em Brasília. Fora de qualquer pico.
-    - cron: '0 6 15 * *'
+    # 06:00 UTC = 03:00 em Brasília, fora de qualquer pico. Do dia 15 ao 28:
+    # depois do 28 não insiste mais — se o Portal está há duas semanas sem
+    # publicar, esperar o ciclo seguinte é mais honesto que martelar.
+    - cron: '0 6 15-28 * *'
   workflow_dispatch:
     inputs:
       sem_dou:
@@ -64,14 +69,39 @@ jobs:
         with:
           python-version: '3.12'
 
+      # O curto-circuito da janela 15-28: um HEAD por competência pendente, sem
+      # baixar um byte. A resposta sai na linha-resumo do `--dry-run`
+      # ("A baixar: N | ..."), que é CONTRATO deste grep — há um aviso no print
+      # do script. "A baixar: 0" = o Portal ainda não publicou; o resto do job
+      # é pulado. O dispatch MANUAL ignora o curto-circuito: quem clicou quer o
+      # ciclo inteiro, e o pipeline sem mês novo continua barato e inofensivo.
+      # Um `--dry-run` que falhe (buraco na série, Portal sem resposta) derruba
+      # o job aqui mesmo, de propósito: isso não se resolve esperando.
+      - name: Há competência nova no Portal?
+        id: novidade
+        if: github.event_name == 'schedule'
+        run: |
+          set -o pipefail
+          python scripts/baixar_transparencia.py --dry-run 2>&1 | tee /tmp/dryrun.log
+          if grep -qE '^(A baixar: 0 \||Nada a fazer:)' /tmp/dryrun.log; then
+            echo "baixar=nao" >> "$GITHUB_OUTPUT"
+            echo "Sem competência nova — o resto do job será pulado."
+          else
+            echo "baixar=sim" >> "$GITHUB_OUTPUT"
+          fi
+        working-directory: evasao
+        shell: bash
+
       # ANTES do crawler, e é a mesma razão escrita no workflow de destinos:
       # melhor falhar aqui do que gravar motivo ou destino errado sobre pessoa
       # nomeada e commitar. Os dois testes são sem rede e levam segundos.
       - name: Testar a leitura de atos do DOU
+        if: github.event_name != 'schedule' || steps.novidade.outputs.baixar == 'sim'
         run: python scripts/testar_dou.py
         working-directory: evasao
 
       - name: Testar a mescla das fontes externas
+        if: github.event_name != 'schedule' || steps.novidade.outputs.baixar == 'sim'
         run: python scripts/testar_publicacao.py
         working-directory: evasao
 
@@ -80,6 +110,7 @@ jobs:
       # etapa fica no log deste passo E vai para o corpo do commit, logo abaixo.
       - name: Rodar o pipeline mensal
         id: pipeline
+        if: github.event_name != 'schedule' || steps.novidade.outputs.baixar == 'sim'
         run: |
           set -o pipefail
           python scripts/atualizar.py --baixar ${{ inputs.sem_dou && '--sem-dou' || '' }} \
@@ -87,6 +118,7 @@ jobs:
         working-directory: evasao
 
       - name: Commit e push do que mudou
+        if: github.event_name != 'schedule' || steps.novidade.outputs.baixar == 'sim'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
