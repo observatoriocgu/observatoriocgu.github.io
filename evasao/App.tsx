@@ -592,10 +592,10 @@ const App: React.FC = () => {
             </p>
             <p className="mb-3 text-sm text-gray-500">
               Os selos dizem quem atesta cada saída.{' '}
-              <span className="text-sky-300">SIAPE</span> é o cadastro de pessoal do Portal da Transparência, que vai
+              <span className="font-medium text-gray-300">SIAPE</span> é o cadastro de pessoal do Portal da Transparência, que vai
               até {resumoDoDou ? formatarCompetenciaLonga(resumoDoDou.ultimaCompetenciaSiape) : 'a última competência'} e
               mostra a pessoa presente num mês e ausente no seguinte.{' '}
-              <span className="text-amber-300">DOU</span> é o ato publicado no Diário Oficial, que sai no dia. Saída
+              <span className="font-medium text-gray-300">DOU</span> é o ato publicado no Diário Oficial, que sai no dia. Saída
               recente costuma ter só o selo do DOU: o ato já existe e o Portal, que atrasa cerca de dois meses, ainda
               não a registrou.
             </p>
