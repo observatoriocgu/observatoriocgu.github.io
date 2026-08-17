@@ -52,7 +52,11 @@ Edital CGU nº 5 de 13/06/2022, publicado no DOU (D17).
   construir_painel.py, e dados.csv e serie_mensal.csv saem dos SNAPSHOTS, não
   dele — nenhum código o lê. Serve para auditar a série à mão. A D16 dizia que
   dados.csv e serie_mensal.csv derivavam dele; nunca derivaram, e versionar o
-  arquivo custava 20,7 MB reescritos por competência, publicados no site
+  arquivo custava 20,7 MB reescritos por competência, publicados no site.
+  REBAIXADA POR ESCRITO em 17/08/2026: a prova está na ordem de chamada —
+  `gerar_historico` é o ÚLTIMO a rodar no construir_painel, depois das camadas de
+  enriquecimento, e RECEBE `pessoas` como argumento. A suposta base é derivada do
+  que ela alimentaria
 - historico_mensal.csv e dados.csv são DERIVADOS. Nunca editar à mão. Correção
   humana vai em data/curadoria.csv, que vence sobre DOU e SIAPE no merge
 - Unidade se conta pelo CÓDIGO (COD_UORG_LOTACAO), nunca pelo nome: o nome

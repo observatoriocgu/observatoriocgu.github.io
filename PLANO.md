@@ -12,8 +12,9 @@ nem nas contagens.
 
 **Revisão de 14/08/2026 (D11, D16, D17):** a fonte primária passou a ser a **diferença mês a mês do
 SIAPE** (Portal da Transparência). O universo é **quem saiu efetivamente da CGU**, apurado pelo
-SIAPE e confirmado no DOU. Os 49 snapshots viram uma **base consolidada empilhada**
-(`historico_mensal.csv`, **D16**), que é o banco do observatório. A **área do concurso de entrada
+SIAPE e confirmado no DOU. Os 49 snapshots viram **uma linha por pessoa**
+(`dados.csv`), que é o que a interface consome; empilhados, viram também um dump de
+auditoria (`historico_mensal.csv`, **D16**, rebaixada), que não alimenta nada. A **área do concurso de entrada
 fica dentro do escopo** e vem do próprio DOU (**D17**) — o que ficou para a Fase 7 é o concurso de
 **destino** ("para onde o fulano foi", "quem está estudando pra sair"). Isso superou a Fase 2 (v1)
 e absorveu a Fase 4 — ambas ficam no plano como registro, marcadas.
@@ -50,7 +51,7 @@ Todas as decisões abaixo estão **fechadas**. As fases podem ser executadas sem
 | D9 | Veteranos e múltiplos concursos | Fases 2-4 | coluna **`CONCURSO`** própria (`CGU-2021`, `CGU-2026`, … , `VETERANO`), separada de `AREA`. Tudo num arquivo só. Um concurso novo = um valor novo, não um arquivo novo |
 | D10 | Card "dias sem perder um Auditor" | Fase 2.5 | fonte passa a ser o **DOU**, não o `dados.csv`. Conta só atos **da CGU** (exclui AFFC cedidos, cujo ato sai por outro órgão). O trecho arquivado é **HTML** do ato, não PDF. Recorde de dias **removido** do card |
 | D11 | Fonte primária do painel | Fases 2-4 | a **diferença mês a mês do SIAPE** (Portal da Transparência) é a espinha do observatório. Todos os arquivos de dado passam a ser **derivados**, nunca editados à mão. *(Revisado em 14/08/2026: o **resultado final do concurso entra**, mas pelo **DOU**, não pelo site da FGV — ver D17. O que fica fora é concurso de **destino**, para onde a pessoa foi depois de sair.)* |
-| D16 | Base consolidada para a UI | Fases 2-3 | `historico_transparencia_cgu/` é empilhada em **`data/historico_mensal.csv`** — uma linha por (competência × pessoa), 17 colunas das 43, com `MES`, `CONCURSO` e `AREA` acrescentados. É **a** base do observatório; `dados.csv` e `serie_mensal.csv` passam a ser derivados dela |
+| D16 | ~~Base consolidada para a UI~~ → **dump de auditoria** | Fases 2-3 | `historico_transparencia_cgu/` é empilhada em **`historico_mensal.csv`** — uma linha por (competência × pessoa), 17 colunas das 43, com `MES`, `CONCURSO` e `AREA`. **REBAIXADA em 17/08/2026:** a redação original dizia que ele era *a* base do observatório e que `dados.csv` e `serie_mensal.csv` derivavam dele. **Nunca derivaram.** Os três produtos leem os SNAPSHOTS em memória (`painel.carregar`), e `gerar_historico` é o ÚLTIMO a rodar — depois das camadas de enriquecimento — e ainda recebe `pessoas` como argumento: a suposta base é *downstream* do que ela alimentaria. Nenhum código Python o lê, nenhum TypeScript o carrega. O que ele é de fato: um **dump de 20,8 MB para auditar a série à mão**, fora do Git, regenerável. Isso é útil e continua existindo — só não é base de nada |
 | D17 | Área do concurso | Fase 2 | vem do **DOU**, não de crawler de banca: o `Edital CGU nº 5 de 13/06/2022` traz, **numa requisição**, inscrição, nome, nota, classificação, modalidade e área de especialização dos 488 aprovados AFFC. Vale igual para o CGU-2026 quando o edital sair |
 | D12 | Chave de identidade | Fases 2-3 | **`Id_SERVIDOR_PORTAL`**, e só ele. **Revoga** a cadeia `INSCRICAO → MASP → HGV-0 → NOME` e o par `CONCURSO + INSCRICAO` da D9. Nome **nunca** é chave (homônimos) |
 | D13 | Definição de "saiu da CGU" | Fase 2 | ausência do conjunto CGU (`COD_ORG_LOTACAO = 59000`) **a partir da última presença**, nunca por diff par a par. Saída detectada no snapshot mais novo nasce **provisória** |
@@ -637,7 +638,7 @@ de teste de aceitação do pipeline. Todos os recortes usam **uma regra só**, a
 | Fato | Valor |
 |---|---|
 | Snapshots | 49, `202206`→`202606`, **sem lacunas** |
-| Linhas empilhadas na base consolidada (**D16**) | **88.421** |
+| Linhas empilhadas no dump de auditoria (**D16**) | **88.421** |
 | Pessoas distintas vistas na CGU no período | 2.009 |
 | Efetivo CGU `202206` → `202606` | 1.559 → **1.741** |
 | **Saídas confirmadas no período** | **268** |
@@ -672,7 +673,7 @@ de teste de aceitação do pipeline. Todos os recortes usam **uma regra só**, a
 4. **`DATA_INGRESSO_ORGAO` muta para 6 pessoas** em 2.009 — usar o valor **modal** da série, não o
    do último snapshot.
 
-### Três armadilhas que a base consolidada cria
+### Três armadilhas da série mês a mês
 
 Medidas nesta rodada. As três produzem gráfico plausível e **errado** se ninguém souber delas.
 
@@ -745,7 +746,7 @@ rodar o pipeline de novo apaga o trabalho do crawler e da curadoria.
 | Camada | Arquivo | Git | Quem escreve |
 |---|---|---|---|
 | Fonte bruta | `data/historico_transparencia_cgu/*.csv` | ignorado (~70 MB) | download manual + `filtrar_affc.py` |
-| **Derivado (D16)** | **`data/historico_mensal.csv`** — 88.421 linhas, ~21 MB | commitado | `construir_painel.py` — regenerável do zero, **jamais editado à mão** |
+| Dump de auditoria (D16, rebaixada) | `historico_transparencia_cgu/historico_mensal.csv` — 88.421 linhas, 20,8 MB | **ignorado** — ninguém o lê | `construir_painel.py` — regenerável do zero, **jamais editado à mão** |
 | Derivado | `data/dados.csv` — 2.009 linhas, uma por pessoa | commitado | idem |
 | Derivado | `data/serie_mensal.csv` — 49 linhas, uma por mês | commitado | idem |
 | **Enriquecido** | `data/dou/por_pessoa.csv` | commitado | `enriquecer_saidas.py` — acumulativo, só acrescenta |
@@ -762,7 +763,7 @@ Precedência do merge: **curadoria > DOU > SIAPE**.
 > **modelo de vigência** — uma linha por período estável em vez de uma por mês, **10.840 linhas
 > (12%)**, mesma informação — sem mudar mais nada no resto da arquitetura.
 
-### 2.2 Esquema do `historico_mensal.csv` (D16) — a base consolidada
+### 2.2 Esquema do `historico_mensal.csv` (D16) — o dump de auditoria
 
 Uma linha por **(competência × pessoa)**: 88.421 linhas, 17 colunas das 43 originais.
 
@@ -844,7 +845,8 @@ máquina. Os dois crawlers atuais já são stdlib pura (urllib + fallback `curl`
     `COD_ORG_LOTACAO` (3 casos) → `MOTIVO_SAIDA = MUDOU DE ÓRGÃO NA CARREIRA`, `ORGAO_DESTINO` = o
     órgão novo, `FONTE_DESTINO = SIAPE`
   - concurso: `MES_ENTRADA == 202206` → `VETERANO`; senão `CGU-2021`
-  - **empilha** os snapshots em `historico_mensal.csv` (**D16**), com `MES`, `CONCURSO` e `AREA`
+  - **empilha** os snapshots em `historico_mensal.csv` (**D16**), com `MES`, `CONCURSO` e `AREA` —
+    dump de auditoria, não insumo: é o último a ser gerado e ninguém o lê
   - normalizar `UORG_LOTACAO` (38 grafias para 34 códigos) com tabela de-para explícita:
     `CONTROLADORIA-GERAL DA UNIAO` e `CGU` → mesma unidade sede; `CONTR REGIONAL DO ESTADO - RJ` →
     `CGU-Regional/RJ`. **A identidade da unidade é o `COD_UORG_LOTACAO`** — o nome é só rótulo
