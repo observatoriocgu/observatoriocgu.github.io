@@ -7,17 +7,22 @@ mês em portaldatransparencia.gov.br/download-de-dados/servidores e descompactar
 o `AAAAMM_Cadastro.csv` em `evasao/data/historico_transparencia_cgu/`.
 
 O que ele faz:
-  1. olha a pasta e vê quais competências de 202206 até o mês atual não têm
-     `AAAAMM_Cadastro_filtrado_AFFC.csv`;
+  1. olha os snapshots VERSIONADOS (`data/siape/AAAAMM.csv.gz`) e vê quais
+     competências de 202206 até o mês atual faltam — a pergunta é respondida
+     pelo repositório, não pela pasta de trabalho local (D32);
   2. baixa o ZIP de cada uma que falta (equivale a marcar "exercício atual",
      "mês atual" e "planilha Servidores_SIAPE" na tela do portal);
   3. extrai só o `AAAAMM_Cadastro.csv` — os outros três membros do ZIP
      (Remuneração, Afastamentos, Observações) são descartados;
-  4. chama o `filtrar_affc.py` para reduzir o bruto (~420 MB) aos AFFC.
+  4. chama o `filtrar_affc.py`, que reduz o bruto (~420 MB) aos AFFC e às 16
+     colunas que a derivação lê, e grava `data/siape/AAAAMM.csv.gz` (~89 KB).
 
-O caso de uso normal é o mês novo: com a pasta já preenchida, sobra uma
-competência ou nenhuma. Com a pasta vazia, ele faz o backfill inteiro — 49
-meses, ~4 GB de download.
+O caso de uso normal é o mês novo: com a série em dia, sobra uma competência ou
+nenhuma. Com a pasta vazia, ele faz o backfill inteiro — ~4 GB de download.
+
+RODA IGUAL NA MÁQUINA E NO CI. O que ele grava são os ~89 KB do snapshot; o ZIP e
+o CSV de 420 MB são efêmeros nos dois lugares. É o que permite ao workflow mensal
+fazer a rotina inteira sem que ninguém baixe nada à mão.
 
 O PORTAL ATRASA. Em agosto/2026 a competência mais recente publicada era
 junho/2026: os dois últimos meses do intervalo esperado normalmente ainda não
@@ -58,6 +63,7 @@ if str(AQUI) not in sys.path:
     sys.path.insert(0, str(AQUI))
 
 import filtrar_affc  # noqa: E402  (só resolve depois de ajustar o sys.path)
+import painel  # noqa: E402
 
 RAIZ = AQUI.parent
 PASTA_PADRAO = RAIZ / "data" / "historico_transparencia_cgu"
@@ -128,7 +134,17 @@ def intervalo(inicio: str, fim: str) -> list[str]:
 
 
 def caminho_filtrado(pasta: Path, comp: str) -> Path:
-    return pasta / f"{comp}_Cadastro{filtrar_affc.SUFIXO_SAIDA}.csv"
+    """
+    O snapshot VERSIONADO da competência — e repare que ele não depende de
+    `pasta` (D32).
+
+    É de propósito: a pergunta "o que já foi carregado?" tem de ser respondida
+    pelo que está no repositório, não pelo que sobrou na pasta de trabalho de
+    quem roda. Assim a resposta é a mesma na sua máquina e no CI, e um bruto
+    esquecido no disco não faz o script pular uma competência que o projeto
+    ainda não tem.
+    """
+    return painel.PASTA_SNAPSHOTS / f"{comp}.csv.gz"
 
 
 def caminho_bruto(pasta: Path, comp: str) -> Path:

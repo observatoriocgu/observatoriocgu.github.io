@@ -148,10 +148,10 @@ Edital CGU nº 5 de 13/06/2022, publicado no DOU (D17).
   ALVES, sem matrícula em nenhum dos dois
 
 ## Pipeline de dados (evasao/scripts/)
-- atualizar.py         comando único: filtra -> constrói -> DOU -> reconstrói
+- atualizar.py         comando único: filtra -> constrói -> DOU -> reconstrói.
+                       Com --baixar, busca antes os snapshots que faltam (D32)
 - baixar_transparencia.py  baixa do Portal os snapshots que faltam e chama o
-                       filtro. NÃO é chamado pelo atualizar.py — roda à parte,
-                       antes dele, no lugar dos passos 1-2 da rotina mensal
+                       filtro. É o passo 0 do atualizar.py, com --baixar (D32)
 - dou.py               biblioteca: rede, busca, cache, classificação de atos
 - atos.py              biblioteca: o índice dos atos de SAÍDA (data/dou/atos_saida.csv)
 - atos_destino.py      biblioteca: o índice dos atos de DESTINO, publicados pelo
@@ -252,6 +252,38 @@ Edital CGU nº 5 de 13/06/2022, publicado no DOU (D17).
   falecimento, e era classificado como falecimento — mas o ato é sobre o
   pensionista, sai muito depois do óbito e o instituidor pode ser aposentado ou
   TFFC (fora do escopo, D7). Ver dou.PADROES_PENSAO
+
+## O SIAPE entra sozinho (D32, 17/08/2026)
+- OS SNAPSHOTS SÃO VERSIONADOS: `data/siape/AAAAMM.csv.gz`, 16 colunas, 89 KB por
+  competência, ARQUIVO NOVO a cada mês e nunca reescrito. 4,4 MB a série inteira,
+  ~1 MB/ano. A pasta `historico_transparencia_cgu/` continua ignorada e passou a
+  ser só a área de trabalho do download (ZIP + CSV bruto, efêmeros)
+- POR QUE ISSO NÃO É "FLOOD" DE GIT: o repositório já reescreve 400 KB do
+  dados.csv, 200 KB do alteracoes-registros.json e 100 KB do atos_saida.csv POR
+  COMPETÊNCIA. O snapshot é menor que isso e é append-only
+- AS 16 COLUNAS SAEM DE `painel.COLUNAS_NO_SNAPSHOT`, e o `filtrar_affc.py` LÊ
+  DALI. Não duplicar a lista: coluna acrescentada num lado e esquecida no outro
+  nasce vazia sem erro nenhum (foi o que aconteceu com ATO_DESTINO_ARQUIVO)
+- O CPF FICA DE FORA, e essa é a razão principal da projeção — não o tamanho. O
+  Portal o publica mascarado (`***.930.011-**`), mas são 6 dos 11 dígitos ao lado
+  do nome completo, e o snapshot vai para repositório público. Saem junto função
+  comissionada, afastamentos e diplomas de ingresso
+- NÃO EXISTE DERIVAÇÃO INCREMENTAL, e não é por preguiça: `MES_ENTRADA` é a
+  primeira aparição na série e `MES_SAIDA` é o mês seguinte à ÚLTIMA presença
+  (D13), com 6 pessoas que somem e voltam. Processar só o mês novo exigiria uma
+  SEGUNDA definição de "saiu" — a duplicação que a D31 acabou de remover do lado
+  do DOU. Por isso o CI precisa da série inteira, e por isso ela é versionada
+- `atualizar.py --baixar` é o passo 0 (opt-in: o backfill do zero baixa ~4 GB)
+- O ESTADO É LIDO DO REPOSITÓRIO, não da pasta local: `caminho_filtrado` aponta
+  para `data/siape/`, então "o que já foi carregado?" tem a mesma resposta na sua
+  máquina e no CI
+- `atualizar-siape.yml` roda dia 15, faz a rotina INTEIRA e commita. Os testes
+  sem rede rodam ANTES do crawler, como no workflow de destinos. O RESUMO DO
+  PIPELINE VAI NO CORPO DO COMMIT — sugestões de curadoria, saídas sem motivo,
+  gente que sumiu e voltou. Num log de workflow esses avisos morrem; no commit,
+  chegam por e-mail a quem acompanha o repositório
+- O dump de auditoria mudou de lugar: `data/auditoria/historico_mensal.csv`,
+  ignorado. Ele é 20,8 MB REESCRITOS por competência — o oposto do snapshot
 
 ## Uma regra só para "de quem é o ato" (D31, 17/08/2026)
 - Quem responde é `atos.dono_do_ato` (ato -> pessoa) e `dou.identidade_no_ato`

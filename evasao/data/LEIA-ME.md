@@ -7,8 +7,9 @@
 
 | Arquivo | Como nasce | Editar à mão? |
 |---|---|---|
-| `historico_transparencia_cgu/` | download do Portal + `filtrar_affc.py` | não (fora do git) |
-| `historico_transparencia_cgu/historico_mensal.csv` | `construir_painel.py` — os snapshots empilhados, 88.421 linhas | não (fora do git) |
+| `siape/AAAAMM.csv.gz` | `baixar_transparencia.py` + `filtrar_affc.py` — o snapshot mensal, 16 colunas (D32) | **não** |
+| `historico_transparencia_cgu/` | área de trabalho do download: ZIP e CSV bruto, apagados depois | não (fora do git) |
+| `auditoria/historico_mensal.csv` | `construir_painel.py` — os snapshots empilhados, 88.421 linhas, que ninguém lê | não (fora do git) |
 | `dados.csv` | `construir_painel.py` — uma linha por Auditor | **não** |
 | `painel.csv` | `gerar_publicacao.py` — o `dados.csv` **mesclado**, e é o que o site lê (D29) | não (fora do git) |
 | `serie_mensal.csv` | `construir_painel.py` — uma linha por competência | **não** |
@@ -27,20 +28,22 @@
 Precedência no merge: **curadoria > DOU > ranking > concurso > SIAPE**. Qualquer
 campo preenchido no `curadoria.csv` vence.
 
-O `historico_mensal.csv` mora **junto dos snapshots**, e não aqui, porque é deles
-que ele é feito — os 49 empilhados, uma linha por (competência × pessoa). Ele não
-é lido por ninguém: o `construir_painel.py` o escreve, mas `dados.csv` e
-`serie_mensal.csv` saem dos snapshots, não dele, e nenhuma tela o carrega. Serve
-para auditar a série à mão, e é regenerável a qualquer momento com
-`python scripts/construir_painel.py`. Versionado, custava 20,7 MB reescritos a
-cada competência e ainda subia para o site publicado.
+O `historico_mensal.csv` mora em `auditoria/`, fora do Git: são os 49 snapshots
+empilhados (uma linha por competência × pessoa) e **ninguém o lê**. O
+`construir_painel.py` o escreve, mas `dados.csv` e `serie_mensal.csv` saem dos
+snapshots, não dele — e ele é o último a ser gerado, recebendo as pessoas
+prontas. Serve para conferir a série à mão, e é regenerável a qualquer momento.
+Versionado, custaria 20,8 MB **reescritos** a cada competência. Compare com o
+snapshot da D32: 89 KB, arquivo novo, nunca reescrito.
 
 ## O `dados.csv` não é o que o site lê (D29)
 
-O `destinos_ranking.csv` e as saídas do `dou.json` **não entram** no
-`dados.csv`, e nunca entrarão: quem escreve o `dados.csv` é o `construir_painel.py`,
-que precisa dos snapshots do Portal — fora do Git, ~70 MB — e por isso só roda na
-máquina de quem os tem. Quem roda todo dia é a varredura do DOU, no CI.
+O `destinos_ranking.csv` e as saídas do `dou.json` **não entram** no `dados.csv`,
+e nunca entrarão — mas a razão mudou com a D32. Não é mais "o construir_painel só
+roda na sua máquina": ele roda no CI todo mês, desde que os snapshots passaram a
+ser versionados. É que essas duas fontes mudam **todo dia** (a varredura do DOU) e
+**toda semana** (os destinos), enquanto o painel é reconstruído uma vez por
+competência. Esperar pelo painel atrasaria em semanas o que já se sabe hoje.
 
 A junção acontece **na hora de publicar o site**, em `gerar_publicacao.py`, e o
 resultado é o `painel.csv`:

@@ -4,6 +4,7 @@ O comando único do observatório (D15 do PLANO.md).
 
 Encadeia o pipeline inteiro:
 
+    baixar_transparencia  os snapshots que faltam, do Portal   (só com --baixar)
     filtrar_affc      reduz os CSVs brutos do Portal (~420 MB cada) aos AFFC
     concurso          resultado final do concurso, do DOU  (só com --concurso)
     construir_painel  snapshots -> historico_mensal / dados / serie / alterações
@@ -26,15 +27,16 @@ como era até 15/08/2026, quando o card e a lista de saídas do painel podiam
 discordar sem que nenhum dos dois estivesse errado.
 
 ROTINA MENSAL
-    1. python baixar_transparencia.py   # baixa e descompacta o que faltar
-    2. python atualizar.py
-    3. conferir os avisos, revisar `curadoria_sugestoes.csv`, commitar
+    1. python atualizar.py --baixar
+    2. conferir os avisos, revisar `curadoria_sugestoes.csv`, commitar
 
-  O passo 1 substitui o que antes era manual — pegar o ZIP do mês em
-  portaldatransparencia.gov.br/download-de-dados/servidores e descompactar o
-  `AAAAMM_Cadastro.csv` em evasao/data/historico_transparencia_cgu/. Ele NÃO é
-  chamado daqui de propósito: baixa ~4 GB no backfill, e um pipeline que dispara
-  isso sozinho surpreende quem só queria reconstruir o painel.
+  Desde a D32 o workflow `atualizar-siape.yml` faz isso sozinho, todo mês, no
+  CI — o comando acima é para quando você quiser rodar antes ou conferir.
+
+  O DOWNLOAD É OPT-IN, e não padrão, por uma razão de tamanho: com a série vazia
+  ele baixa ~4 GB, e um pipeline que dispara isso sozinho surpreende quem só
+  queria reconstruir o painel. Com a série em dia é um mês, ~80 MB — mas quem
+  decide é quem chama.
 
 Uso:
     python atualizar.py                 # ciclo completo
@@ -71,6 +73,8 @@ def rodar(descricao: str, argumentos: list[str], passo: list[int] | None = None)
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Roda o pipeline de dados do observatório.")
+    parser.add_argument("--baixar", action="store_true",
+                        help="Antes de tudo, busca no Portal os snapshots que faltam.")
     parser.add_argument("--sem-dou", action="store_true",
                         help="Pula o enriquecimento pelo DOU (só a parte offline).")
     parser.add_argument("--concurso", action="store_true",
@@ -87,7 +91,15 @@ def main() -> int:
     # O total é CALCULADO, não escrito à mão: as duas bandeiras mudam quantos
     # passos existem, e o rótulo fixo "1/7" mentia sempre que `--concurso` ou
     # `--sem-dou` entravam. `passo` é [atual, total], e quem incrementa é `rodar`.
-    passo = [0, (3 if args.sem_dou else 7) + (1 if args.concurso else 0)]
+    passo = [0, (3 if args.sem_dou else 7) + (1 if args.concurso else 0)
+             + (1 if args.baixar else 0)]
+
+    # Passo 0: o Portal. Só com `--baixar`, e antes do filtro — é ele que produz
+    # o bruto que o filtro reduz. Sem competência nova, sai em segundos dizendo
+    # "aguardando publicação", que é o caso mais comum do mês.
+    if args.baixar and not rodar("Baixando do Portal da Transparência",
+                                 ["baixar_transparencia.py"], passo):
+        return 1
 
     # Sem `--manter-original` os CSVs brutos são apagados depois de filtrados —
     # é o comportamento padrão do script, e o que impede a pasta de crescer para

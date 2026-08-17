@@ -7,18 +7,28 @@ Contexto: os arquivos `AAAAMM_Cadastro.csv` do portal trazem TODOS os servidores
 civis federais (~420 MB e ~600 mil linhas cada). O observatório só precisa dos
 AFFC da CGU, que são algumas milhares de linhas por mês.
 
-O script NÃO transforma os dados: mantém as 43 colunas originais e a ordem das
-linhas. Apenas descarta as linhas de outros cargos.
+O script faz DUAS reduções, e a segunda passou a existir na D32, quando o
+snapshot deixou de ser arquivo de trabalho local e virou dado versionado:
 
-Entrada : AAAAMM_Cadastro.csv
-Saída   : AAAAMM_Cadastro_filtrado_AFFC.csv
+  1. LINHAS  — só as do cargo AFFC (de ~600 mil para ~2,5 mil);
+  2. COLUNAS — só as 16 que a derivação lê (`painel.COLUNAS_NO_SNAPSHOT`),
+     de 43. Uma das 27 descartadas é o CPF: mascarado (`***.930.011-**`), mas
+     com 6 dos 11 dígitos ao lado do nome completo. O observatório não precisa
+     dele, e o snapshot vai para repositório PÚBLICO — não republicar é decisão,
+     não economia. Saem junto função comissionada, afastamentos e diplomas.
 
-ATENÇÃO: por padrão o arquivo original é APAGADO depois que o filtrado é gravado
+A saída é comprimida: 1.442 KB por competência viram 89 KB. A lista de colunas
+NÃO é escrita aqui — vem de `painel.py`, que é quem sabe o que a derivação lê.
+
+Entrada : AAAAMM_Cadastro.csv              (bruto do Portal, ~420 MB, efêmero)
+Saída   : ../data/siape/AAAAMM.csv.gz      (versionado, ~89 KB)
+
+ATENÇÃO: por padrão o arquivo original é APAGADO depois que o snapshot é gravado
 com sucesso. Use --manter-original para conservá-lo, ou --dry-run para simular.
 
-O script vive em `evasao/scripts/` e trabalha por padrão sobre
-`evasao/data/historico_transparencia_cgu/` — que é ignorada pelo git, porque os
-CSVs do portal somam dezenas de GB.
+A pasta de ENTRADA (`evasao/data/historico_transparencia_cgu/`) é ignorada pelo
+git — os CSVs do portal somam dezenas de GB e são descartáveis. A pasta de SAÍDA
+(`evasao/data/siape/`) é versionada.
 
 Uso (de qualquer diretório):
     python filtrar_affc.py                      # processa a pasta padrão
@@ -34,9 +44,12 @@ import argparse
 import csv
 import os
 import sys
+import gzip
 import time
 import unicodedata
 from pathlib import Path
+
+import painel
 
 # O script está em evasao/scripts/, então a raiz do projeto Vite é um nível acima.
 RAIZ = Path(__file__).resolve().parent.parent
@@ -49,7 +62,7 @@ CARGO_ALVO = "AUDITOR FEDERAL DE FINANCAS E CONTROLE"
 
 COLUNA_CARGO = "DESCRICAO_CARGO"
 
-SUFIXO_SAIDA = "_filtrado_AFFC"
+PASTA_SAIDA = RAIZ / "data" / "siape"
 PADRAO_ENTRADA = "*_Cadastro.csv"
 
 # O portal publica em ISO-8859-1. latin-1 nunca falha na decodificação (mapeia
@@ -83,17 +96,22 @@ def listar_entradas(pasta: Path, nomes: list[str]) -> list[Path]:
             sys.exit("Arquivo não encontrado: " + ", ".join(str(c) for c in faltando))
         return caminhos
 
-    # Nunca reprocessar uma saída própria.
-    return sorted(
-        caminho
-        for caminho in pasta.glob(PADRAO_ENTRADA)
-        if SUFIXO_SAIDA not in caminho.stem
-    )
+    return sorted(pasta.glob(PADRAO_ENTRADA))
+
+
+def competencia(entrada: Path) -> str:
+    """`202207_Cadastro.csv` -> `202207`. O nome do Portal sempre começa assim."""
+    return entrada.name[:6]
+
+
+def caminho_do_snapshot(entrada: Path) -> Path:
+    return PASTA_SAIDA / f"{competencia(entrada)}.csv.gz"
 
 
 def filtrar_arquivo(entrada: Path, dry_run: bool, manter_original: bool) -> tuple[int, int]:
     """Devolve (linhas_lidas, linhas_mantidas)."""
-    saida = entrada.with_name(entrada.stem + SUFIXO_SAIDA + entrada.suffix)
+    saida = caminho_do_snapshot(entrada)
+    saida.parent.mkdir(parents=True, exist_ok=True)
     # Grava num temporário e só renomeia no fim: se o script for interrompido,
     # não fica um arquivo pela metade parecendo completo.
     temporario = saida.with_suffix(saida.suffix + ".parcial")
@@ -122,14 +140,25 @@ def filtrar_arquivo(entrada: Path, dry_run: bool, manter_original: bool) -> tupl
                 )
                 return 0, 0
 
+            # As colunas que sobrevivem, na ordem em que `painel.py` as pede. Uma
+            # que o Portal deixe de publicar aborta AQUI, e não meses depois com
+            # a coluna vazia no site.
+            faltando = [c for c in painel.COLUNAS_NO_SNAPSHOT if c not in cabecalho]
+            if faltando:
+                print(f"  ! {entrada.name} nao tem: {', '.join(faltando)} — pulando.")
+                return 0, 0
+
             indice_cargo = cabecalho.index(COLUNA_CARGO)
+            indices = [cabecalho.index(c) for c in painel.COLUNAS_NO_SNAPSHOT]
 
             if not dry_run:
-                fh_saida = open(temporario, "w", encoding=ENCODING_SAIDA, newline="")
+                fh_saida = gzip.open(
+                    temporario, "wt", encoding=ENCODING_SAIDA, newline="", compresslevel=9
+                )
                 escritor = csv.writer(
                     fh_saida, delimiter=SEPARADOR, quotechar='"', quoting=csv.QUOTE_ALL
                 )
-                escritor.writerow(cabecalho)
+                escritor.writerow(list(painel.COLUNAS_NO_SNAPSHOT))
 
             for linha in leitor:
                 lidas += 1
@@ -138,7 +167,9 @@ def filtrar_arquivo(entrada: Path, dry_run: bool, manter_original: bool) -> tupl
                 if normalizar(linha[indice_cargo]) == alvo:
                     mantidas += 1
                     if escritor is not None:
-                        escritor.writerow(linha)
+                        escritor.writerow(
+                            [linha[i] if i < len(linha) else "" for i in indices]
+                        )
     finally:
         if fh_saida is not None:
             fh_saida.close()
@@ -225,7 +256,8 @@ def main() -> int:
 
     total_bytes = sum(caminho.stat().st_size for caminho in entradas)
 
-    print(f"Pasta   : {pasta}")
+    print(f"Entrada : {pasta}")
+    print(f"Saída   : {PASTA_SAIDA}")
     print(f"Arquivos: {len(entradas)} ({formatar_bytes(total_bytes)})")
     print(f"Cargo   : {CARGO_ALVO}")
     if args.dry_run:
@@ -241,9 +273,8 @@ def main() -> int:
     processados = 0
 
     for indice, entrada in enumerate(entradas, start=1):
-        saida = entrada.with_name(entrada.stem + SUFIXO_SAIDA + entrada.suffix)
-        if saida.is_file() and not args.dry_run:
-            print(f"[{indice}/{len(entradas)}] {entrada.name}: já filtrado — pulando.")
+        if caminho_do_snapshot(entrada).is_file() and not args.dry_run:
+            print(f"[{indice}/{len(entradas)}] {entrada.name}: snapshot já existe — pulando.")
             continue
 
         print(f"[{indice}/{len(entradas)}] processando {entrada.name}...")

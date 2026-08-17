@@ -1,0 +1,127 @@
+name: Atualizar o quadro de AFFC da CGU (SIAPE)
+
+# A rotina mensal inteira, sem ninguém na máquina (D32):
+#
+#   Portal da Transparência -> snapshot versionado -> painel -> DOU -> site
+#
+# O QUE MUDOU PARA ISTO SER POSSÍVEL. Até a D32 os snapshots do SIAPE ficavam
+# fora do Git — 1,4 MB por competência, 43 colunas —, e por isso o
+# `construir_painel.py` só rodava na máquina de quem os tinha. Agora eles são
+# versionados em `data/siape/AAAAMM.csv.gz`: 16 colunas (as que a derivação lê,
+# sem CPF) e 89 KB por mês, arquivo novo a cada competência, nunca reescrito.
+#
+# POR QUE NÃO DAVA PARA PROCESSAR SÓ O MÊS NOVO EM MEMÓRIA. A derivação é sobre a
+# SÉRIE INTEIRA: `MES_ENTRADA` é a primeira aparição em 49 meses, `MES_SAIDA` é o
+# mês seguinte à ÚLTIMA presença (D13) — e há 6 pessoas que somem e voltam, que só
+# a série desmente. Um mês isolado não responde quem entrou nem quem saiu. A
+# alternativa seria uma derivação incremental, isto é, uma SEGUNDA definição de
+# "saiu" convivendo com a primeira: exatamente a classe de defeito que a D31
+# acabou de remover do outro lado.
+#
+# O BRUTO CONTINUA EFÊMERO. O ZIP (~80 MB) e o CSV do Portal (~420 MB) vivem só no
+# disco do runner; o que este workflow commita são os 89 KB do snapshot mais os
+# derivados que já eram versionados.
+#
+# MENSAL, dia 15. O Portal publica com ~2 meses de atraso e sem dia fixo; se a
+# competência ainda não saiu, o passo devolve "aguardando publicação" em segundos
+# e o resto do pipeline roda igual, sem gravar nada de novo.
+
+on:
+  schedule:
+    # 06:00 UTC do dia 15 = 03:00 em Brasília. Fora de qualquer pico.
+    - cron: '0 6 15 * *'
+  workflow_dispatch:
+    inputs:
+      sem_dou:
+        description: 'Pular o enriquecimento pelo DOU (só a parte offline)'
+        type: boolean
+        default: false
+
+# Nunca em paralelo com ele mesmo: são duas horas de crawl no pior caso, e duas
+# execuções escreveriam no mesmo `dados.csv`.
+concurrency:
+  group: atualizar-siape
+  cancel-in-progress: false
+
+jobs:
+  atualizar:
+    runs-on: ubuntu-latest
+    # O backfill do zero baixa ~4 GB e o crawl do DOU tem pausa de 1s por
+    # requisição. No mês normal são poucos minutos; o teto largo é para o dia em
+    # que a série precisar ser reconstruída.
+    timeout-minutes: 240
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      # ANTES do crawler, e é a mesma razão escrita no workflow de destinos:
+      # melhor falhar aqui do que gravar motivo ou destino errado sobre pessoa
+      # nomeada e commitar. Os dois testes são sem rede e levam segundos.
+      - name: Testar a leitura de atos do DOU
+        run: python scripts/testar_dou.py
+        working-directory: evasao
+
+      - name: Testar a mescla das fontes externas
+        run: python scripts/testar_publicacao.py
+        working-directory: evasao
+
+      # O pipeline inteiro: baixa o que faltar, filtra, constrói, busca motivo e
+      # destino no DOU, varre o DOU do período e reconstrói. O resumo de cada
+      # etapa fica no log deste passo E vai para o corpo do commit, logo abaixo.
+      - name: Rodar o pipeline mensal
+        id: pipeline
+        run: |
+          set -o pipefail
+          python scripts/atualizar.py --baixar ${{ inputs.sem_dou && '--sem-dou' || '' }} \
+            2>&1 | tee /tmp/pipeline.log
+        working-directory: evasao
+
+      - name: Commit e push do que mudou
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          git add evasao/data/siape \
+                  evasao/data/dados.csv \
+                  evasao/data/serie_mensal.csv \
+                  evasao/data/curadoria_sugestoes.csv \
+                  evasao/data/dou \
+                  evasao/public/dou.json \
+                  evasao/public/alteracoes-registros.json \
+                  evasao/data/destinos_ranking.csv
+
+          if git diff --cached --quiet; then
+            echo "Nada mudou neste ciclo."
+            exit 0
+          fi
+
+          # O RESUMO VAI PARA O COMMIT, e não só para o log. É onde estão os
+          # avisos que ninguém mais imprime — sugestões de curadoria, saídas sem
+          # motivo, gente que sumiu e voltou. No log de um workflow eles morrem;
+          # no commit, chegam por e-mail a quem acompanha o repositório.
+          {
+            echo "Atualiza o quadro de AFFC a partir do SIAPE"
+            echo
+            sed -n '/^Pessoas /,/^Saídas com destino/p' /tmp/pipeline.log
+            echo
+            echo "Rodado por atualizar-siape.yml (D32)."
+          } > /tmp/mensagem.txt
+
+          git commit -F /tmp/mensagem.txt
+
+          # O workflow do DOU roda todo dia e pode ter empurrado algo enquanto
+          # este crawlava. Rebase antes de empurrar: são arquivos diferentes, e
+          # perder a corrida não pode custar o ciclo inteiro.
+          git pull --rebase --autostash origin main
+          git push
+        shell: bash

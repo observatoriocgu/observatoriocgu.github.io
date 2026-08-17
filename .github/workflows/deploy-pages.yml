@@ -22,9 +22,12 @@ on:
   workflow_run:
     workflows:
       - "Atualizar saídas do DOU (AFFC)"
+      # A rotina mensal do SIAPE (D32): quando ela commita uma competência nova,
+      # o site tem de ser remontado para o `painel.csv` sair do `dados.csv` novo.
+      - "Atualizar o quadro de AFFC da CGU (SIAPE)"
       # Mesma razão: o `destinos_ranking.csv` é lido em tempo de execução de
       # /evasao/data/, então ele só chega ao ar quando o site é remontado.
-      - "Atualizar destinos no Ranking dos Concursos (AFFC)"
+      - "Atualizar destinos de quem saiu da CGU (AFFC)"
     types:
       - completed
   workflow_dispatch:
@@ -59,11 +62,11 @@ jobs:
       # alteracoes-registros.json) e escreve os dois que o site de fato lê —
       # `data/painel.csv` e `public/alteracoes.json`.
       #
-      # É possível porque a mescla NÃO depende dos snapshots do Portal, que estão
-      # fora do Git; quem depende é o `construir_painel.py`, e ele continua
-      # rodando só na máquina de quem os tem. Como este workflow dispara a cada
-      # push e ao fim da varredura do DOU, uma saída publicada hoje chega ao site
-      # hoje — o mesmo frescor de quando a mescla acontecia no navegador.
+      # Ela roda AQUI, e não no `construir_painel.py`, porque as fontes que ela
+      # junta mudam todo dia (a varredura do DOU) e toda semana (os destinos),
+      # enquanto o painel é reconstruído uma vez por competência. Como este
+      # workflow dispara a cada push e ao fim das rotinas de dados, uma saída
+      # publicada hoje chega ao site hoje.
       - name: Setup Python
         uses: actions/setup-python@v5
         with:

@@ -37,13 +37,26 @@ from __future__ import annotations
 
 import collections
 import csv
+import gzip
 import re
 import unicodedata
 from pathlib import Path
 
 RAIZ = Path(__file__).resolve().parent.parent
-PASTA_SNAPSHOTS = RAIZ / "data" / "historico_transparencia_cgu"
-PADRAO_SNAPSHOT = "*_Cadastro_filtrado_AFFC.csv"
+# Os snapshots do SIAPE, um por competência, VERSIONADOS (D32).
+#
+# Até 17/08/2026 eles ficavam em `data/historico_transparencia_cgu/`, fora do Git,
+# com as 43 colunas do Portal e 1,4 MB por mês — e por isso a construção do painel
+# só rodava na máquina de quem os tivesse baixado. Aqui eles têm as 16 colunas que
+# a derivação lê, comprimidos: 89 KB por competência, ARQUIVO NOVO a cada mês,
+# nunca reescrito. 4,2 MB para a série inteira, ~1 MB por ano.
+#
+# É menos churn do que o repositório já tem: o `dados.csv` sozinho são 400 KB
+# REESCRITOS por competência. E é o que permite ao CI reconstruir o painel — a
+# derivação é sobre a SÉRIE INTEIRA (primeira aparição, última presença, valor
+# modal do ingresso), então um mês isolado não responde nada.
+PASTA_SNAPSHOTS = RAIZ / "data" / "siape"
+PADRAO_SNAPSHOT = "*.csv.gz"
 
 COD_ORG_CGU = "59000"
 
@@ -104,6 +117,27 @@ COLUNAS_ORIGEM = (
 
 # O cabeçalho do Portal usa `Id_SERVIDOR_PORTAL`; padronizamos em caixa alta.
 ORIGEM_NO_CSV = {"ID_SERVIDOR_PORTAL": "Id_SERVIDOR_PORTAL"}
+
+# As colunas que o snapshot versionado precisa guardar, com o nome que elas têm
+# no CSV do Portal. É `COLUNAS_ORIGEM` mais as duas que separam quem está lotado
+# na CGU de quem é AFFC em outro órgão.
+#
+# QUEM ESCREVE O SNAPSHOT LÊ DAQUI (`filtrar_affc.py`), e é de propósito: se
+# alguém acrescentar uma coluna a `COLUNAS_ORIGEM` e a lista do escritor fosse
+# outra, as competências novas nasceriam sem ela e a derivação leria vazio — sem
+# erro nenhum, como aconteceu com `ATO_DESTINO_ARQUIVO` em 16/08/2026.
+#
+# O QUE FICA DE FORA são 27 das 43 colunas do Portal, e uma delas é o CPF —
+# mascarado (`***.930.011-**`), mas com 6 dos 11 dígitos ao lado do nome
+# completo. O observatório não precisa dele, e o snapshot vai para repositório
+# público: não republicar é decisão, não economia. Junto saem função
+# comissionada, afastamentos, diplomas de ingresso e o resto.
+COLUNAS_NO_SNAPSHOT = tuple(
+    dict.fromkeys(
+        [ORIGEM_NO_CSV.get(coluna, coluna) for coluna in COLUNAS_ORIGEM]
+        + ["COD_ORG_LOTACAO", "ORG_LOTACAO"]
+    )
+)
 
 COLUNAS_HISTORICO = ("MES",) + COLUNAS_ORIGEM + ("CONCURSO", "AREA", "UNIDADE", "UF")
 
@@ -175,7 +209,10 @@ def carregar(pasta: Path = PASTA_SNAPSHOTS) -> tuple[list[str], dict, dict]:
 
     arquivos = sorted(pasta.glob(PADRAO_SNAPSHOT))
     if not arquivos:
-        raise SystemExit(f"Nenhum snapshot {PADRAO_SNAPSHOT} em {pasta}")
+        raise SystemExit(
+            f"Nenhum snapshot {PADRAO_SNAPSHOT} em {pasta}.\n"
+            f"  Rode `python scripts/baixar_transparencia.py` para buscá-los no Portal."
+        )
 
     meses: list[str] = []
     cgu: dict[str, dict[str, dict]] = {}
@@ -187,8 +224,22 @@ def carregar(pasta: Path = PASTA_SNAPSHOTS) -> tuple[list[str], dict, dict]:
         do_mes: dict[str, dict] = {}
         fora_do_mes: dict[str, str] = {}
 
-        with open(arquivo, encoding="utf-8", newline="") as fh:
-            for linha in csv.DictReader(fh, delimiter=";"):
+        with gzip.open(arquivo, "rt", encoding="utf-8", newline="") as fh:
+            leitor = csv.DictReader(fh, delimiter=";")
+
+            # Coluna que a derivação espera e o snapshot não tem sai VAZIA, sem
+            # erro nenhum — e uma competência inteira nasceria com o campo em
+            # branco. Falhar aqui é o oposto disso, e é barato.
+            faltando = [c for c in COLUNAS_NO_SNAPSHOT if c not in (leitor.fieldnames or [])]
+            if faltando:
+                raise SystemExit(
+                    f"! {arquivo.name} não tem: {', '.join(faltando)}.\n"
+                    f"  O snapshot foi gravado por uma versão antiga do "
+                    f"`filtrar_affc.py`. Rebaixe a competência com "
+                    f"`python scripts/baixar_transparencia.py --refazer {mes}`."
+                )
+
+            for linha in leitor:
                 identificador = linha.get("Id_SERVIDOR_PORTAL", "")
                 if not identificador:
                     continue
@@ -297,11 +348,13 @@ def derivar_pessoas(meses: list[str], cgu: dict, fora: dict) -> list[dict]:
 
 def gerar_historico(meses: list[str], cgu: dict, pessoas: list[dict]) -> list[dict]:
     """
-    A base consolidada (D16): os snapshots empilhados, com competência e concurso.
+    O dump de auditoria (D16, rebaixada): os snapshots empilhados, com
+    competência e concurso.
 
-    `CONCURSO` e `AREA` são atributos da pessoa e ficam repetidos em todas as
-    linhas dela. A desnormalização é de propósito: é o que deixa a base usável
-    direto pela interface, sem join.
+    NÃO É BASE DE NADA e ninguém o lê — nem Python, nem a interface. Repare que
+    ele é o último a ser gerado e recebe `pessoas` pronta: é derivado do que
+    supostamente alimentaria. Serve para conferir a série à mão, e por isso mora
+    em `data/auditoria/`, fora do Git: são 20,8 MB reescritos por competência.
     """
     por_id = {p["ID_SERVIDOR_PORTAL"]: p for p in pessoas}
     linhas = []

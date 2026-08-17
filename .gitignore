@@ -28,11 +28,19 @@ pnpm-debug.log*
 .env.*
 !.env.example
 
-# Snapshots mensais do Portal da Transparência. Os CSVs brutos do portal têm
-# ~420 MB cada (o GitHub recusa acima de 100 MB) e os filtrados por AFFC somam
-# ~70 MB — dado de trabalho, regenerável, não pertence ao repo.
-# Gerar com: python evasao/scripts/filtrar_affc.py
+# A pasta de TRABALHO do download: o ZIP do Portal e o `AAAAMM_Cadastro.csv`
+# bruto (~420 MB cada, e o GitHub recusa acima de 100 MB). São descartáveis — o
+# Portal republica —, e o `filtrar_affc.py` os apaga assim que grava o snapshot.
+#
+# O SNAPSHOT, esse, é VERSIONADO desde a D32: `evasao/data/siape/AAAAMM.csv.gz`,
+# 16 colunas e 89 KB por competência. É o que permite ao CI reconstruir o painel
+# sem ninguém baixar nada à mão.
 evasao/data/historico_transparencia_cgu/
+evasao/data/siape/*.parcial
+
+# O dump de auditoria (D16, rebaixada): os snapshots empilhados, 20,8 MB
+# REESCRITOS por competência, e ninguém o lê. Serve para conferir a série à mão.
+evasao/data/auditoria/
 
 # Cache das páginas do DOU. Ato publicado é imutável, então o cache só evita
 # rebaixar as mesmas ~3.000 páginas do backfill — é acelerador local, não dado.
