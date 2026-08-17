@@ -22,35 +22,32 @@ import { formatarDataIsoParaBr } from '../lib/dados';
 
 /**
  * O painel é escuro e a tabela detalhada é clara. Um selo legível num tema é
- * ilegível no outro, então cada um tem sua paleta — mesmos rótulos, mesma
+ * ilegível no outro, então cada um tem o seu cinza — mesmos rótulos, mesma
  * semântica, contraste diferente.
  */
 export type TemaSelo = 'escuro' | 'claro';
 
-const CORES_POR_FONTE: Record<TemaSelo, Record<string, string>> = {
-  escuro: {
-    DOU: 'border-amber-500/50 text-amber-300 bg-amber-500/10',
-    SIAPE: 'border-sky-500/50 text-sky-300 bg-sky-500/10',
-    RANKING: 'border-violet-500/50 text-violet-300 bg-violet-500/10',
-    DIARIO: 'border-teal-500/50 text-teal-300 bg-teal-500/10',
-    GOOGLE: 'border-rose-500/50 text-rose-300 bg-rose-500/10',
-    BUSCA: 'border-gray-600 text-gray-400 bg-gray-800/40',
-    MANUAL: 'border-emerald-500/50 text-emerald-300 bg-emerald-500/10',
-  },
-  claro: {
-    DOU: 'border-amber-600 text-amber-900 bg-amber-100',
-    SIAPE: 'border-sky-600 text-sky-900 bg-sky-100',
-    RANKING: 'border-violet-600 text-violet-900 bg-violet-100',
-    DIARIO: 'border-teal-600 text-teal-900 bg-teal-100',
-    GOOGLE: 'border-rose-600 text-rose-900 bg-rose-100',
-    BUSCA: 'border-gray-400 text-gray-700 bg-gray-100',
-    MANUAL: 'border-emerald-600 text-emerald-900 bg-emerald-100',
-  },
+/**
+ * A cor do selo é a MESMA para toda fonte, e é cinza.
+ *
+ * Cada fonte já teve a sua (âmbar para o DOU, azul para o SIAPE, violeta para o
+ * ranking, e mais três). O resultado em tela era uma fila de pílulas coloridas
+ * ao lado de uma frase sobre pessoa nomeada, e a cor puxava o olho para a
+ * PROCEDÊNCIA quando o que a página conta é a SAÍDA. Quem quer saber de onde
+ * veio o dado lê o rótulo — que continua ali, escrito — ou o `title`. A cor não
+ * carregava informação que o texto já não desse; carregava ênfase, e a ênfase
+ * estava no lugar errado. NÃO reintroduzir cor por fonte: o selo é nota de
+ * rodapé, não manchete.
+ */
+const COR_DO_SELO: Record<TemaSelo, string> = {
+  escuro: 'border-gray-700 text-gray-400 bg-gray-800/40',
+  claro: 'border-gray-300 text-gray-600 bg-gray-100',
 };
 
+/** Um tom abaixo do selo com fonte: é ausência de dado, não dado. */
 const SEM_FONTE: Record<TemaSelo, string> = {
-  escuro: 'border-gray-700 text-gray-500 bg-gray-900/40',
-  claro: 'border-gray-300 text-gray-500 bg-white',
+  escuro: 'border-gray-800 text-gray-500 bg-gray-900/40',
+  claro: 'border-gray-200 text-gray-500 bg-white',
 };
 
 export const SeloFonte: React.FC<{ fonte: string; compacto?: boolean; tema?: TemaSelo }> = ({
@@ -67,7 +64,7 @@ export const SeloFonte: React.FC<{ fonte: string; compacto?: boolean; tema?: Tem
       title={`Fonte: ${descricao}`}
       className={`inline-flex items-center whitespace-nowrap rounded border px-1.5 py-0.5 font-medium ${
         compacto ? 'text-[10px]' : 'text-xs'
-      } ${CORES_POR_FONTE[tema][chave] ?? SEM_FONTE[tema]}`}
+      } ${chave in ROTULO_POR_FONTE ? COR_DO_SELO[tema] : SEM_FONTE[tema]}`}
     >
       {rotulo}
     </span>
@@ -75,60 +72,37 @@ export const SeloFonte: React.FC<{ fonte: string; compacto?: boolean; tema?: Tem
 };
 
 /**
- * As cores do LINK para o documento da fonte.
+ * O LINK para o documento da fonte, cinza como o selo — e pela mesma razão.
  *
- * Mesma família de cor do selo correspondente, sem o preenchimento: o selo diz
- * de onde veio, o link ao lado abre o documento, e um não pode ser confundido
- * com o outro num aglomerado de pílulas coloridas. Fonte sem cor própria — ou
- * sem documento, como o SIAPE — cai no neutro.
+ * O que distingue o link do selo ao lado não é mais a cor, é o comportamento: o
+ * link muda de tom ao passar o mouse e leva a lugar nenhum senão ao documento.
+ * Sem preenchimento, para que a fila não vire um bloco só.
  */
-const CORES_DE_LINK: Record<TemaSelo, Record<string, string>> = {
-  escuro: {
-    DOU: 'border-amber-500/40 text-amber-400 hover:border-amber-400 hover:bg-amber-500/10',
-    RANKING: 'border-violet-500/40 text-violet-300 hover:border-violet-400 hover:bg-violet-500/10',
-    DIARIO: 'border-teal-500/40 text-teal-300 hover:border-teal-400 hover:bg-teal-500/10',
-    GOOGLE: 'border-rose-500/40 text-rose-300 hover:border-rose-400 hover:bg-rose-500/10',
-    MANUAL: 'border-emerald-500/40 text-emerald-300 hover:border-emerald-400 hover:bg-emerald-500/10',
-  },
-  claro: {
-    DOU: 'border-amber-600 text-amber-800 hover:bg-amber-100',
-    RANKING: 'border-violet-600 text-violet-800 hover:bg-violet-100',
-    DIARIO: 'border-teal-600 text-teal-800 hover:bg-teal-100',
-    GOOGLE: 'border-rose-600 text-rose-800 hover:bg-rose-100',
-    MANUAL: 'border-emerald-600 text-emerald-800 hover:bg-emerald-100',
-  },
-};
-
-const LINK_NEUTRO: Record<TemaSelo, string> = {
-  escuro: 'border-gray-700 text-gray-400 hover:border-gray-500 hover:bg-gray-800/40',
-  claro: 'border-gray-300 text-gray-600 hover:bg-gray-100',
+const COR_DO_LINK: Record<TemaSelo, string> = {
+  escuro: 'border-gray-700 text-gray-400 hover:border-gray-500 hover:text-gray-200 hover:bg-gray-800/40',
+  claro: 'border-gray-300 text-gray-600 hover:border-gray-400 hover:text-gray-900 hover:bg-gray-100',
 };
 
 /** O documento em que a fonte se apoia, aberto em nova aba. */
 export const LinkDaFonte: React.FC<{
-  fonte: string;
   href: string;
   rotulo: string;
   titulo?: string;
   compacto?: boolean;
   tema?: TemaSelo;
-}> = ({ fonte, href, rotulo, titulo, compacto = false, tema = 'escuro' }) => {
-  const chave = String(fonte ?? '').trim().toUpperCase();
-
-  return (
-    <a
-      href={href}
-      target="_blank"
-      rel="noopener noreferrer"
-      title={titulo}
-      className={`inline-flex items-center whitespace-nowrap rounded border px-2 py-0.5 transition-colors ${
-        compacto ? 'text-[10px]' : 'text-xs'
-      } ${CORES_DE_LINK[tema][chave] ?? LINK_NEUTRO[tema]}`}
-    >
-      {rotulo}
-    </a>
-  );
-};
+}> = ({ href, rotulo, titulo, compacto = false, tema = 'escuro' }) => (
+  <a
+    href={href}
+    target="_blank"
+    rel="noopener noreferrer"
+    title={titulo}
+    className={`inline-flex items-center whitespace-nowrap rounded border px-2 py-0.5 transition-colors ${
+      compacto ? 'text-[10px]' : 'text-xs'
+    } ${COR_DO_LINK[tema]}`}
+  >
+    {rotulo}
+  </a>
+);
 
 /**
  * Todas as fontes que atestam o mesmo fato, lado a lado.
@@ -233,7 +207,6 @@ export const LinhasDeProcedencia: React.FC<{ saida: DetalheSaida; tema?: TemaSel
         <SelosDaLinha fontes={saida.fontesSaida} compacto tema={tema} />
         {saida.atoUrl ? (
           <LinkDaFonte
-            fonte="DOU"
             href={saida.atoUrl}
             rotulo={`ato de ${formatarDataIsoParaBr(saida.dataPublicacao) || 'data não informada'}`}
             titulo={saida.atoTitulo || 'Ato de saída publicado no DOU'}
@@ -260,7 +233,6 @@ export const LinhasDeProcedencia: React.FC<{ saida: DetalheSaida; tema?: TemaSel
           <SelosDaLinha fontes={[saida.fonteDestino]} compacto tema={tema} />
           {saida.urlDestino && (
             <LinkDaFonte
-              fonte={saida.fonteDestino}
               href={saida.urlDestino}
               rotulo={rotuloDoLinkDeDestino(saida.fonteDestino, saida.dataDestino)}
               titulo={tituloDoLinkDeDestino(saida.fonteDestino, saida.nome, saida.destino)}
