@@ -35,7 +35,6 @@ pnpm-debug.log*
 # O SNAPSHOT, esse, é VERSIONADO desde a D32: `evasao/data/siape/AAAAMM.csv.gz`,
 # 16 colunas e 89 KB por competência. É o que permite ao CI reconstruir o painel
 # sem ninguém baixar nada à mão.
-evasao/data/historico_transparencia_cgu/
 evasao/data/siape/*.parcial
 
 # O dump de auditoria (D16, rebaixada): os snapshots empilhados, 20,8 MB
