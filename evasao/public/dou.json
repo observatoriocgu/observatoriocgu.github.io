@@ -2,9 +2,20 @@
   "fonte": "Diário Oficial da União — in.gov.br",
   "cargo": "Auditor Federal de Finanças e Controle",
   "orgao": "Controladoria-Geral da União",
-  "varreduraAte": "2026-08-19",
+  "varreduraAte": "2026-08-20",
   "ultimaCompetenciaSiape": "202606",
   "saidasRecentes": [
+    {
+      "nome": "VINICIUS CRETELLA SIQUEIRA",
+      "tipo": "vacancia",
+      "rotulo": "Vacância (posse em outro cargo)",
+      "dataPublicacao": "2026-08-20",
+      "titulo": "PORTARIA N° 2.250, DE 19 DE AGOSTO DE 2026",
+      "urlDou": "https://www.in.gov.br/web/dou/-/portaria-n-2.250-de-19-de-agosto-de-2026-726685123",
+      "arquivo": "2026-08-20_vacancia_portaria-n-2-250-de-19-de-agosto-de-2026-726685123.html",
+      "idServidor": "2220874",
+      "jaNoSiape": false
+    },
     {
       "nome": "DANIEL PEREIRA COELHO",
       "tipo": "vacancia",
@@ -149,20 +160,20 @@
       "jaNoSiape": true
     }
   ],
-  "dataMaisRecente": "2026-08-11",
+  "dataMaisRecente": "2026-08-20",
   "tipoMaisRecente": "vacancia",
   "eventos": [
     {
       "tipo": "vacancia",
       "rotulo": "Vacância (posse em outro cargo)",
-      "titulo": "PORTARIA Nº 2.100, DE 10 DE AGOSTO DE 2026",
-      "dataPublicacao": "2026-08-11",
+      "titulo": "PORTARIA N° 2.250, DE 19 DE AGOSTO DE 2026",
+      "dataPublicacao": "2026-08-20",
       "secao": "DO2",
-      "edicao": "150",
-      "pagina": "65",
+      "edicao": "157",
+      "pagina": "60",
       "orgao": "Controladoria-Geral da União/Secretaria Executiva/Diretoria de Gestão Corporativa",
-      "urlDou": "https://www.in.gov.br/web/dou/-/portaria-n-2.100-de-10-de-agosto-de-2026-724497607",
-      "arquivo": "2026-08-11_vacancia_portaria-n-2-100-de-10-de-agosto-de-2026-724497607.html"
+      "urlDou": "https://www.in.gov.br/web/dou/-/portaria-n-2.250-de-19-de-agosto-de-2026-726685123",
+      "arquivo": "2026-08-20_vacancia_portaria-n-2-250-de-19-de-agosto-de-2026-726685123.html"
     },
     {
       "tipo": "aposentadoria",
