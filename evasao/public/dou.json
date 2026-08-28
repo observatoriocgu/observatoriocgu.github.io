@@ -2,9 +2,20 @@
   "fonte": "Diário Oficial da União — in.gov.br",
   "cargo": "Auditor Federal de Finanças e Controle",
   "orgao": "Controladoria-Geral da União",
-  "varreduraAte": "2026-08-26",
+  "varreduraAte": "2026-08-28",
   "ultimaCompetenciaSiape": "202606",
   "saidasRecentes": [
+    {
+      "nome": "ALEXANDRE PINHEIRO E SILVA",
+      "tipo": "vacancia",
+      "rotulo": "Vacância (posse em outro cargo)",
+      "dataPublicacao": "2026-08-27",
+      "titulo": "PORTARIA Nº 2.300, DE 25 DE AGOSTO DE 2026",
+      "urlDou": "https://www.in.gov.br/web/dou/-/portaria-n-2.300-de-25-de-agosto-de-2026-728251374",
+      "arquivo": "2026-08-27_vacancia_portaria-n-2-300-de-25-de-agosto-de-2026-728251374.html",
+      "idServidor": "3774899",
+      "jaNoSiape": false
+    },
     {
       "nome": "VINICIUS CRETELLA SIQUEIRA",
       "tipo": "vacancia",
@@ -160,20 +171,20 @@
       "jaNoSiape": true
     }
   ],
-  "dataMaisRecente": "2026-08-20",
+  "dataMaisRecente": "2026-08-27",
   "tipoMaisRecente": "vacancia",
   "eventos": [
     {
       "tipo": "vacancia",
       "rotulo": "Vacância (posse em outro cargo)",
-      "titulo": "PORTARIA N° 2.250, DE 19 DE AGOSTO DE 2026",
-      "dataPublicacao": "2026-08-20",
+      "titulo": "PORTARIA Nº 2.300, DE 25 DE AGOSTO DE 2026",
+      "dataPublicacao": "2026-08-27",
       "secao": "DO2",
-      "edicao": "157",
-      "pagina": "60",
+      "edicao": "162",
+      "pagina": "66",
       "orgao": "Controladoria-Geral da União/Secretaria Executiva/Diretoria de Gestão Corporativa",
-      "urlDou": "https://www.in.gov.br/web/dou/-/portaria-n-2.250-de-19-de-agosto-de-2026-726685123",
-      "arquivo": "2026-08-20_vacancia_portaria-n-2-250-de-19-de-agosto-de-2026-726685123.html"
+      "urlDou": "https://www.in.gov.br/web/dou/-/portaria-n-2.300-de-25-de-agosto-de-2026-728251374",
+      "arquivo": "2026-08-27_vacancia_portaria-n-2-300-de-25-de-agosto-de-2026-728251374.html"
     },
     {
       "tipo": "aposentadoria",
