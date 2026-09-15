@@ -1,9 +1,56 @@
 {
   "fonte": "Portal da Transparência — Cadastro de Servidores Civis (SIAPE)",
   "primeiroMes": "202206",
-  "ultimoMes": "202606",
-  "totalChangeCount": 718,
+  "ultimoMes": "202607",
+  "totalChangeCount": 722,
   "history": [
+    {
+      "mes": "202607",
+      "data": "2026-07-01",
+      "changeCount": 4,
+      "changes": [
+        {
+          "id": "2933808",
+          "nome": "HIRAM FELIX MATOS GASPAR",
+          "tipo": "saida",
+          "fromSituacao": "EM EXERCÍCIO",
+          "toSituacao": "SAÍDA SEM ATO IDENTIFICADO",
+          "orgaoDestino": "",
+          "unidade": "CGU-Regional/BA",
+          "concurso": "VETERANO"
+        },
+        {
+          "id": "277819",
+          "nome": "MARIANA PEREIRA DA SILVA",
+          "tipo": "saida",
+          "fromSituacao": "EM EXERCÍCIO",
+          "toSituacao": "SAÍDA SEM ATO IDENTIFICADO",
+          "orgaoDestino": "Senado Federal",
+          "unidade": "Sede/DF",
+          "concurso": "CGU-2021"
+        },
+        {
+          "id": "3147883",
+          "nome": "ROBERTO FERNANDES DE SOUZA JUNIOR",
+          "tipo": "saida",
+          "fromSituacao": "EM EXERCÍCIO",
+          "toSituacao": "SAÍDA SEM ATO IDENTIFICADO",
+          "orgaoDestino": "Senado Federal",
+          "unidade": "Sede/DF",
+          "concurso": "CGU-2021"
+        },
+        {
+          "id": "2262905",
+          "nome": "SAULO JOSE GOMES",
+          "tipo": "saida",
+          "fromSituacao": "EM EXERCÍCIO",
+          "toSituacao": "SAÍDA SEM ATO IDENTIFICADO",
+          "orgaoDestino": "",
+          "unidade": "Não informada",
+          "concurso": "VETERANO"
+        }
+      ]
+    },
     {
       "mes": "202606",
       "data": "2026-06-01",
@@ -14,7 +61,7 @@
           "nome": "ISLANE RIBEIRO FEITOZA",
           "tipo": "saida",
           "fromSituacao": "EM EXERCÍCIO",
-          "toSituacao": "SAÍDA SEM ATO IDENTIFICADO",
+          "toSituacao": "APOSENTADO",
           "orgaoDestino": "",
           "unidade": "CGU-Regional/GO",
           "concurso": "VETERANO"
@@ -24,7 +71,7 @@
           "nome": "MARIA HELENA KERBER",
           "tipo": "saida",
           "fromSituacao": "EM EXERCÍCIO",
-          "toSituacao": "SAÍDA SEM ATO IDENTIFICADO",
+          "toSituacao": "APOSENTADO",
           "orgaoDestino": "",
           "unidade": "Sede/DF",
           "concurso": "VETERANO"
@@ -2236,7 +2283,7 @@
         },
         {
           "id": "3934822",
-          "nome": "MOACYR DE GRANDE NETO",
+          "nome": "NETO DE GRANDE",
           "tipo": "entrada",
           "fromSituacao": "",
           "toSituacao": "EM EXERCÍCIO",
@@ -7011,7 +7058,7 @@
           "fromSituacao": "",
           "toSituacao": "EM EXERCÍCIO",
           "orgaoDestino": "",
-          "unidade": "Sede/DF",
+          "unidade": "Não informada",
           "concurso": "CGU-2021"
         },
         {
@@ -7221,7 +7268,7 @@
           "fromSituacao": "",
           "toSituacao": "EM EXERCÍCIO",
           "orgaoDestino": "",
-          "unidade": "Não informada",
+          "unidade": "Sede/DF",
           "concurso": "CGU-2021"
         },
         {
@@ -7491,7 +7538,7 @@
           "fromSituacao": "",
           "toSituacao": "EM EXERCÍCIO",
           "orgaoDestino": "",
-          "unidade": "Sede/DF",
+          "unidade": "CGU-Regional/MA",
           "concurso": "CGU-2021"
         },
         {

@@ -2,8 +2,8 @@
   "fonte": "Diário Oficial da União — in.gov.br",
   "cargo": "Auditor Federal de Finanças e Controle",
   "orgao": "Controladoria-Geral da União",
-  "varreduraAte": "2026-09-14",
-  "ultimaCompetenciaSiape": "202606",
+  "varreduraAte": "2026-09-15",
+  "ultimaCompetenciaSiape": "202607",
   "saidasRecentes": [
     {
       "nome": "TICIANA ALVES SOARES",
@@ -124,7 +124,7 @@
       "urlDou": "https://www.in.gov.br/web/dou/-/portaria-n-1.692-de-30-de-junho-de-2026-718755635",
       "arquivo": "2026-07-14_aposentadoria_portaria-n-1-692-de-30-de-junho-de-2026-718755635.html",
       "idServidor": "2262905",
-      "jaNoSiape": false
+      "jaNoSiape": true
     },
     {
       "nome": "ROBERTO FERNANDES DE SOUZA JUNIOR",
@@ -135,7 +135,7 @@
       "urlDou": "https://www.in.gov.br/web/dou/-/portaria-n-1.693-de-1-de-julho-de-2026-716086952",
       "arquivo": "2026-07-02_vacancia_portaria-n-1-693-de-1-de-julho-de-2026-716086952.html",
       "idServidor": "3147883",
-      "jaNoSiape": false
+      "jaNoSiape": true
     },
     {
       "nome": "HIRAM FELIX MATOS GASPAR",
@@ -146,7 +146,7 @@
       "urlDou": "https://www.in.gov.br/web/dou/-/portaria-n-1.588-de-19-de-junho-de-2026-715769551",
       "arquivo": "2026-07-01_aposentadoria_portaria-n-1-588-de-19-de-junho-de-2026-715769551.html",
       "idServidor": "2933808",
-      "jaNoSiape": false
+      "jaNoSiape": true
     },
     {
       "nome": "MARIANA PEREIRA DA SILVA",
@@ -157,28 +157,6 @@
       "urlDou": "https://www.in.gov.br/web/dou/-/portaria-n-1.680-de-29-de-junho-de-2026-715448874",
       "arquivo": "2026-06-30_vacancia_portaria-n-1-680-de-29-de-junho-de-2026-715448874.html",
       "idServidor": "277819",
-      "jaNoSiape": false
-    },
-    {
-      "nome": "ISLANE RIBEIRO FEITOZA",
-      "tipo": "aposentadoria",
-      "rotulo": "Aposentadoria",
-      "dataPublicacao": "2026-06-15",
-      "titulo": "PORTARIA N° 1.560, DE 12 DE JUNHO DE 2026",
-      "urlDou": "https://www.in.gov.br/web/dou/-/portaria-n-1.560-de-12-de-junho-de-2026-712121111",
-      "arquivo": "2026-06-15_aposentadoria_portaria-n-1-560-de-12-de-junho-de-2026-712121111.html",
-      "idServidor": "1277172",
-      "jaNoSiape": true
-    },
-    {
-      "nome": "MARIA HELENA KERBER",
-      "tipo": "aposentadoria",
-      "rotulo": "Aposentadoria",
-      "dataPublicacao": "2026-06-12",
-      "titulo": "PORTARIA N° 1.521, DE 11 DE JUNHO DE 2026",
-      "urlDou": "https://www.in.gov.br/web/dou/-/portaria-n-1.521-de-11-de-junho-de-2026-711752489",
-      "arquivo": "2026-06-12_aposentadoria_portaria-n-1-521-de-11-de-junho-de-2026-711752489.html",
-      "idServidor": "3209603",
       "jaNoSiape": true
     }
   ],
