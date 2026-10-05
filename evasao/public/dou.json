@@ -2,9 +2,20 @@
   "fonte": "Diário Oficial da União — in.gov.br",
   "cargo": "Auditor Federal de Finanças e Controle",
   "orgao": "Controladoria-Geral da União",
-  "varreduraAte": "2026-10-04",
+  "varreduraAte": "2026-10-05",
   "ultimaCompetenciaSiape": "202607",
   "saidasRecentes": [
+    {
+      "nome": "WERBETHI VILAR VIANA",
+      "tipo": "aposentadoria",
+      "rotulo": "Aposentadoria",
+      "dataPublicacao": "2026-10-05",
+      "titulo": "PORTARIA Nº 2.434, DE 21 DE SETEMBRO DE 2026",
+      "urlDou": "https://www.in.gov.br/web/dou/-/portaria-n-2.434-de-21-de-setembro-de-2026-736349311",
+      "arquivo": "2026-10-05_aposentadoria_portaria-n-2-434-de-21-de-setembro-de-2026-736349311.html",
+      "idServidor": "2972514",
+      "jaNoSiape": false
+    },
     {
       "nome": "JOSÉ CARLOS DA FONSECA",
       "tipo": "aposentadoria",
@@ -182,7 +193,7 @@
       "jaNoSiape": true
     }
   ],
-  "dataMaisRecente": "2026-10-01",
+  "dataMaisRecente": "2026-10-05",
   "tipoMaisRecente": "aposentadoria",
   "eventos": [
     {
@@ -200,14 +211,14 @@
     {
       "tipo": "aposentadoria",
       "rotulo": "Aposentadoria",
-      "titulo": "PORTARIA Nº 2.635, DE 28 DE SETEMBRO DE 2026",
-      "dataPublicacao": "2026-10-01",
+      "titulo": "PORTARIA Nº 2.434, DE 21 DE SETEMBRO DE 2026",
+      "dataPublicacao": "2026-10-05",
       "secao": "DO2",
-      "edicao": "186",
-      "pagina": "94",
+      "edicao": "188",
+      "pagina": "59",
       "orgao": "Controladoria-Geral da União/Secretaria Executiva/Diretoria de Gestão Corporativa",
-      "urlDou": "https://www.in.gov.br/web/dou/-/portaria-n-2.635-de-28-de-setembro-de-2026-735718093",
-      "arquivo": "2026-10-01_aposentadoria_portaria-n-2-635-de-28-de-setembro-de-2026-735718093.html"
+      "urlDou": "https://www.in.gov.br/web/dou/-/portaria-n-2.434-de-21-de-setembro-de-2026-736349311",
+      "arquivo": "2026-10-05_aposentadoria_portaria-n-2-434-de-21-de-setembro-de-2026-736349311.html"
     },
     {
       "tipo": "exoneracao",
