@@ -2,8 +2,8 @@
   "fonte": "Diário Oficial da União — in.gov.br",
   "cargo": "Auditor Federal de Finanças e Controle",
   "orgao": "Controladoria-Geral da União",
-  "varreduraAte": "2026-10-14",
-  "ultimaCompetenciaSiape": "202607",
+  "varreduraAte": "2026-10-15",
+  "ultimaCompetenciaSiape": "202608",
   "saidasRecentes": [
     {
       "nome": "WERBETHI VILAR VIANA",
@@ -17,7 +17,7 @@
       "jaNoSiape": false
     },
     {
-      "nome": "JOSÉ CARLOS DA FONSECA",
+      "nome": "JOSE CARLOS DA FONSECA",
       "tipo": "aposentadoria",
       "rotulo": "Aposentadoria",
       "dataPublicacao": "2026-10-01",
@@ -28,7 +28,7 @@
       "jaNoSiape": false
     },
     {
-      "nome": "EURÍPEDES RODRIGUES DE ANDRADE FILHO",
+      "nome": "EURIPEDES RODRIGUES DE ANDRADE FILHO",
       "tipo": "aposentadoria",
       "rotulo": "Aposentadoria",
       "dataPublicacao": "2026-10-01",
@@ -113,7 +113,7 @@
       "urlDou": "https://www.in.gov.br/web/dou/-/portaria-n-1.869-de-23-de-julho-de-2026-722781263",
       "arquivo": "2026-08-03_aposentadoria_portaria-n-1-869-de-23-de-julho-de-2026-722781263.html",
       "idServidor": "2352385",
-      "jaNoSiape": false
+      "jaNoSiape": true
     },
     {
       "nome": "DANIEL LIMA OLIVEIRA",
@@ -124,7 +124,7 @@
       "urlDou": "https://www.in.gov.br/web/dou/-/portaria-n-1.940-de-30-de-julho-de-2026-722493873",
       "arquivo": "2026-07-31_vacancia_portaria-n-1-940-de-30-de-julho-de-2026-722493873.html",
       "idServidor": "1286109",
-      "jaNoSiape": false
+      "jaNoSiape": true
     },
     {
       "nome": "GABRIEL ISMAEL CARRAZZONE LACATIVA",
@@ -135,7 +135,7 @@
       "urlDou": "https://www.in.gov.br/web/dou/-/portaria-n-1.872-de-20-de-julho-de-2026-720316047",
       "arquivo": "2026-07-21_vacancia_portaria-n-1-872-de-20-de-julho-de-2026-720316047.html",
       "idServidor": "3100512",
-      "jaNoSiape": false
+      "jaNoSiape": true
     },
     {
       "nome": "MATHEUS BARBOSA DE OLIVEIRA",
@@ -146,7 +146,7 @@
       "urlDou": "https://www.in.gov.br/web/dou/-/portaria-n-1.867-de-16-de-julho-de-2026-719848481",
       "arquivo": "2026-07-17_vacancia_portaria-n-1-867-de-16-de-julho-de-2026-719848481.html",
       "idServidor": "3007680",
-      "jaNoSiape": false
+      "jaNoSiape": true
     },
     {
       "nome": "SAULO JOSE GOMES",

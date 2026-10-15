@@ -1,9 +1,66 @@
 {
   "fonte": "Portal da Transparência — Cadastro de Servidores Civis (SIAPE)",
   "primeiroMes": "202206",
-  "ultimoMes": "202607",
-  "totalChangeCount": 722,
+  "ultimoMes": "202608",
+  "totalChangeCount": 727,
   "history": [
+    {
+      "mes": "202608",
+      "data": "2026-08-01",
+      "changeCount": 5,
+      "changes": [
+        {
+          "id": "1286109",
+          "nome": "DANIEL LIMA OLIVEIRA",
+          "tipo": "saida",
+          "fromSituacao": "EM EXERCÍCIO",
+          "toSituacao": "SAÍDA SEM ATO IDENTIFICADO",
+          "orgaoDestino": "Secretaria de Fazenda do Rio Grande do Norte",
+          "unidade": "CGU-Regional/RR",
+          "concurso": "CGU-2021"
+        },
+        {
+          "id": "2352385",
+          "nome": "FRANCISCO HAMILTON SOARES DE CARVALHO",
+          "tipo": "saida",
+          "fromSituacao": "EM EXERCÍCIO",
+          "toSituacao": "SAÍDA SEM ATO IDENTIFICADO",
+          "orgaoDestino": "",
+          "unidade": "Não informada",
+          "concurso": "VETERANO"
+        },
+        {
+          "id": "3100512",
+          "nome": "GABRIEL ISMAEL CARRAZZONE LACATIVA",
+          "tipo": "saida",
+          "fromSituacao": "EM EXERCÍCIO",
+          "toSituacao": "SAÍDA SEM ATO IDENTIFICADO",
+          "orgaoDestino": "Câmara dos Deputados",
+          "unidade": "Sede/DF",
+          "concurso": "CGU-2021"
+        },
+        {
+          "id": "3007680",
+          "nome": "MATHEUS BARBOSA DE OLIVEIRA",
+          "tipo": "saida",
+          "fromSituacao": "EM EXERCÍCIO",
+          "toSituacao": "SAÍDA SEM ATO IDENTIFICADO",
+          "orgaoDestino": "Câmara dos Deputados",
+          "unidade": "Sede/DF",
+          "concurso": "CGU-2021"
+        },
+        {
+          "id": "4274890",
+          "nome": "MARCIO CONCEICAO DE LARA CUNHA",
+          "tipo": "entrada",
+          "fromSituacao": "",
+          "toSituacao": "EM EXERCÍCIO",
+          "orgaoDestino": "",
+          "unidade": "Sede/DF",
+          "concurso": "CGU-2021"
+        }
+      ]
+    },
     {
       "mes": "202607",
       "data": "2026-07-01",
@@ -1573,7 +1630,7 @@
           "fromSituacao": "",
           "toSituacao": "EM EXERCÍCIO",
           "orgaoDestino": "",
-          "unidade": "CGU-Regional/RO",
+          "unidade": "CGU-Regional/AC",
           "concurso": "CGU-2021"
         }
       ]
