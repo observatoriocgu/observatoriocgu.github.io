@@ -2,9 +2,42 @@
   "fonte": "Diário Oficial da União — in.gov.br",
   "cargo": "Auditor Federal de Finanças e Controle",
   "orgao": "Controladoria-Geral da União",
-  "varreduraAte": "2026-11-02",
+  "varreduraAte": "2026-11-03",
   "ultimaCompetenciaSiape": "202608",
   "saidasRecentes": [
+    {
+      "nome": "JOÃO TADEU DE CASTRO BATISTA",
+      "tipo": "aposentadoria",
+      "rotulo": "Aposentadoria",
+      "dataPublicacao": "2026-11-03",
+      "titulo": "PORTARIA Nº 2.867, DE 19 DE OUTUBRO DE 2026",
+      "urlDou": "https://www.in.gov.br/web/dou/-/portaria-n-2.867-de-19-de-outubro-de-2026-741237893",
+      "arquivo": "2026-11-03_aposentadoria_portaria-n-2-867-de-19-de-outubro-de-2026-741237893.html",
+      "idServidor": "2897262",
+      "jaNoSiape": false
+    },
+    {
+      "nome": "ESTEMIR ROGELSON DOS SANTOS GOULART",
+      "tipo": "aposentadoria",
+      "rotulo": "Aposentadoria",
+      "dataPublicacao": "2026-11-03",
+      "titulo": "PORTARIA Nº 2.897, DE 26 DE OUTUBRO DE 2026",
+      "urlDou": "https://www.in.gov.br/web/dou/-/portaria-n-2.897-de-26-de-outubro-de-2026-741252378",
+      "arquivo": "2026-11-03_aposentadoria_portaria-n-2-897-de-26-de-outubro-de-2026-741252378.html",
+      "idServidor": "1618827",
+      "jaNoSiape": false
+    },
+    {
+      "nome": "EDUARDO FADIGAS DE SOUZA",
+      "tipo": "aposentadoria",
+      "rotulo": "Aposentadoria",
+      "dataPublicacao": "2026-11-03",
+      "titulo": "PORTARIA Nº 2.976, DE 29 DE OUTUBRO DE 2026",
+      "urlDou": "https://www.in.gov.br/web/dou/-/portaria-n-2.976-de-29-de-outubro-de-2026-741273629",
+      "arquivo": "2026-11-03_aposentadoria_portaria-n-2-976-de-29-de-outubro-de-2026-741273629.html",
+      "idServidor": "4104",
+      "jaNoSiape": false
+    },
     {
       "nome": "RODRIGO RIANELLY DE MACEDO EVANGELISTA",
       "tipo": "vacancia",
@@ -204,8 +237,8 @@
       "jaNoSiape": true
     }
   ],
-  "dataMaisRecente": "2026-10-26",
-  "tipoMaisRecente": "vacancia",
+  "dataMaisRecente": "2026-11-03",
+  "tipoMaisRecente": "aposentadoria",
   "eventos": [
     {
       "tipo": "vacancia",
@@ -222,14 +255,14 @@
     {
       "tipo": "aposentadoria",
       "rotulo": "Aposentadoria",
-      "titulo": "PORTARIA Nº 2.434, DE 21 DE SETEMBRO DE 2026",
-      "dataPublicacao": "2026-10-05",
+      "titulo": "PORTARIA Nº 2.976, DE 29 DE OUTUBRO DE 2026",
+      "dataPublicacao": "2026-11-03",
       "secao": "DO2",
-      "edicao": "188",
-      "pagina": "59",
+      "edicao": "206",
+      "pagina": "75",
       "orgao": "Controladoria-Geral da União/Secretaria Executiva/Diretoria de Gestão Corporativa",
-      "urlDou": "https://www.in.gov.br/web/dou/-/portaria-n-2.434-de-21-de-setembro-de-2026-736349311",
-      "arquivo": "2026-10-05_aposentadoria_portaria-n-2-434-de-21-de-setembro-de-2026-736349311.html"
+      "urlDou": "https://www.in.gov.br/web/dou/-/portaria-n-2.976-de-29-de-outubro-de-2026-741273629",
+      "arquivo": "2026-11-03_aposentadoria_portaria-n-2-976-de-29-de-outubro-de-2026-741273629.html"
     },
     {
       "tipo": "exoneracao",
