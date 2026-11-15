@@ -1,9 +1,66 @@
 {
   "fonte": "Portal da Transparência — Cadastro de Servidores Civis (SIAPE)",
   "primeiroMes": "202206",
-  "ultimoMes": "202608",
-  "totalChangeCount": 727,
+  "ultimoMes": "202609",
+  "totalChangeCount": 732,
   "history": [
+    {
+      "mes": "202609",
+      "data": "2026-09-01",
+      "changeCount": 5,
+      "changes": [
+        {
+          "id": "3185051",
+          "nome": "CIRO JONATAS DE SOUZA OLIVEIRA",
+          "tipo": "saida",
+          "fromSituacao": "EM EXERCÍCIO",
+          "toSituacao": "SAÍDA SEM ATO IDENTIFICADO",
+          "orgaoDestino": "Tribunal de Contas da União",
+          "unidade": "CGU-Regional/PB",
+          "concurso": "VETERANO"
+        },
+        {
+          "id": "3733592",
+          "nome": "DANIEL PEREIRA COELHO",
+          "tipo": "saida",
+          "fromSituacao": "EM EXERCÍCIO",
+          "toSituacao": "SAÍDA SEM ATO IDENTIFICADO",
+          "orgaoDestino": "Tribunal de Contas da União",
+          "unidade": "Sede/DF",
+          "concurso": "CGU-2021"
+        },
+        {
+          "id": "41722",
+          "nome": "THIAGO GUEDES PAYSAN",
+          "tipo": "saida",
+          "fromSituacao": "EM EXERCÍCIO",
+          "toSituacao": "SAÍDA SEM ATO IDENTIFICADO",
+          "orgaoDestino": "Tribunal de Contas da União",
+          "unidade": "Sede/DF",
+          "concurso": "VETERANO"
+        },
+        {
+          "id": "1793192",
+          "nome": "TICIANA ALVES SOARES",
+          "tipo": "saida",
+          "fromSituacao": "EM EXERCÍCIO",
+          "toSituacao": "SAÍDA SEM ATO IDENTIFICADO",
+          "orgaoDestino": "",
+          "unidade": "CGU-Regional/CE",
+          "concurso": "VETERANO"
+        },
+        {
+          "id": "2220874",
+          "nome": "VINICIUS CRETELLA SIQUEIRA",
+          "tipo": "saida",
+          "fromSituacao": "EM EXERCÍCIO",
+          "toSituacao": "SAÍDA SEM ATO IDENTIFICADO",
+          "orgaoDestino": "",
+          "unidade": "Sede/DF",
+          "concurso": "CGU-2021"
+        }
+      ]
+    },
     {
       "mes": "202608",
       "data": "2026-08-01",
@@ -1877,7 +1934,7 @@
           "fromSituacao": "",
           "toSituacao": "EM EXERCÍCIO",
           "orgaoDestino": "",
-          "unidade": "CGU-Regional/PA",
+          "unidade": "Sede/DF",
           "concurso": "CGU-2021"
         },
         {
@@ -6415,7 +6472,7 @@
           "fromSituacao": "",
           "toSituacao": "EM EXERCÍCIO",
           "orgaoDestino": "",
-          "unidade": "CGU-Regional/AC",
+          "unidade": "CGU-Regional/RO",
           "concurso": "CGU-2021"
         },
         {

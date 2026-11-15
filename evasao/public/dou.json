@@ -2,11 +2,11 @@
   "fonte": "Diário Oficial da União — in.gov.br",
   "cargo": "Auditor Federal de Finanças e Controle",
   "orgao": "Controladoria-Geral da União",
-  "varreduraAte": "2026-11-14",
-  "ultimaCompetenciaSiape": "202608",
+  "varreduraAte": "2026-11-15",
+  "ultimaCompetenciaSiape": "202609",
   "saidasRecentes": [
     {
-      "nome": "JOÃO TADEU DE CASTRO BATISTA",
+      "nome": "JOAO TADEU DE CASTRO BATISTA",
       "tipo": "aposentadoria",
       "rotulo": "Aposentadoria",
       "dataPublicacao": "2026-11-03",
@@ -91,7 +91,7 @@
       "urlDou": "https://www.in.gov.br/web/dou/-/portaria-n-2.178-de-19-de-agosto-de-2026-729364421",
       "arquivo": "2026-09-01_aposentadoria_portaria-n-2-178-de-19-de-agosto-de-2026-729364421.html",
       "idServidor": "1793192",
-      "jaNoSiape": false
+      "jaNoSiape": true
     },
     {
       "nome": "ALEXANDRE PINHEIRO E SILVA",
@@ -113,7 +113,7 @@
       "urlDou": "https://www.in.gov.br/web/dou/-/portaria-n-2.250-de-19-de-agosto-de-2026-726685123",
       "arquivo": "2026-08-20_vacancia_portaria-n-2-250-de-19-de-agosto-de-2026-726685123.html",
       "idServidor": "2220874",
-      "jaNoSiape": false
+      "jaNoSiape": true
     },
     {
       "nome": "DANIEL PEREIRA COELHO",
@@ -124,7 +124,7 @@
       "urlDou": "https://www.in.gov.br/web/dou/-/portaria-n-2.099-de-10-de-agosto-de-2026-724489858",
       "arquivo": "2026-08-11_vacancia_portaria-n-2-099-de-10-de-agosto-de-2026-724489858.html",
       "idServidor": "3733592",
-      "jaNoSiape": false
+      "jaNoSiape": true
     },
     {
       "nome": "CIRO JONATAS DE SOUZA OLIVEIRA",
@@ -135,7 +135,7 @@
       "urlDou": "https://www.in.gov.br/web/dou/-/portaria-n-2.100-de-10-de-agosto-de-2026-724497607",
       "arquivo": "2026-08-11_vacancia_portaria-n-2-100-de-10-de-agosto-de-2026-724497607.html",
       "idServidor": "3185051",
-      "jaNoSiape": false
+      "jaNoSiape": true
     },
     {
       "nome": "THIAGO GUEDES PAYSAN",
@@ -146,7 +146,7 @@
       "urlDou": "https://www.in.gov.br/web/dou/-/portaria-n-2.062-de-6-de-agosto-de-2026-724074316",
       "arquivo": "2026-08-07_vacancia_portaria-n-2-062-de-6-de-agosto-de-2026-724074316.html",
       "idServidor": "41722",
-      "jaNoSiape": false
+      "jaNoSiape": true
     },
     {
       "nome": "FRANCISCO HAMILTON SOARES DE CARVALHO",
